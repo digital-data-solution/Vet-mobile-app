@@ -11,7 +11,8 @@ export async function getToken(): Promise<string | null> {
 }
 
 export async function apiFetch(path: string, options: RequestInit = {}) {
-  const base = await AsyncStorage.getItem('xp_base_url') || 'http://localhost:5000';
+  // Always use production URL
+  const base = 'https://vet-market-place.onrender.com';
   const url = base.replace(/\/+$/, '') + path;
   const token = await getToken();
   const headers: Record<string, string> = {
