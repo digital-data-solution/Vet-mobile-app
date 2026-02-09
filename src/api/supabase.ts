@@ -1,12 +1,28 @@
+// Polyfills required for Supabase to work correctly in React Native
+import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'YOUR_SUPABASE_URL'; // Replace with your Supabase URL
-const supabaseAnonKey = 'YOUR_SUPABASE_ANON_KEY'; // Replace with your Supabase anon key
+// Replace with your Supabase project credentials
+const supabaseUrl = 'YOUR_SUPABASE_URL';
+const supabaseAnonKey = 'YOUR_SUPABASE_ANON_KEY';
+
+// AsyncStorage adapter expected by supabase-js: plain object with getItem/setItem/removeItem
+const storage = {
+  getItem: async (key: string) => {
+    return AsyncStorage.getItem(key);
+  },
+  setItem: async (key: string, value: string) => {
+    return AsyncStorage.setItem(key, value);
+  },
+  removeItem: async (key: string) => {
+    return AsyncStorage.removeItem(key);
+  },
+};
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: AsyncStorage,
+    storage,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
