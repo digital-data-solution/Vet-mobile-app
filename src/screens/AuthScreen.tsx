@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Alert, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { apiFetch, saveToken, getToken } from '../api/client';
+import { supabase, signInWithPhone, verifyOTP, signUpWithPhone, onAuthStateChange } from '../api/supabase';
+import { saveToken, getToken } from '../api/client';
 
 export default function AuthScreen({ navigation }: any) {
   const [phone, setPhone] = useState('');
@@ -10,23 +11,19 @@ export default function AuthScreen({ navigation }: any) {
   const [step, setStep] = useState<'login' | 'register' | 'verify'>('login');
 
   const register = async () => {
-    if (!phone || !email) {
-      Alert.alert('Error', 'Please enter phone and email');
+    if (!phone) {
+      Alert.alert('Error', 'Please enter phone number');
       return;
     }
 
     setLoading(true);
     try {
-      const res = await apiFetch('/api/auth/register', { 
-        method: 'POST', 
-        body: JSON.stringify({ phone, email }) 
-      });
-      
-      if (res.ok) {
+      const { data, error } = await signUpWithPhone(phone);
+      if (error) {
+        Alert.alert('Registration Failed', error.message);
+      } else {
         Alert.alert('Success', 'OTP sent to your phone. Please check your messages.');
         setStep('verify');
-      } else {
-        Alert.alert('Registration Failed', res.body?.message || 'Unknown error');
       }
     } catch (error) {
       Alert.alert('Error', 'Network error occurred');
@@ -42,18 +39,14 @@ export default function AuthScreen({ navigation }: any) {
 
     setLoading(true);
     try {
-      const endpoint = step === 'register' ? '/api/auth/verify-otp' : '/api/auth/verify-login-otp';
-      const res = await apiFetch(endpoint, { 
-        method: 'POST', 
-        body: JSON.stringify({ phone, otp }) 
-      });
-      
-      if (res.ok && res.body?.token) {
-        await saveToken(res.body.token);
-        Alert.alert('Success', step === 'register' ? 'Account verified and logged in!' : 'Logged in successfully!');
+      const { data, error } = await verifyOTP(phone, otp);
+      if (error) {
+        Alert.alert('Verification Failed', error.message);
+      } else if (data.user) {
+        // Save the access token
+        await saveToken(data.session?.access_token || '');
+        Alert.alert('Success', step === 'register' ? 'Account created and logged in!' : 'Logged in successfully!');
         navigation.navigate('MainTabs');
-      } else {
-        Alert.alert('Verification Failed', res.body?.message || 'Invalid OTP');
       }
     } catch (error) {
       Alert.alert('Error', 'Network error occurred');
@@ -69,16 +62,12 @@ export default function AuthScreen({ navigation }: any) {
 
     setLoading(true);
     try {
-      const res = await apiFetch('/api/auth/login-phone', { 
-        method: 'POST', 
-        body: JSON.stringify({ phone }) 
-      });
-      
-      if (res.ok) {
+      const { data, error } = await signInWithPhone(phone);
+      if (error) {
+        Alert.alert('Login Failed', error.message);
+      } else {
         Alert.alert('Success', 'OTP sent to your phone. Please check your messages.');
         setStep('verify');
-      } else {
-        Alert.alert('Login Failed', res.body?.message || 'Failed to send OTP');
       }
     } catch (error) {
       Alert.alert('Error', 'Network error occurred');
@@ -86,15 +75,24 @@ export default function AuthScreen({ navigation }: any) {
     setLoading(false);
   };
 
-  const checkExistingToken = async () => {
-    const token = await getToken();
-    if (token) {
-      navigation.navigate('Home');
+  const checkExistingSession = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      navigation.navigate('MainTabs');
     }
   };
 
   useEffect(() => {
-    checkExistingToken();
+    checkExistingSession();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        navigation.navigate('MainTabs');
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   return (
