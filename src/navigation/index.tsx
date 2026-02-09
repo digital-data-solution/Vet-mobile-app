@@ -4,6 +4,12 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import HomeScreen from '../screens/HomeScreen';
+import AuthScreen from '../screens/AuthScreen';
+import ProfessionalsScreen from '../screens/ProfessionalsScreen';
+import ShopsScreen from '../screens/ShopsScreen';
+import SubscriptionScreen from '../screens/SubscriptionScreen';
+import VetVerificationScreen from '../screens/VetVerificationScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
