@@ -1,19 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, FlatList, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, FlatList, Alert, ActivityIndicator, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import * as Location from 'expo-location';
 import { apiFetch } from '../api/client';
 
-export default function ProfessionalsScreen() {
+export default function ProfessionalsScreen({ navigation }: any) {
   const [lng, setLng] = useState('3.3792');
   const [lat, setLat] = useState('6.5244');
   const [distance, setDistance] = useState('5');
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
+  const [address, setAddress] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    getCurrentLocation();
+    fetchAllProfessionals();
   }, []);
+
+  const fetchAllProfessionals = async () => {
+    setLoading(true);
+    try {
+      const res = await apiFetch('/api/v1/professional', { method: 'GET' });
+      if (res.ok) {
+        setResults(res.body?.data || []);
+      } else {
+        Alert.alert('Error', res.body?.message || 'Failed to fetch professionals');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Network error occurred');
+    }
+    setLoading(false);
+  };
 
   const getCurrentLocation = async () => {
     setLocationLoading(true);
@@ -37,7 +54,7 @@ export default function ProfessionalsScreen() {
   const nearby = async () => {
     setLoading(true);
     try {
-      const url = `/api/v1/professionals/nearby?lng=${encodeURIComponent(lng)}&lat=${encodeURIComponent(lat)}&distance=${encodeURIComponent(distance)}`;
+      const url = `/api/v1/professionals/nearby?lng=${encodeURIComponent(lng)}&lat=${encodeURIComponent(lat)}&distance=${encodeURIComponent(distance)}&search=${encodeURIComponent(searchTerm)}`;
       const res = await apiFetch(url, { method: 'GET' });
       if (res.ok) {
         setResults(res.body?.data || []);
@@ -50,81 +67,139 @@ export default function ProfessionalsScreen() {
     setLoading(false);
   };
 
+  // Helper to geocode address to lat/lng
+  const geocodeAddress = async () => {
+    setLocationLoading(true);
+    try {
+      if (!address) {
+        Alert.alert('Error', 'Please enter a local address');
+        setLocationLoading(false);
+        return;
+      }
+      const res = await Location.geocodeAsync(address);
+      if (res && res.length > 0) {
+        setLat(res[0].latitude.toString());
+        setLng(res[0].longitude.toString());
+      } else {
+        Alert.alert('Error', 'Could not find location for address');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to geocode address');
+    }
+    setLocationLoading(false);
+  };
+
+  // Select vet handler
+  const selectVet = (vet: any) => {
+    // Navigate to vet profile or booking screen
+    if (navigation && navigation.navigate) {
+      navigation.navigate('VetProfileScreen', { vet });
+    }
+  };
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Find Professionals</Text>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={80}
+    >
+      <View style={styles.container}>
+        <Text style={styles.title}>Find Veterinarians Near You</Text>
       
-      <View style={styles.locationSection}>
-        <Text style={styles.sectionTitle}>Your Location</Text>
-        <View style={styles.coordsContainer}>
-          <TextInput 
-            value={lng} 
-            onChangeText={setLng} 
-            style={styles.coordInput} 
-            placeholder="Longitude" 
-            keyboardType="numeric"
+        <View style={styles.locationSection}>
+          <Text style={styles.sectionTitle}>Your Location</Text>
+          <TextInput
+            value={address}
+            onChangeText={setAddress}
+            style={styles.input}
+            placeholder="Enter Local Address (e.g. Ikeja, Lagos)"
           />
-          <TextInput 
-            value={lat} 
-            onChangeText={setLat} 
-            style={styles.coordInput} 
-            placeholder="Latitude" 
-            keyboardType="numeric"
+          <Button
+            title={locationLoading ? "Finding Address..." : "Use Address"}
+            onPress={geocodeAddress}
+            disabled={locationLoading}
+          />
+          <View style={styles.coordsContainer}>
+            <TextInput 
+              value={lng} 
+              onChangeText={setLng} 
+              style={styles.coordInput} 
+              placeholder="Longitude" 
+              keyboardType="numeric"
+            />
+            <TextInput 
+              value={lat} 
+              onChangeText={setLat} 
+              style={styles.coordInput} 
+              placeholder="Latitude" 
+              keyboardType="numeric"
+            />
+          </View>
+          <Button 
+            title={locationLoading ? "Getting Location..." : "Use Current Location"} 
+            onPress={getCurrentLocation}
+            disabled={locationLoading}
           />
         </View>
-        <Button 
-          title={locationLoading ? "Getting Location..." : "Use Current Location"} 
-          onPress={getCurrentLocation}
-          disabled={locationLoading}
+
+        {/* Remove manual coordinate inputs */}
+        {/* Show only search and list */}
+        <View style={styles.searchSection}>
+          <Text style={styles.sectionTitle}>Find Veterinarians Near You</Text>
+          <TextInput
+            value={searchTerm}
+            onChangeText={setSearchTerm}
+            style={styles.input}
+            placeholder="Search by name, specialization, city, etc."
+          />
+          <Button
+            title="Show All Vets"
+            onPress={fetchAllProfessionals}
+            disabled={loading}
+          />
+          <Button
+            title={loading ? "Searching..." : "Show Nearby Vets"}
+            onPress={nearby}
+            disabled={loading}
+          />
+        </View>
+
+        {loading && <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />}
+        
+        <FlatList
+          data={results.filter((item) => item.role === 'vet')}
+          keyExtractor={(i: any) => i._id || String(Math.random())}
+          renderItem={({ item }) => (
+            <TouchableOpacity style={styles.item} onPress={() => selectVet(item)}>
+              <Text style={styles.itemName}>{item.name || item.fullName || item.businessName || item.phone}</Text>
+              <Text style={styles.itemDetail}>VCN Number: {item.vcnNumber || 'N/A'}</Text>
+              <Text style={styles.itemDetail}>Specialization: {item.specialization || item.vetDetails?.specialization || ''}</Text>
+              <Text style={styles.itemDetail}>Business Name: {item.businessName || ''}</Text>
+              <Text style={styles.itemDetail}>Address: {item.address?.city || item.address?.town || item.address || ''}</Text>
+              <Text style={styles.itemDetail}>Phone: {item.phone || ''}</Text>
+              <Text style={styles.itemDetail}>Email: {item.email || ''}</Text>
+              <Text style={styles.itemDetail}>Distance: {item.distance ? `${item.distance.toFixed(2)} km` : ''}</Text>
+            </TouchableOpacity>
+          )}
+          ListEmptyComponent={!loading ? <Text style={styles.emptyText}>No veterinarians found nearby</Text> : null}
         />
       </View>
-
-      <View style={styles.searchSection}>
-        <Text style={styles.sectionTitle}>Search Settings</Text>
-        <TextInput 
-          value={distance} 
-          onChangeText={setDistance} 
-          style={styles.input} 
-          placeholder="Distance (km)" 
-          keyboardType="numeric"
-        />
-        <Button 
-          title={loading ? "Searching..." : "Find Nearby Professionals"} 
-          onPress={nearby}
-          disabled={loading}
-        />
-      </View>
-
-      {loading && <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />}
-      
-      <FlatList 
-        data={results} 
-        keyExtractor={(i: any) => i._id || String(Math.random())} 
-        renderItem={({ item }) => (
-          <View style={styles.item}>
-            <Text style={styles.itemName}>{item.name || item.fullName || item.phone}</Text>
-            <Text style={styles.itemDetail}>{item.role === 'vet' ? 'Veterinarian' : 'Kennel Owner'}</Text>
-            <Text style={styles.itemDetail}>{item.vetDetails?.specialization || item.kennelDetails?.services || ''}</Text>
-          </View>
-        )} 
-        ListEmptyComponent={!loading ? <Text style={styles.emptyText}>No professionals found nearby</Text> : null}
-      />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({ 
   container: { flex: 1, padding: 16, backgroundColor: '#f5f5f5' },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, textAlign: 'center', color: '#333' },
-  locationSection: { backgroundColor: '#fff', padding: 16, borderRadius: 8, marginBottom: 16 },
-  searchSection: { backgroundColor: '#fff', padding: 16, borderRadius: 8, marginBottom: 16 },
-  sectionTitle: { fontSize: 18, fontWeight: '600', marginBottom: 12, color: '#333' },
-  coordsContainer: { flexDirection: 'row', marginBottom: 12 },
-  coordInput: { flex: 1, borderWidth: 1, borderColor: '#ddd', padding: 8, marginRight: 8, borderRadius: 4 },
-  input: { borderWidth: 1, borderColor: '#ddd', padding: 12, marginBottom: 12, borderRadius: 4, backgroundColor: '#fff' },
-  loader: { marginVertical: 20 },
-  item: { backgroundColor: '#fff', padding: 16, marginBottom: 8, borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
-  itemName: { fontSize: 16, fontWeight: '600', color: '#333' },
-  itemDetail: { fontSize: 14, color: '#666', marginTop: 2 },
-  emptyText: { textAlign: 'center', color: '#666', fontStyle: 'italic', marginTop: 20 }
+  title: { fontSize: 26, fontWeight: 'bold', marginBottom: 24, textAlign: 'center', color: '#222' },
+  locationSection: { backgroundColor: '#fff', padding: 18, borderRadius: 10, marginBottom: 18, shadowColor: '#007AFF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 6, elevation: 4 },
+  searchSection: { backgroundColor: '#fff', padding: 18, borderRadius: 10, marginBottom: 18, shadowColor: '#007AFF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 6, elevation: 4 },
+  sectionTitle: { fontSize: 20, fontWeight: '600', marginBottom: 14, color: '#333' },
+  coordsContainer: { flexDirection: 'row', marginBottom: 14 },
+  coordInput: { flex: 1, borderWidth: 1, borderColor: '#ddd', padding: 10, marginRight: 10, borderRadius: 5 },
+  input: { borderWidth: 1, borderColor: '#ddd', padding: 14, marginBottom: 14, borderRadius: 6, backgroundColor: '#fff', fontSize: 16 },
+  loader: { marginVertical: 22 },
+  item: { backgroundColor: '#fff', padding: 20, marginBottom: 10, borderRadius: 10, shadowColor: '#007AFF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 6, elevation: 4 },
+  itemName: { fontSize: 18, fontWeight: '600', color: '#333' },
+  itemDetail: { fontSize: 16, color: '#666', marginTop: 4 },
+  emptyText: { textAlign: 'center', color: '#666', fontStyle: 'italic', marginTop: 24, fontSize: 16 }
 });

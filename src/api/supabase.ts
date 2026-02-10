@@ -4,8 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 
 // Replace with your Supabase project credentials
-const supabaseUrl = 'YOUR_SUPABASE_URL';
-const supabaseAnonKey = 'YOUR_SUPABASE_ANON_KEY';
+const supabaseUrl = 'https://vmzbvaybnohfxfkrungj.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtemJ2YXlibm9oZnhma3J1bmdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2NDQxMjksImV4cCI6MjA4NjIyMDEyOX0.QkGCSJkiD3r__oD3A7JJaT421Mqb_3efL7UMufh7YWU';
 
 // AsyncStorage adapter expected by supabase-js: plain object with getItem/setItem/removeItem
 const storage = {
@@ -30,16 +30,18 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 });
 
 // Auth helper functions
-export const signUpWithPhone = async (phone: string) => {
+export const signUpWithPhone = async (phone: string, password: string) => {
   const { data, error } = await supabase.auth.signUp({
     phone: phone,
+    password: password,
   });
   return { data, error };
 };
 
-export const signInWithPhone = async (phone: string) => {
-  const { data, error } = await supabase.auth.signInWithOtp({
+export const signInWithPhone = async (phone: string, password: string) => {
+  const { data, error } = await supabase.auth.signInWithPassword({
     phone: phone,
+    password: password,
   });
   return { data, error };
 };
