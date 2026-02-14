@@ -15,6 +15,7 @@ import ShopOnboardingScreen from '../screens/ShopOnboardingScreen';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ProfileScreen from '../screens/ProfileScreen';
 import RegisterScreen from '../screens/RegisterScreen';
+import KennelsScreen from '../screens/KennelsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -63,6 +64,17 @@ function UserTabs() {
             tabBarLabel: 'Vets',
             tabBarIcon: ({ color, size }) => (
               <TabBarIcon name="medkit" color={color} size={size} />
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Kennels"
+          component={KennelsScreen}
+          options={{
+            title: 'Kennels',
+            tabBarLabel: 'Kennels',
+            tabBarIcon: ({ color, size }) => (
+              <TabBarIcon name="paw" color={color} size={size} />
             ),
           }}
         />
@@ -264,8 +276,11 @@ export default function AppNavigator() {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Auth" component={AuthScreen} />
         <Stack.Screen name="ProfessionalOnboarding" component={ProfessionalOnboardingScreen} />
+        <Stack.Screen name="KennelOnboarding" component={require('../screens/KennelOnboardingScreen').default} />
         <Stack.Screen name="ShopOnboardingScreen" component={ShopOnboardingScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
+        <Stack.Screen name="ExploreOptions" component={require('../screens/ExploreOptionsScreen').default} />
+        <Stack.Screen name="SubscriptionScreen" component={SubscriptionScreen} />
         <Stack.Screen name="MainTabs">
           {() => (userRole === 'vet' || userRole === 'kennel_owner') ? <ProfessionalTabs /> : <UserTabs />}
         </Stack.Screen>

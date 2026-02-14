@@ -1,3 +1,4 @@
+import { supabase } from './supabase'; // ← THIS IS MISSING
 // This file provides a password reset (forgot password) helper using Supabase
 export async function resetPassword(email: string) {
   // Supabase supports password reset via email only

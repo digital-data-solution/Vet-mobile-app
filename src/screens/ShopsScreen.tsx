@@ -1,15 +1,46 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, FlatList, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  TextInput,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import * as Location from 'expo-location';
 import { apiFetch } from '../api/client';
+import { Ionicons } from '@expo/vector-icons';
 
-export default function ShopsScreen({ navigation }: any) {
-  const [lng, setLng] = useState('3.3792');
-  const [lat, setLat] = useState('6.5244');
-  const [distance, setDistance] = useState('5');
-  const [results, setResults] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+interface Shop {
+  _id: string;
+  name?: string;
+  shopName?: string;
+  businessName?: string;
+  ownerName?: string;
+  address?: string | { city?: string; town?: string; full?: string };
+  phone?: string;
+  email?: string;
+  description?: string;
+  distance?: number;
+  services?: string[];
+}
+
+interface Props {
+  navigation: any;
+}
+
+export default function ShopsScreen({ navigation }: Props) {
+  const [shops, setShops] = useState<Shop[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
   const [locationLoading, setLocationLoading] = useState(false);
+  const [coords, setCoords] = useState({ lat: '6.5244', lng: '3.3792' });
+  const [distance, setDistance] = useState('10');
+  const [hasSearched, setHasSearched] = useState(false);
 
   useEffect(() => {
     fetchAllShops();
@@ -18,146 +49,322 @@ export default function ShopsScreen({ navigation }: any) {
   const fetchAllShops = async () => {
     setLoading(true);
     try {
-      const res = await apiFetch('/api/v1/shops', { method: 'GET' });
-      if (res.ok) {
-        setResults(res.body?.data || []);
+      const res = await apiFetch('/api/v1/shops?limit=50', { method: 'GET' });
+      if (res.ok && (res.body?.success || Array.isArray(res.body?.data) || Array.isArray(res.body))) {
+        const data = res.body?.data ?? res.body ?? [];
+        setShops(Array.isArray(data) ? data : []);
       } else {
-        Alert.alert('Error', res.body?.message || 'Failed to fetch shops');
+        setShops([]);
       }
-    } catch (error) {
-      Alert.alert('Error', 'Network error occurred');
+    } catch {
+      setShops([]);
+    } finally {
+      setLoading(false);
+      setHasSearched(true);
     }
-    setLoading(false);
   };
 
-  const getCurrentLocation = async () => {
+  const useMyLocation = async () => {
     setLocationLoading(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission denied', 'Location permission is required to find nearby shops');
-        setLocationLoading(false);
+        Alert.alert('Permission Denied', 'Location access needed to find nearby shops.');
         return;
       }
-
-      const location = await Location.getCurrentPositionAsync({});
-      setLat(location.coords.latitude.toString());
-      setLng(location.coords.longitude.toString());
-    } catch (error) {
-      Alert.alert('Error', 'Failed to get current location');
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      setCoords({ lat: loc.coords.latitude.toString(), lng: loc.coords.longitude.toString() });
+      Alert.alert('Location Set', 'Tap "Search Nearby" to find shops near you.');
+    } catch {
+      Alert.alert('Error', 'Failed to get location.');
+    } finally {
+      setLocationLoading(false);
     }
-    setLocationLoading(false);
   };
 
-  const nearby = async () => {
+  const searchNearby = async () => {
     setLoading(true);
     try {
-      const url = `/api/v1/shops/nearby?lng=${encodeURIComponent(lng)}&lat=${encodeURIComponent(lat)}&distance=${encodeURIComponent(distance)}`;
-      const res = await apiFetch(url, { method: 'GET' });
+      const params = new URLSearchParams({
+        lng: coords.lng,
+        lat: coords.lat,
+        distance,
+        ...(searchTerm.trim() && { search: searchTerm.trim() }),
+      });
+      const res = await apiFetch(`/api/v1/shops/nearby?${params}`, { method: 'GET' });
       if (res.ok) {
-        setResults(res.body?.data || []);
+        const data = res.body?.data ?? res.body ?? [];
+        setShops(Array.isArray(data) ? data : []);
       } else {
-        Alert.alert('Error', res.body?.message || 'Failed to fetch shops');
+        Alert.alert('Error', 'Could not find shops nearby.');
       }
-    } catch (error) {
-      Alert.alert('Error', 'Network error occurred');
+    } catch {
+      Alert.alert('Network Error', 'Please check your connection.');
+    } finally {
+      setLoading(false);
+      setHasSearched(true);
     }
-    setLoading(false);
   };
 
-  // Fix: Add selectShop handler
-  const selectShop = (shop: any) => {
-    if (navigation && navigation.navigate) {
-      navigation.navigate('ShopProfileScreen', { shop });
-    }
+  const getDisplayName = (shop: Shop) =>
+    shop.shopName ?? shop.businessName ?? shop.name ?? 'Pet Shop';
+
+  const getAddress = (shop: Shop): string => {
+    if (typeof shop.address === 'string') return shop.address;
+    return shop.address?.full ?? shop.address?.city ?? shop.address?.town ?? '';
   };
+
+  const filtered = shops.filter(s =>
+    !searchTerm.trim() ||
+    (getDisplayName(s) + getAddress(s) + (s.description ?? ''))
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase())
+  );
+
+  const renderShop = ({ item }: { item: Shop }) => (
+    <TouchableOpacity
+      style={styles.card}
+      onPress={() => navigation.navigate('ShopProfileScreen', { shop: item })}
+      activeOpacity={0.78}
+    >
+      <View style={styles.avatarWrap}>
+        <Text style={styles.avatarEmoji}>🛒</Text>
+      </View>
+      <View style={styles.cardBody}>
+        <Text style={styles.shopName} numberOfLines={1}>{getDisplayName(item)}</Text>
+        {item.description ? (
+          <Text style={styles.description} numberOfLines={1}>{item.description}</Text>
+        ) : null}
+        {getAddress(item) ? (
+          <View style={styles.addressRow}>
+            <Ionicons name="location-outline" size={12} color="#64748B" />
+            <Text style={styles.addressText} numberOfLines={1}>{getAddress(item)}</Text>
+          </View>
+        ) : null}
+        {item.distance != null ? (
+          <Text style={styles.distanceText}>{item.distance.toFixed(1)} km away</Text>
+        ) : null}
+      </View>
+      <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
+    </TouchableOpacity>
+  );
 
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={80}
+      keyboardVerticalOffset={90}
     >
-      <View style={styles.container}>
-        <Text style={styles.title}>Find Pet Shops Near You</Text>
-        
-        <View style={styles.locationSection}>
-          <Text style={styles.sectionTitle}>Your Location</Text>
-          <View style={styles.coordsContainer}>
-            <TextInput 
-              value={lng} 
-              onChangeText={setLng} 
-              style={styles.coordInput} 
-              placeholder="Longitude" 
-              keyboardType="numeric"
+      <View style={styles.root}>
+        {/* Search */}
+        <View style={styles.searchContainer}>
+          <View style={styles.searchBar}>
+            <Ionicons name="search-outline" size={18} color="#94A3B8" style={{ marginRight: 8 }} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search pet shops..."
+              placeholderTextColor="#94A3B8"
+              value={searchTerm}
+              onChangeText={setSearchTerm}
+              returnKeyType="search"
+              onSubmitEditing={searchNearby}
             />
-            <TextInput 
-              value={lat} 
-              onChangeText={setLat} 
-              style={styles.coordInput} 
-              placeholder="Latitude" 
-              keyboardType="numeric"
-            />
+            {searchTerm.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchTerm('')}>
+                <Ionicons name="close-circle" size={18} color="#94A3B8" />
+              </TouchableOpacity>
+            )}
           </View>
-          <Button 
-            title={locationLoading ? "Getting Location..." : "Use Current Location"} 
-            onPress={getCurrentLocation}
+        </View>
+
+        {/* Location & actions */}
+        <View style={styles.actionsRow}>
+          <TouchableOpacity
+            style={styles.locationBtn}
+            onPress={useMyLocation}
             disabled={locationLoading}
-          />
-        </View>
+          >
+            {locationLoading ? (
+              <ActivityIndicator size="small" color="#EA580C" />
+            ) : (
+              <>
+                <Ionicons name="navigate-outline" size={14} color="#EA580C" />
+                <Text style={styles.locationBtnText}>My Location</Text>
+              </>
+            )}
+          </TouchableOpacity>
 
-        <View style={styles.searchSection}>
-          <Text style={styles.sectionTitle}>Search Settings</Text>
-          <TextInput 
-            value={distance} 
-            onChangeText={setDistance} 
-            style={styles.input} 
-            placeholder="Distance (km)" 
-            keyboardType="numeric"
-          />
-          <Button
-            title="Show All Shops"
-            onPress={fetchAllShops}
-            disabled={loading}
-          />
-          <Button
-            title={loading ? "Searching..." : "Show Nearby Shops"}
-            onPress={nearby}
-            disabled={loading}
-          />
-        </View>
-
-        {loading && <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />}
-        
-        <FlatList 
-          data={results} 
-          keyExtractor={(i: any) => i._id || String(Math.random())} 
-          renderItem={({ item }) => (
-            <TouchableOpacity style={styles.item} onPress={() => selectShop(item)}>
-              <Text style={styles.itemName}>{item.shopName || item.businessName || item.ownerName}</Text>
-              <Text style={styles.itemDetail}>{item.address?.city || item.address?.town || item.address || ''}</Text>
-              <Text style={styles.itemDetail}>Distance: {item.distance ? `${item.distance.toFixed(2)} km` : ''}</Text>
+          {/* Distance chips */}
+          {(['5', '10', '25'].map(d => (
+            <TouchableOpacity
+              key={d}
+              style={[styles.distanceChip, distance === d && styles.distanceChipActive]}
+              onPress={() => setDistance(d)}
+            >
+              <Text style={[styles.distanceChipText, distance === d && styles.distanceChipTextActive]}>
+                {d}km
+              </Text>
             </TouchableOpacity>
-          )} 
-          ListEmptyComponent={!loading ? <Text style={styles.emptyText}>No shops found nearby</Text> : null}
-        />
+          )))}
+
+          <TouchableOpacity style={styles.searchNearbyBtn} onPress={searchNearby}>
+            <Text style={styles.searchNearbyText}>Nearby</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* All shops button */}
+        <TouchableOpacity style={styles.allShopsBtn} onPress={fetchAllShops} disabled={loading}>
+          <Text style={styles.allShopsBtnText}>Show All Pet Shops</Text>
+        </TouchableOpacity>
+
+        {/* Results */}
+        {loading ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color="#EA580C" />
+            <Text style={styles.loadingText}>Finding shops...</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={filtered}
+            keyExtractor={item => item._id}
+            renderItem={renderShop}
+            contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              hasSearched ? (
+                <Text style={styles.resultCount}>
+                  {filtered.length} shop{filtered.length !== 1 ? 's' : ''} found
+                </Text>
+              ) : null
+            }
+            ListEmptyComponent={
+              hasSearched ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyEmoji}>🛒</Text>
+                  <Text style={styles.emptyTitle}>No shops found</Text>
+                  <Text style={styles.emptyText}>
+                    Try expanding your search area or browse all shops.
+                  </Text>
+                </View>
+              ) : null
+            }
+          />
+        )}
       </View>
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({ 
-  container: { flex: 1, padding: 16, backgroundColor: '#f5f5f5' },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, textAlign: 'center', color: '#333' },
-  locationSection: { backgroundColor: '#fff', padding: 16, borderRadius: 8, marginBottom: 16 },
-  searchSection: { backgroundColor: '#fff', padding: 16, borderRadius: 8, marginBottom: 16 },
-  sectionTitle: { fontSize: 18, fontWeight: '600', marginBottom: 12, color: '#333' },
-  coordsContainer: { flexDirection: 'row', marginBottom: 12 },
-  coordInput: { flex: 1, borderWidth: 1, borderColor: '#ddd', padding: 8, marginRight: 8, borderRadius: 4 },
-  input: { borderWidth: 1, borderColor: '#ddd', padding: 12, marginBottom: 12, borderRadius: 4, backgroundColor: '#fff' },
-  loader: { marginVertical: 20 },
-  item: { backgroundColor: '#fff', padding: 16, marginBottom: 8, borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
-  itemName: { fontSize: 16, fontWeight: '600', color: '#333' },
-  itemDetail: { fontSize: 14, color: '#666', marginTop: 2 },
-  emptyText: { textAlign: 'center', color: '#666', fontStyle: 'italic', marginTop: 20 }
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#F8FAFC' },
+
+  searchContainer: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 10 },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.07,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  searchInput: { flex: 1, paddingVertical: 12, fontSize: 15, color: '#0F172A' },
+
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    gap: 6,
+  },
+  locationBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF7ED',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+  },
+  locationBtnText: { fontSize: 12, color: '#EA580C', fontWeight: '600' },
+  distanceChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  distanceChipActive: { backgroundColor: '#FFF7ED', borderColor: '#FED7AA' },
+  distanceChipText: { fontSize: 12, color: '#64748B', fontWeight: '600' },
+  distanceChipTextActive: { color: '#EA580C', fontWeight: '700' },
+  searchNearbyBtn: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: '#EA580C',
+    borderRadius: 10,
+    paddingVertical: 9,
+  },
+  searchNearbyText: { fontSize: 13, color: '#fff', fontWeight: '700' },
+
+  allShopsBtn: {
+    marginHorizontal: 16,
+    marginBottom: 10,
+    paddingVertical: 11,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#fff',
+    alignItems: 'center',
+  },
+  allShopsBtnText: { fontSize: 13, color: '#475569', fontWeight: '600' },
+
+  loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60 },
+  loadingText: { marginTop: 12, color: '#64748B', fontSize: 15 },
+
+  list: { paddingHorizontal: 16, paddingBottom: 30 },
+  resultCount: { fontSize: 13, color: '#64748B', fontWeight: '500', marginBottom: 10 },
+
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  avatarWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: '#FFF7ED',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    borderWidth: 1.5,
+    borderColor: '#FED7AA',
+  },
+  avatarEmoji: { fontSize: 24 },
+  cardBody: { flex: 1, marginRight: 4 },
+  shopName: { fontSize: 15, fontWeight: '700', color: '#0F172A', marginBottom: 3 },
+  description: { fontSize: 12, color: '#64748B', marginBottom: 4 },
+  addressRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  addressText: { fontSize: 12, color: '#64748B', flex: 1 },
+  distanceText: { fontSize: 12, color: '#EA580C', fontWeight: '600', marginTop: 3 },
+
+  emptyState: { alignItems: 'center', paddingTop: 60 },
+  emptyEmoji: { fontSize: 52, marginBottom: 16 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#0F172A', marginBottom: 8 },
+  emptyText: { fontSize: 14, color: '#64748B', textAlign: 'center' },
 });
