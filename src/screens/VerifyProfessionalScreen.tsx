@@ -7,89 +7,81 @@ import {
   StyleSheet,
   Linking,
   Alert,
-  ActivityIndicator,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { apiFetch } from '../api/client';
 
-type LookupState = 'idle' | 'opening' | 'done';
+// ─────────────────────────────────────────────────────────────────────────────
+// TYPES
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface VerifyResult {
+  name?: string;
+  vcnNumber?: string;
+  specialization?: string;
+  isVerified?: boolean;
+  status?: string;
+}
+
+type CheckStatus = 'idle' | 'checking' | 'found' | 'not_found';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPONENT
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function VerifyProfessionalScreen() {
   const [vcnNumber, setVcnNumber] = useState('');
-  const [lookupState, setLookupState] = useState<LookupState>('idle');
-  const [error, setError] = useState('');
+  const [checkStatus, setCheckStatus] = useState<CheckStatus>('idle');
+  const [result, setResult] = useState<VerifyResult | null>(null);
 
-  const handleVerify = async () => {
-    setError('');
+  // ─── Check in-app ──────────────────────────────────────────────────────────
 
+  const checkInApp = async () => {
     if (!vcnNumber.trim()) {
-      setError('Please enter a VCN number before searching.');
+      Alert.alert('Required', 'Please enter a VCN number first.');
       return;
     }
-
-    // Basic format hint — VCN numbers typically follow VCN/YYYY/NNNNN
-    const cleaned = vcnNumber.trim().toUpperCase();
-
-    setLookupState('opening');
-
-    // The portal search URL with the VCN number pre-filled
-    const url = `https://portal.vcn.gov.ng/verify?search=${encodeURIComponent(cleaned)}`;
-
+    setCheckStatus('checking');
+    setResult(null);
     try {
-      const supported = await Linking.canOpenURL(url);
-      if (!supported) {
-        // Fallback: open portal homepage if deep link not supported
-        await Linking.openURL('https://portal.vcn.gov.ng');
-      } else {
-        await Linking.openURL(url);
-      }
-      setLookupState('done');
-    } catch {
-      setLookupState('idle');
-      Alert.alert(
-        'Unable to Open Browser',
-        'Could not open the VCN portal automatically. Please visit portal.vcn.gov.ng and search manually.',
-        [{ text: 'OK' }]
+      const res = await apiFetch(
+        `/api/v1/professionals/list?vcnNumber=${encodeURIComponent(vcnNumber.trim())}&limit=1`,
+        { method: 'GET' },
       );
+      if (res.ok && res.body?.data?.length > 0) {
+        setResult(res.body.data[0]);
+        setCheckStatus('found');
+      } else {
+        setCheckStatus('not_found');
+      }
+    } catch {
+      setCheckStatus('not_found');
     }
   };
 
-  const handleReset = () => {
-    setVcnNumber('');
-    setLookupState('idle');
-    setError('');
+  // ─── Open VCN portal ───────────────────────────────────────────────────────
+
+  const openVcnPortal = () => {
+    const query = vcnNumber.trim()
+      ? `?search=${encodeURIComponent(vcnNumber.trim())}`
+      : '';
+    Linking.openURL(`https://portal.vcn.gov.ng/verify${query}`).catch(() =>
+      Alert.alert('Error', 'Unable to open browser.'),
+    );
   };
 
-  // ── Post-lookup state ────────────────────────────────────────────────────
-  if (lookupState === 'done') {
-    return (
-      <View style={styles.doneContainer}>
-        <Text style={styles.doneEmoji}>🔍</Text>
-        <Text style={styles.doneTitle}>Portal Opened</Text>
-        <Text style={styles.doneSubtitle}>
-          The VCN portal has been opened with{' '}
-          <Text style={styles.vcnHighlight}>{vcnNumber.trim().toUpperCase()}</Text>.{'\n\n'}
-          On the portal, check that:
-        </Text>
+  // ─── Reset ─────────────────────────────────────────────────────────────────
 
-        <View style={styles.checkList}>
-          <CheckRow text="The practitioner's name and photo match" />
-          <CheckRow text="The licence status shows Active" />
-          <CheckRow text="The specialisation matches what was advertised" />
-          <CheckRow text="The expiry date has not passed" />
-        </View>
+  const reset = () => {
+    setVcnNumber('');
+    setCheckStatus('idle');
+    setResult(null);
+  };
 
-        <TouchableOpacity style={styles.reopenBtn} onPress={handleVerify} activeOpacity={0.85}>
-          <Text style={styles.reopenBtnText}>Reopen Portal ↗</Text>
-        </TouchableOpacity>
+  // ─── Render ────────────────────────────────────────────────────────────────
 
-        <TouchableOpacity style={styles.resetBtn} onPress={handleReset} activeOpacity={0.85}>
-          <Text style={styles.resetBtnText}>Search Another VCN</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  // ── Main screen ──────────────────────────────────────────────────────────
   return (
     <ScrollView
       style={styles.scroll}
@@ -97,202 +89,219 @@ export default function VerifyProfessionalScreen() {
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
-      {/* Header */}
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
       <View style={styles.header}>
-        <Text style={styles.headerEmoji}>🔬</Text>
+        <View style={styles.headerIconWrap}>
+          <Text style={styles.headerEmoji}>🪪</Text>
+        </View>
         <Text style={styles.title}>Verify a Professional</Text>
         <Text style={styles.subtitle}>
-          Enter the vet's VCN number to confirm they are registered with the Veterinary Council of Nigeria
-          and avoid quackery.
+          Protect your pets — check that your vet is registered with the Veterinary Council of
+          Nigeria (VCN)
         </Text>
       </View>
 
-      {/* Info card */}
-      <View style={styles.infoCard}>
+      {/* ── Why verify ──────────────────────────────────────────────────────── */}
+      <View style={styles.whyCard}>
         <Text style={styles.cardTitle}>Why Verify?</Text>
-        <CheckRow text="Confirm the practitioner is licensed" />
-        <CheckRow text="Check their licence is still active" />
-        <CheckRow text="Protect your pet from unqualified practitioners" />
+        <ReasonRow
+          icon="shield-checkmark-outline"
+          color="#10B981"
+          text="Avoid unqualified practitioners and quacks"
+        />
+        <ReasonRow
+          icon="medal-outline"
+          color="#F59E0B"
+          text="Confirm active VCN registration status"
+        />
+        <ReasonRow
+          icon="heart-outline"
+          color="#EF4444"
+          text="Ensure the safety and wellbeing of your pet"
+        />
       </View>
 
-      {/* Search card */}
-      <View style={styles.searchCard}>
-        <Text style={styles.cardTitle}>Enter VCN Number</Text>
-        <Text style={styles.fieldHint}>
-          You can find a vet's VCN number on their profile or by asking them directly.
-          It usually follows the format <Text style={styles.mono}>VCN/YYYY/NNNNN</Text>.
-        </Text>
+      {/* ── Search form ─────────────────────────────────────────────────────── */}
+      <View style={styles.formCard}>
+        <Text style={styles.cardTitle}>Check a VCN Number</Text>
 
-        <TextInput
-          style={[styles.input, error ? styles.inputError : null]}
-          placeholder="e.g. VCN/2019/00123"
-          placeholderTextColor="#9CA3AF"
-          value={vcnNumber}
-          onChangeText={(v) => { setVcnNumber(v); setError(''); }}
-          autoCapitalize="characters"
-          autoCorrect={false}
-          returnKeyType="search"
-          onSubmitEditing={handleVerify}
-          editable={lookupState !== 'opening'}
-        />
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        <View style={styles.inputWrapper}>
+          <Ionicons name="card-outline" size={18} color="#94A3B8" style={{ marginRight: 10 }} />
+          <TextInput
+            style={styles.input}
+            placeholder="e.g. VCN/2024/001234"
+            placeholderTextColor="#94A3B8"
+            value={vcnNumber}
+            onChangeText={(v) => {
+              setVcnNumber(v);
+              setCheckStatus('idle');
+              setResult(null);
+            }}
+            autoCapitalize="characters"
+            returnKeyType="search"
+            onSubmitEditing={checkInApp}
+          />
+          {vcnNumber.length > 0 && (
+            <TouchableOpacity onPress={reset}>
+              <Ionicons name="close-circle" size={18} color="#94A3B8" />
+            </TouchableOpacity>
+          )}
+        </View>
 
+        {/* Check in-app */}
         <TouchableOpacity
-          style={[styles.verifyBtn, lookupState === 'opening' && styles.verifyBtnDisabled]}
-          onPress={handleVerify}
-          disabled={lookupState === 'opening'}
+          style={[styles.checkBtn, checkStatus === 'checking' && styles.checkBtnDisabled]}
+          onPress={checkInApp}
+          disabled={checkStatus === 'checking'}
           activeOpacity={0.85}
         >
-          {lookupState === 'opening' ? (
+          {checkStatus === 'checking' ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.verifyBtnText}>Search on VCN Portal ↗</Text>
+            <>
+              <Ionicons name="search-outline" size={18} color="#fff" />
+              <Text style={styles.checkBtnText}>Check on Xpress Vet</Text>
+            </>
           )}
         </TouchableOpacity>
+
+        <View style={styles.dividerRow}>
+          <View style={styles.divider} />
+          <Text style={styles.dividerText}>or</Text>
+          <View style={styles.divider} />
+        </View>
+
+        {/* VCN portal button */}
+        <TouchableOpacity style={styles.portalBtn} onPress={openVcnPortal} activeOpacity={0.8}>
+          <Ionicons name="open-outline" size={16} color="#2563EB" />
+          <Text style={styles.portalBtnText}>Verify on VCN Portal</Text>
+        </TouchableOpacity>
+        <Text style={styles.portalHint}>Opens official vcn.gov.ng in your browser</Text>
       </View>
 
-      {/* What to look for */}
-      <View style={styles.tipsCard}>
-        <Text style={styles.cardTitle}>What to Check on the Portal</Text>
-        <TipRow
-          number="1"
-          title="Name & Photo"
-          desc="Confirm the registered name and photo match the person you're dealing with."
-        />
-        <TipRow
-          number="2"
-          title="Licence Status"
-          desc="The status should say Active. Expired or Suspended means they cannot legally practise."
-        />
-        <TipRow
-          number="3"
-          title="Specialisation"
-          desc="Make sure the listed specialisation covers the service being offered."
-        />
-        <TipRow
-          number="4"
-          title="Expiry Date"
-          desc="VCN licences are renewed annually. Ensure the current year is covered."
-        />
-      </View>
+      {/* ── Found result ─────────────────────────────────────────────────────── */}
+      {checkStatus === 'found' && result ? (
+        <View style={styles.resultCard}>
+          <View style={styles.resultHeader}>
+            <View style={styles.resultIconWrap}>
+              <Ionicons name="checkmark-circle" size={28} color="#10B981" />
+            </View>
+            <View>
+              <Text style={styles.resultTitle}>Registered Professional</Text>
+              <Text style={styles.resultSubtitle}>Found in Xpress Vet database</Text>
+            </View>
+          </View>
+
+          {result.name ? (
+            <ResultRow label="Name" value={result.name} />
+          ) : null}
+          {result.vcnNumber ? (
+            <ResultRow label="VCN Number" value={result.vcnNumber} />
+          ) : null}
+          {result.specialization ? (
+            <ResultRow label="Specialization" value={result.specialization} />
+          ) : null}
+
+          <View style={styles.resultRow}>
+            <Text style={styles.resultLabel}>Status</Text>
+            <View style={styles.statusBadge}>
+              <Text style={styles.statusBadgeText}>✓ Verified</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.portalBtnSmall} onPress={openVcnPortal}>
+            <Text style={styles.portalBtnSmallText}>Also confirm on VCN Portal →</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
+      {/* ── Not found ────────────────────────────────────────────────────────── */}
+      {checkStatus === 'not_found' ? (
+        <View style={styles.notFoundCard}>
+          <Ionicons name="warning-outline" size={32} color="#F59E0B" />
+          <Text style={styles.notFoundTitle}>Not Found in Xpress Vet</Text>
+          <Text style={styles.notFoundText}>
+            This VCN number isn't in our database. The professional may not be registered here yet,
+            but you can still verify directly on the official VCN portal.
+          </Text>
+          <TouchableOpacity style={styles.portalBtnAlt} onPress={openVcnPortal} activeOpacity={0.8}>
+            <Ionicons name="open-outline" size={15} color="#fff" />
+            <Text style={styles.portalBtnAltText}>Check on VCN Portal</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </ScrollView>
   );
 }
 
-// ── Sub-components ───────────────────────────────────────────────────────────
-function CheckRow({ text }: { text: string }) {
+// ─────────────────────────────────────────────────────────────────────────────
+// SUB-COMPONENTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ReasonRow({ icon, color, text }: { icon: any; color: string; text: string }) {
   return (
-    <View style={styles.checkRow}>
-      <Text style={styles.checkIcon}>✓</Text>
-      <Text style={styles.checkText}>{text}</Text>
+    <View style={styles.reasonRow}>
+      <View style={[styles.reasonIcon, { backgroundColor: color + '18' }]}>
+        <Ionicons name={icon} size={16} color={color} />
+      </View>
+      <Text style={styles.reasonText}>{text}</Text>
     </View>
   );
 }
 
-function TipRow({ number, title, desc }: { number: string; title: string; desc: string }) {
+function ResultRow({ label, value }: { label: string; value: string }) {
   return (
-    <View style={styles.tipRow}>
-      <View style={styles.tipNumber}>
-        <Text style={styles.tipNumberText}>{number}</Text>
-      </View>
-      <View style={styles.tipContent}>
-        <Text style={styles.tipTitle}>{title}</Text>
-        <Text style={styles.tipDesc}>{desc}</Text>
-      </View>
+    <View style={styles.resultRow}>
+      <Text style={styles.resultLabel}>{label}</Text>
+      <Text style={styles.resultValue}>{value}</Text>
     </View>
   );
 }
 
-// ── Styles ───────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// STYLES
+// ─────────────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: '#F3F4F6' },
+  scroll: { flex: 1, backgroundColor: '#F8FAFC' },
   container: { paddingBottom: 40 },
 
-  // ── Done state ───────────────────────────────────────────────────────────
-  doneContainer: {
-    flex: 1,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    padding: 32,
-    paddingTop: 60,
-  },
-  doneEmoji: { fontSize: 60, marginBottom: 20 },
-  doneTitle: { fontSize: 24, fontWeight: '800', color: '#111827', marginBottom: 10 },
-  doneSubtitle: {
-    fontSize: 15,
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 20,
-  },
-  vcnHighlight: { fontWeight: '700', color: '#111827', fontFamily: 'monospace' },
-  checkList: { width: '100%', marginBottom: 28 },
-  reopenBtn: {
-    width: '100%',
-    backgroundColor: '#2563EB',
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  reopenBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  resetBtn: {
-    width: '100%',
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-  },
-  resetBtnText: { color: '#374151', fontWeight: '600', fontSize: 15 },
-
-  // ── Header ───────────────────────────────────────────────────────────────
+  // Header
   header: {
     backgroundColor: '#fff',
     alignItems: 'center',
     paddingTop: 36,
     paddingBottom: 28,
     paddingHorizontal: 24,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
     marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    elevation: 4,
   },
-  headerEmoji: { fontSize: 52, marginBottom: 12 },
-  title: { fontSize: 24, fontWeight: '800', color: '#111827', marginBottom: 8 },
-  subtitle: { fontSize: 14, color: '#6B7280', textAlign: 'center', lineHeight: 20 },
-
-  // ── Cards ─────────────────────────────────────────────────────────────────
-  infoCard: {
+  headerIconWrap: {
+    width: 76,
+    height: 76,
+    borderRadius: 22,
     backgroundColor: '#EFF6FF',
-    marginHorizontal: 16,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 14,
-    borderWidth: 1.5,
-    borderColor: '#BFDBFE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#DBEAFE',
   },
-  searchCard: {
+  headerEmoji: { fontSize: 36 },
+  title: { fontSize: 24, fontWeight: '800', color: '#0F172A', marginBottom: 8, textAlign: 'center' },
+  subtitle: { fontSize: 14, color: '#64748B', textAlign: 'center', lineHeight: 20 },
+
+  // Why card
+  whyCard: {
     backgroundColor: '#fff',
     marginHorizontal: 16,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  tipsCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 14,
     shadowColor: '#000',
@@ -302,68 +311,162 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   cardTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#6B7280',
+    color: '#94A3B8',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
     marginBottom: 14,
   },
-
-  // ── Form ──────────────────────────────────────────────────────────────────
-  fieldHint: { fontSize: 13, color: '#9CA3AF', lineHeight: 18, marginBottom: 12 },
-  mono: { fontFamily: 'monospace', color: '#374151' },
-  input: {
-    borderWidth: 1.5,
-    borderColor: '#E5E7EB',
+  reasonRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 12 },
+  reasonIcon: {
+    width: 34,
+    height: 34,
     borderRadius: 10,
-    padding: 13,
-    fontSize: 16,
-    color: '#111827',
-    backgroundColor: '#F9FAFB',
-    marginBottom: 4,
-    letterSpacing: 1,
-    fontFamily: 'monospace',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  inputError: { borderColor: '#EF4444' },
-  errorText: { fontSize: 12, color: '#EF4444', marginBottom: 8 },
-  verifyBtn: {
+  reasonText: { fontSize: 14, color: '#334155', flex: 1, lineHeight: 20 },
+
+  // Form card
+  formCard: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    backgroundColor: '#F8FAFC',
+    marginBottom: 14,
+  },
+  input: { flex: 1, paddingVertical: 14, fontSize: 15, color: '#0F172A', letterSpacing: 0.5 },
+  checkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#2563EB',
     paddingVertical: 15,
     borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 12,
+    gap: 8,
+    marginBottom: 14,
     shadowColor: '#2563EB',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 4,
   },
-  verifyBtnDisabled: { opacity: 0.7 },
-  verifyBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-
-  // ── Check rows ────────────────────────────────────────────────────────────
-  checkRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 6 },
-  checkIcon: { fontSize: 14, color: '#2563EB', fontWeight: '700', marginRight: 10, marginTop: 1 },
-  checkText: { fontSize: 14, color: '#374151', flex: 1, lineHeight: 20 },
-
-  // ── Tip rows ──────────────────────────────────────────────────────────────
-  tipRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 10 },
-  tipNumber: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1.5,
-    borderColor: '#BFDBFE',
+  checkBtnDisabled: { opacity: 0.6 },
+  checkBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
+  divider: { flex: 1, height: 1, backgroundColor: '#E2E8F0' },
+  dividerText: { fontSize: 13, color: '#94A3B8', fontWeight: '600' },
+  portalBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
-    marginTop: 1,
-    flexShrink: 0,
+    backgroundColor: '#EFF6FF',
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+    marginBottom: 6,
   },
-  tipNumberText: { fontSize: 12, fontWeight: '700', color: '#2563EB' },
-  tipContent: { flex: 1 },
-  tipTitle: { fontSize: 14, fontWeight: '700', color: '#111827', marginBottom: 2 },
-  tipDesc: { fontSize: 13, color: '#6B7280', lineHeight: 18 },
+  portalBtnText: { color: '#2563EB', fontSize: 15, fontWeight: '700' },
+  portalHint: { fontSize: 12, color: '#94A3B8', textAlign: 'center' },
+
+  // Result card
+  resultCard: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 14,
+    borderWidth: 1.5,
+    borderColor: '#D1FAE5',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  resultHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ECFDF5',
+  },
+  resultIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: '#ECFDF5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  resultTitle: { fontSize: 16, fontWeight: '800', color: '#065F46' },
+  resultSubtitle: { fontSize: 12, color: '#6EE7B7', marginTop: 2 },
+  resultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0FDF4',
+  },
+  resultLabel: { fontSize: 13, color: '#64748B', fontWeight: '600' },
+  resultValue: { fontSize: 14, color: '#0F172A', fontWeight: '600', flex: 1, textAlign: 'right' },
+  statusBadge: {
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  statusBadgeText: { fontSize: 12, color: '#065F46', fontWeight: '700' },
+  portalBtnSmall: { marginTop: 12, alignItems: 'center' },
+  portalBtnSmallText: { fontSize: 13, color: '#2563EB', fontWeight: '600' },
+
+  // Not found
+  notFoundCard: {
+    backgroundColor: '#FFFBEB',
+    marginHorizontal: 16,
+    borderRadius: 16,
+    padding: 22,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+  },
+  notFoundTitle: { fontSize: 17, fontWeight: '800', color: '#92400E', marginTop: 10, marginBottom: 8 },
+  notFoundText: {
+    fontSize: 14,
+    color: '#78350F',
+    textAlign: 'center',
+    lineHeight: 21,
+    marginBottom: 18,
+  },
+  portalBtnAlt: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F59E0B',
+    paddingVertical: 13,
+    paddingHorizontal: 22,
+    borderRadius: 12,
+    gap: 8,
+  },
+  portalBtnAltText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });

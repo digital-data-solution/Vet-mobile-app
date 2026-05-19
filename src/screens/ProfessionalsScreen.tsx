@@ -15,6 +15,10 @@ import * as Location from 'expo-location';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiFetch } from '../api/client';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TYPES
+// ─────────────────────────────────────────────────────────────────────────────
+
 interface Professional {
   _id: string;
   userId?: { name?: string; phone?: string; email?: string };
@@ -37,6 +41,28 @@ interface Props {
   navigation: any;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Navigate to SubscriptionScreen regardless of whether we're in a tab or stack. */
+function goToSubscription(navigation: any) {
+  try {
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.navigate('Subscription'); // tab name in ProfessionalTabs / KennelOwnerTabs / ShopOwnerTabs
+    } else {
+      navigation.navigate('SubscriptionScreen'); // stack screen name
+    }
+  } catch {
+    navigation.navigate('SubscriptionScreen');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPONENT
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function ProfessionalsScreen({ navigation }: Props) {
   const [coords, setCoords] = useState({ lat: '6.5244', lng: '3.3792' });
   const [distance, setDistance] = useState('10');
@@ -48,31 +74,49 @@ export default function ProfessionalsScreen({ navigation }: Props) {
   const [locationLoading, setLocationLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
-  // Subscription check on screen focus
+  // ─── Subscription gate ──────────────────────────────────────────────────────
+
   useFocusEffect(
     useCallback(() => {
+      let active = true;
+
       const checkSubscription = async () => {
         try {
           const res = await apiFetch('/api/subscriptions/me', { method: 'GET' });
+          if (!active) return;
+
           if (!res.ok || !res.body?.data?.isActive) {
             Alert.alert(
               'Subscription Required',
-              'You need an active subscription to access this feature.',
-              [{ text: 'Go to Subscription', onPress: () => navigation.replace('SubscriptionScreen') }]
+              'You need an active subscription to search for professionals.',
+              [
+                { text: 'Not Now', style: 'cancel' },
+                { text: 'Subscribe', onPress: () => goToSubscription(navigation) },
+              ],
             );
           }
         } catch {
-          Alert.alert('Error', 'Could not verify subscription.');
-          navigation.replace('SubscriptionScreen');
+          if (!active) return;
+          Alert.alert(
+            'Connection Error',
+            'Could not verify your subscription. Please check your internet connection.',
+            [{ text: 'OK' }],
+          );
         }
       };
+
       checkSubscription();
-    }, [navigation])
+      return () => { active = false; };
+    }, [navigation]),
   );
+
+  // ─── Initial fetch ───────────────────────────────────────────────────────────
 
   useEffect(() => {
     fetchAllProfessionals();
   }, [roleFilter]);
+
+  // ─── Fetch all ───────────────────────────────────────────────────────────────
 
   const fetchAllProfessionals = async () => {
     setLoading(true);
@@ -87,15 +131,17 @@ export default function ProfessionalsScreen({ navigation }: Props) {
       if (res.ok && res.body?.success) {
         setResults(res.body.data || []);
       } else {
-        Alert.alert('Error', res.body?.message || 'Failed to fetch professionals');
+        Alert.alert('Error', res.body?.message || 'Failed to fetch professionals.');
       }
-    } catch (error) {
-      console.error('Fetch error:', error);
-      Alert.alert('Error', 'Network error occurred');
+    } catch {
+      Alert.alert('Error', 'Network error. Please try again.');
+    } finally {
+      setLoading(false);
+      setHasSearched(true);
     }
-    setLoading(false);
-    setHasSearched(true);
   };
+
+  // ─── Location ────────────────────────────────────────────────────────────────
 
   const getCurrentLocation = async () => {
     setLocationLoading(true);
@@ -111,8 +157,7 @@ export default function ProfessionalsScreen({ navigation }: Props) {
         lng: location.coords.longitude.toString(),
       });
       Alert.alert('Location Updated', 'Now showing results near your current location.');
-    } catch (error) {
-      console.error('Location error:', error);
+    } catch {
       Alert.alert('Error', 'Failed to get current location. Please try again.');
     } finally {
       setLocationLoading(false);
@@ -134,15 +179,16 @@ export default function ProfessionalsScreen({ navigation }: Props) {
         });
         Alert.alert('Location Set', `Location updated to: ${addressInput}`);
       } else {
-        Alert.alert('Not Found', 'Could not find coordinates for that address. Try a more specific address.');
+        Alert.alert('Not Found', 'Could not find that address. Try a more specific one.');
       }
-    } catch (error) {
-      console.error('Geocode error:', error);
+    } catch {
       Alert.alert('Error', 'Failed to look up that address.');
     } finally {
       setLocationLoading(false);
     }
   };
+
+  // ─── Nearby search ───────────────────────────────────────────────────────────
 
   const searchNearby = async () => {
     setLoading(true);
@@ -160,16 +206,17 @@ export default function ProfessionalsScreen({ navigation }: Props) {
       if (res.ok && res.body?.success) {
         setResults(res.body.data || []);
       } else {
-        Alert.alert('Error', res.body?.message || 'Failed to fetch professionals');
+        Alert.alert('Error', res.body?.message || 'Failed to fetch professionals.');
       }
-    } catch (error) {
-      console.error('Search error:', error);
-      Alert.alert('Error', 'Network error occurred');
+    } catch {
+      Alert.alert('Error', 'Network error. Please try again.');
     } finally {
       setLoading(false);
       setHasSearched(true);
     }
   };
+
+  // ─── Render card ─────────────────────────────────────────────────────────────
 
   const renderProfessional = ({ item }: { item: Professional }) => {
     const isVet = item.role === 'vet';
@@ -187,7 +234,9 @@ export default function ProfessionalsScreen({ navigation }: Props) {
           </View>
           <View style={styles.cardMeta}>
             <Text style={styles.vetName}>{displayName}</Text>
-            {item.specialization ? <Text style={styles.specialization}>{item.specialization}</Text> : null}
+            {item.specialization ? (
+              <Text style={styles.specialization}>{item.specialization}</Text>
+            ) : null}
             {!isVet && item.name !== displayName ? (
               <Text style={styles.ownerName}>Owner: {item.name}</Text>
             ) : null}
@@ -202,10 +251,10 @@ export default function ProfessionalsScreen({ navigation }: Props) {
         <View style={styles.cardDetails}>
           {item.address ? <DetailRow icon="📍" value={item.address} /> : null}
           {item.phone || item.userId?.phone ? (
-            <DetailRow icon="📞" value={item.phone || item.userId?.phone || ''} />
+            <DetailRow icon="📞" value={(item.phone || item.userId?.phone) ?? ''} />
           ) : null}
           {item.email || item.userId?.email ? (
-            <DetailRow icon="✉️" value={item.email || item.userId?.email || ''} />
+            <DetailRow icon="✉️" value={(item.email || item.userId?.email) ?? ''} />
           ) : null}
           {item.distance != null ? (
             <DetailRow icon="📏" value={`${item.distance.toFixed(1)} km away`} highlight />
@@ -218,10 +267,13 @@ export default function ProfessionalsScreen({ navigation }: Props) {
     );
   };
 
-  const professionals = results.filter((item) => {
-    if (roleFilter === 'all') return true;
-    return item.role === roleFilter;
-  });
+  // ─── Filtered list ───────────────────────────────────────────────────────────
+
+  const professionals = results.filter((item) =>
+    roleFilter === 'all' ? true : item.role === roleFilter,
+  );
+
+  // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <KeyboardAvoidingView
@@ -230,6 +282,7 @@ export default function ProfessionalsScreen({ navigation }: Props) {
       keyboardVerticalOffset={90}
     >
       <View style={styles.container}>
+
         {/* Search bar */}
         <View style={styles.searchBar}>
           <Text style={styles.searchIcon}>🔍</Text>
@@ -260,7 +313,7 @@ export default function ProfessionalsScreen({ navigation }: Props) {
           ))}
         </View>
 
-        {/* Location section */}
+        {/* Location card */}
         <View style={styles.locationCard}>
           <Text style={styles.locationTitle}>📍 Your Location</Text>
           <TextInput
@@ -293,9 +346,9 @@ export default function ProfessionalsScreen({ navigation }: Props) {
             </TouchableOpacity>
           </View>
 
-          {/* Distance selector */}
+          {/* Distance chips */}
           <View style={styles.distanceRow}>
-            <Text style={styles.distanceLabel}>Search radius:</Text>
+            <Text style={styles.distanceLabel}>Radius:</Text>
             {['5', '10', '25', '50'].map((d) => (
               <TouchableOpacity
                 key={d}
@@ -366,7 +419,19 @@ export default function ProfessionalsScreen({ navigation }: Props) {
   );
 }
 
-function DetailRow({ icon, value, highlight = false }: { icon: string; value: string; highlight?: boolean }) {
+// ─────────────────────────────────────────────────────────────────────────────
+// SUB-COMPONENT
+// ─────────────────────────────────────────────────────────────────────────────
+
+function DetailRow({
+  icon,
+  value,
+  highlight = false,
+}: {
+  icon: string;
+  value: string;
+  highlight?: boolean;
+}) {
   return (
     <View style={styles.detailRow}>
       <Text style={styles.detailIcon}>{icon}</Text>
@@ -375,8 +440,13 @@ function DetailRow({ icon, value, highlight = false }: { icon: string; value: st
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// STYLES
+// ─────────────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
+
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -393,6 +463,7 @@ const styles = StyleSheet.create({
   },
   searchIcon: { fontSize: 16, marginRight: 8 },
   searchInput: { flex: 1, paddingVertical: 14, fontSize: 15, color: '#111827' },
+
   filterRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -412,6 +483,7 @@ const styles = StyleSheet.create({
   filterChipActive: { backgroundColor: '#EFF6FF', borderColor: '#2563EB' },
   filterChipText: { fontSize: 13, color: '#6B7280', fontWeight: '600' },
   filterChipTextActive: { color: '#2563EB', fontWeight: '700' },
+
   locationCard: {
     backgroundColor: '#fff',
     marginHorizontal: 16,
@@ -453,16 +525,20 @@ const styles = StyleSheet.create({
   distanceChipActive: { backgroundColor: '#EFF6FF', borderColor: '#2563EB' },
   distanceChipText: { fontSize: 12, color: '#6B7280', fontWeight: '500' },
   distanceChipTextActive: { color: '#2563EB', fontWeight: '700' },
+
   actionRow: { flexDirection: 'row', marginHorizontal: 16, marginTop: 12, gap: 10 },
   actionBtn: { flex: 1, paddingVertical: 13, borderRadius: 10, alignItems: 'center' },
   actionBtnOutline: { borderWidth: 1.5, borderColor: '#2563EB' },
   actionBtnOutlineText: { color: '#2563EB', fontWeight: '700', fontSize: 14 },
   actionBtnFill: { backgroundColor: '#2563EB' },
   actionBtnFillText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+
   loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 40 },
   loadingText: { marginTop: 12, color: '#6B7280', fontSize: 15 },
+
   list: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 24 },
   resultCount: { fontSize: 13, color: '#6B7280', marginBottom: 10, fontWeight: '500' },
+
   card: {
     backgroundColor: '#fff',
     borderRadius: 14,
@@ -502,6 +578,7 @@ const styles = StyleSheet.create({
   detailIcon: { fontSize: 13, marginRight: 6, width: 18 },
   detailValue: { fontSize: 13, color: '#6B7280', flex: 1 },
   detailValueHighlight: { color: '#2563EB', fontWeight: '600' },
+
   emptyState: { alignItems: 'center', paddingTop: 40, paddingBottom: 40 },
   emptyEmoji: { fontSize: 48, marginBottom: 16 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 8 },

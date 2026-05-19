@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -34,16 +34,24 @@ function isValidPhone(p: string): boolean {
   return /^\+\d{10,15}$/.test(formatted);
 }
 
+// ✅ Your deep link scheme — must match app.json "scheme" and Supabase redirect URLs
+const DEEP_LINK_SCHEME = 'xpressvet';
+const EMAIL_VERIFY_REDIRECT = `${DEEP_LINK_SCHEME}://verify-email`;
+
 export default function RegisterScreen({ navigation }: Props) {
   const [registerMethod, setRegisterMethod] = useState<RegisterMethod>('email');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [phone, setPhone]                   = useState('');
+  const [email, setEmail]                   = useState('');
+  const [password, setPassword]             = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [otp, setOtp] = useState('');
-  const [step, setStep] = useState<Step>('register');
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [otp, setOtp]                       = useState('');
+  const [step, setStep]                     = useState<Step>('register');
+  const [loading, setLoading]               = useState(false);
+  const [showPassword, setShowPassword]     = useState(false);
+
+  // ✅ Spam guard: track timestamp of last registration attempt
+  const lastSubmitTime = useRef<number | null>(null);
+  const COOLDOWN_MS = 60_000; // 60 seconds between attempts
 
   const validate = (): string | null => {
     if (registerMethod === 'phone') {
@@ -66,14 +74,30 @@ export default function RegisterScreen({ navigation }: Props) {
       return;
     }
 
+    // ✅ Cooldown check — prevents email spam
+    const now = Date.now();
+    if (lastSubmitTime.current && now - lastSubmitTime.current < COOLDOWN_MS) {
+      const remaining = Math.ceil((COOLDOWN_MS - (now - lastSubmitTime.current)) / 1000);
+      Alert.alert(
+        'Please Wait',
+        `You can request another verification email in ${remaining} seconds.`,
+      );
+      return;
+    }
+
     setLoading(true);
     try {
-      let data, error;
+      let data: any, error: any;
 
       if (registerMethod === 'email') {
         ({ data, error } = await supabase.auth.signUp({
-          email: email.trim(),
+          email: email.trim().toLowerCase(),
           password,
+          options: {
+            // ✅ This fixes the localhost redirect — must also be added in
+            // Supabase Dashboard → Authentication → URL Configuration → Redirect URLs
+            emailRedirectTo: EMAIL_VERIFY_REDIRECT,
+          },
         }));
       } else {
         ({ data, error } = await supabase.auth.signUp({
@@ -83,31 +107,45 @@ export default function RegisterScreen({ navigation }: Props) {
       }
 
       if (error) {
-        Alert.alert('Registration Failed', error.message);
+        // ✅ Handle "user already registered" gracefully
+        if (error.message.toLowerCase().includes('already registered')) {
+          Alert.alert(
+            'Account Exists',
+            'An account with this email already exists. Please sign in instead.',
+            [{ text: 'Sign In', onPress: () => navigation.navigate('Auth') }],
+          );
+        } else {
+          Alert.alert('Registration Failed', error.message);
+        }
         return;
       }
 
+      // ✅ Record successful submission time for cooldown
+      lastSubmitTime.current = Date.now();
+
       // Register user in backend (MongoDB)
       const backendPayload = registerMethod === 'email'
-        ? { name: email.split('@')[0], email: email.trim(), password, role: 'pet_owner' }
+        ? { name: email.split('@')[0], email: email.trim().toLowerCase(), password, role: 'pet_owner' }
         : { name: phone.trim(), phone: formatPhone(phone.trim()), password, role: 'pet_owner' };
+
       try {
         await fetch('https://vet-market-place.onrender.com/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(backendPayload),
         });
-      } catch (e) {
-        // Ignore backend errors for now, user can retry onboarding if needed
+      } catch {
+        // Ignore backend errors — user can retry onboarding if needed
       }
 
       if (registerMethod === 'phone') {
         setStep('verifyOtp');
       } else {
-        // Check if email confirmation is required
+        // ✅ data.session is null when email confirmation is required (correct flow)
         if (data?.user && !data.session) {
           setStep('emailSent');
         } else if (data?.session) {
+          // Email confirmation disabled in Supabase — log in directly
           await AsyncStorage.setItem('access_token', data.session.access_token);
           navigation.replace('MainTabs');
         }
@@ -117,7 +155,7 @@ export default function RegisterScreen({ navigation }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [registerMethod, email, phone, password, navigation]);
+  }, [registerMethod, email, phone, password, confirmPassword, navigation]);
 
   const handleVerifyOtp = useCallback(async () => {
     if (!otp || otp.length < 4) {
@@ -143,6 +181,36 @@ export default function RegisterScreen({ navigation }: Props) {
       setLoading(false);
     }
   }, [otp, phone, navigation]);
+
+  // ✅ Resend verification email with cooldown
+  const handleResendEmail = useCallback(async () => {
+    const now = Date.now();
+    if (lastSubmitTime.current && now - lastSubmitTime.current < COOLDOWN_MS) {
+      const remaining = Math.ceil((COOLDOWN_MS - (now - lastSubmitTime.current)) / 1000);
+      Alert.alert('Please Wait', `You can resend the email in ${remaining} seconds.`);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email.trim().toLowerCase(),
+        options: { emailRedirectTo: EMAIL_VERIFY_REDIRECT },
+      });
+
+      if (error) {
+        Alert.alert('Failed to Resend', error.message);
+      } else {
+        lastSubmitTime.current = Date.now();
+        Alert.alert('Email Sent', 'A new verification link has been sent to your email.');
+      }
+    } catch {
+      Alert.alert('Network Error', 'Please check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [email]);
 
   return (
     <KeyboardAvoidingView
@@ -279,7 +347,7 @@ export default function RegisterScreen({ navigation }: Props) {
               <Text style={styles.cardSubtitle}>
                 We sent a verification link to{'\n'}
                 <Text style={styles.boldText}>{email}</Text>
-                {'\n\n'}Click the link in the email, then return here to sign in.
+                {'\n\n'}Tap the link in the email to confirm your account, then come back to sign in.
               </Text>
 
               <PrimaryButton
@@ -288,6 +356,24 @@ export default function RegisterScreen({ navigation }: Props) {
                 onPress={() => navigation.navigate('Auth')}
                 loading={false}
               />
+
+              {/* ✅ Resend option with cooldown built in */}
+              <TouchableOpacity
+                style={styles.textLink}
+                onPress={handleResendEmail}
+                disabled={loading}
+              >
+                <Text style={styles.textLinkText}>
+                  {loading ? 'Sending...' : "Didn't receive it? Resend email"}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.textLink, { marginTop: 4 }]}
+                onPress={() => setStep('register')}
+              >
+                <Text style={[styles.textLinkText, { color: '#6B7280' }]}>← Use a different email</Text>
+              </TouchableOpacity>
             </>
           )}
         </View>
@@ -319,23 +405,12 @@ function ToggleButton({ label, active, onPress }: { label: string; active: boole
 }
 
 function FormInput({
-  icon,
-  placeholder,
-  value,
-  onChangeText,
-  keyboardType,
-  secureTextEntry,
-  autoCapitalize,
-  maxLength,
+  icon, placeholder, value, onChangeText,
+  keyboardType, secureTextEntry, autoCapitalize, maxLength,
 }: {
-  icon: string;
-  placeholder: string;
-  value: string;
-  onChangeText: (v: string) => void;
-  keyboardType?: any;
-  secureTextEntry?: boolean;
-  autoCapitalize?: any;
-  maxLength?: number;
+  icon: string; placeholder: string; value: string;
+  onChangeText: (v: string) => void; keyboardType?: any;
+  secureTextEntry?: boolean; autoCapitalize?: any; maxLength?: number;
 }) {
   return (
     <View style={styles.inputWrapper}>
@@ -356,15 +431,9 @@ function FormInput({
 }
 
 function PrimaryButton({
-  label,
-  loadingLabel,
-  onPress,
-  loading,
+  label, loadingLabel, onPress, loading,
 }: {
-  label: string;
-  loadingLabel: string;
-  onPress: () => void;
-  loading: boolean;
+  label: string; loadingLabel: string; onPress: () => void; loading: boolean;
 }) {
   return (
     <TouchableOpacity
@@ -373,11 +442,10 @@ function PrimaryButton({
       disabled={loading}
       activeOpacity={0.85}
     >
-      {loading ? (
-        <ActivityIndicator size="small" color="#fff" />
-      ) : (
-        <Text style={styles.primaryBtnText}>{label}</Text>
-      )}
+      {loading
+        ? <ActivityIndicator size="small" color="#fff" />
+        : <Text style={styles.primaryBtnText}>{label}</Text>
+      }
     </TouchableOpacity>
   );
 }
@@ -385,83 +453,36 @@ function PrimaryButton({
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: '#F3F4F6' },
-  container: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 40 },
-  logoSection: { alignItems: 'center', marginBottom: 28 },
-  logoEmoji: { fontSize: 56, marginBottom: 10 },
-  appName: { fontSize: 30, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
-  appTagline: { fontSize: 14, color: '#6B7280', marginTop: 4 },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  cardTitle: { fontSize: 22, fontWeight: '800', color: '#111827', marginBottom: 6 },
-  cardSubtitle: { fontSize: 14, color: '#6B7280', lineHeight: 22, marginBottom: 20 },
-  boldText: { fontWeight: '700', color: '#111827' },
-  methodToggle: {
-    flexDirection: 'row',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 10,
-    padding: 4,
-    marginBottom: 18,
-  },
-  toggleBtn: { flex: 1, paddingVertical: 9, borderRadius: 8, alignItems: 'center' },
-  toggleBtnActive: {
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  toggleBtnText: { fontSize: 14, fontWeight: '600', color: '#9CA3AF' },
-  toggleBtnTextActive: { color: '#111827' },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    marginBottom: 14,
-    backgroundColor: '#F9FAFB',
-  },
-  inputIcon: { fontSize: 16, marginRight: 10 },
-  input: { flex: 1, paddingVertical: 13, fontSize: 15, color: '#111827' },
-  showPasswordBtn: { position: 'absolute', right: 14, top: 14 },
-  showPasswordText: { fontSize: 13, color: '#2563EB', fontWeight: '600' },
-  primaryBtn: {
-    backgroundColor: '#2563EB',
-    paddingVertical: 15,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 4,
-    marginBottom: 12,
-    shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
+  scroll:             { flex: 1, backgroundColor: '#F3F4F6' },
+  container:          { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 40 },
+  logoSection:        { alignItems: 'center', marginBottom: 28 },
+  logoEmoji:          { fontSize: 56, marginBottom: 10 },
+  appName:            { fontSize: 30, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
+  appTagline:         { fontSize: 14, color: '#6B7280', marginTop: 4 },
+  card:               { backgroundColor: '#fff', borderRadius: 20, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 4 },
+  cardTitle:          { fontSize: 22, fontWeight: '800', color: '#111827', marginBottom: 6 },
+  cardSubtitle:       { fontSize: 14, color: '#6B7280', lineHeight: 22, marginBottom: 20 },
+  boldText:           { fontWeight: '700', color: '#111827' },
+  methodToggle:       { flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 10, padding: 4, marginBottom: 18 },
+  toggleBtn:          { flex: 1, paddingVertical: 9, borderRadius: 8, alignItems: 'center' },
+  toggleBtnActive:    { backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 2, elevation: 2 },
+  toggleBtnText:      { fontSize: 14, fontWeight: '600', color: '#9CA3AF' },
+  toggleBtnTextActive:{ color: '#111827' },
+  inputWrapper:       { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 10, paddingHorizontal: 12, marginBottom: 14, backgroundColor: '#F9FAFB' },
+  inputIcon:          { fontSize: 16, marginRight: 10 },
+  input:              { flex: 1, paddingVertical: 13, fontSize: 15, color: '#111827' },
+  showPasswordBtn:    { position: 'absolute', right: 14, top: 14 },
+  showPasswordText:   { fontSize: 13, color: '#2563EB', fontWeight: '600' },
+  primaryBtn:         { backgroundColor: '#2563EB', paddingVertical: 15, borderRadius: 12, alignItems: 'center', marginTop: 4, marginBottom: 12, shadowColor: '#2563EB', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
   primaryBtnDisabled: { opacity: 0.7 },
-  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  textLink: { alignItems: 'center', marginTop: 8 },
-  textLinkText: { color: '#2563EB', fontSize: 14, fontWeight: '600' },
-  successIcon: { alignItems: 'center', marginBottom: 12 },
-  successEmoji: { fontSize: 52 },
-  terms: { fontSize: 12, color: '#9CA3AF', textAlign: 'center', lineHeight: 18 },
-  termsLink: { color: '#2563EB', fontWeight: '600' },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 24,
-  },
-  footerText: { fontSize: 14, color: '#6B7280' },
-  footerLink: { fontSize: 14, color: '#2563EB', fontWeight: '700' },
+  primaryBtnText:     { color: '#fff', fontSize: 16, fontWeight: '700' },
+  textLink:           { alignItems: 'center', marginTop: 8 },
+  textLinkText:       { color: '#2563EB', fontSize: 14, fontWeight: '600' },
+  successIcon:        { alignItems: 'center', marginBottom: 12 },
+  successEmoji:       { fontSize: 52 },
+  terms:              { fontSize: 12, color: '#9CA3AF', textAlign: 'center', lineHeight: 18 },
+  termsLink:          { color: '#2563EB', fontWeight: '600' },
+  footer:             { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
+  footerText:         { fontSize: 14, color: '#6B7280' },
+  footerLink:         { fontSize: 14, color: '#2563EB', fontWeight: '700' },
 });

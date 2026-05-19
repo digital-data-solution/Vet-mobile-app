@@ -9,6 +9,10 @@ import {
   Alert,
 } from 'react-native';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TYPES
+// ─────────────────────────────────────────────────────────────────────────────
+
 interface Shop {
   shopName?: string;
   businessName?: string;
@@ -20,33 +24,44 @@ interface Shop {
   distance?: number;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPONENT
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function ShopProfileScreen({ route }: any) {
   const shop: Shop = route.params?.shop ?? {};
 
   const displayName = shop.shopName ?? shop.businessName ?? shop.ownerName ?? 'Pet Shop';
 
   const getAddress = (): string => {
+    if (!shop.address) return '';
     if (typeof shop.address === 'string') return shop.address;
-    return shop.address?.full ?? shop.address?.city ?? shop.address?.town ?? '';
+    return shop.address.full ?? shop.address.city ?? shop.address.town ?? '';
   };
+
+  const address = getAddress();
 
   const callShop = () => {
     if (!shop.phone) return;
     Linking.openURL(`tel:${shop.phone}`).catch(() =>
-      Alert.alert('Error', 'Unable to open phone app')
+      Alert.alert('Error', 'Unable to open phone app.'),
     );
   };
 
   const emailShop = () => {
     if (!shop.email) return;
     Linking.openURL(`mailto:${shop.email}`).catch(() =>
-      Alert.alert('Error', 'Unable to open mail app')
+      Alert.alert('Error', 'Unable to open mail app.'),
     );
   };
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Hero */}
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.container}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* ── Hero ───────────────────────────────────────────────────────────── */}
       <View style={styles.hero}>
         <View style={styles.avatar}>
           <Text style={styles.avatarEmoji}>🛒</Text>
@@ -59,30 +74,38 @@ export default function ShopProfileScreen({ route }: any) {
         ) : null}
       </View>
 
-      {/* Contact actions */}
+      {/* ── Contact actions ─────────────────────────────────────────────────── */}
       {(shop.phone || shop.email) ? (
         <View style={styles.contactRow}>
           {shop.phone ? (
-            <TouchableOpacity style={[styles.contactBtn, styles.contactBtnCall]} onPress={callShop}>
+            <TouchableOpacity
+              style={[styles.contactBtn, styles.contactBtnCall]}
+              onPress={callShop}
+              activeOpacity={0.8}
+            >
               <Text style={styles.contactBtnText}>📞 Call</Text>
             </TouchableOpacity>
           ) : null}
           {shop.email ? (
-            <TouchableOpacity style={[styles.contactBtn, styles.contactBtnEmail]} onPress={emailShop}>
+            <TouchableOpacity
+              style={[styles.contactBtn, styles.contactBtnEmail]}
+              onPress={emailShop}
+              activeOpacity={0.8}
+            >
               <Text style={[styles.contactBtnText, styles.contactBtnEmailText]}>✉️ Email</Text>
             </TouchableOpacity>
           ) : null}
         </View>
       ) : null}
 
-      {/* Details */}
+      {/* ── Details card ────────────────────────────────────────────────────── */}
       <View style={styles.detailsCard}>
         <Text style={styles.cardTitle}>Details</Text>
         {shop.ownerName ? (
           <DetailRow icon="👤" label="Owner" value={shop.ownerName} />
         ) : null}
-        {getAddress() ? (
-          <DetailRow icon="📍" label="Location" value={getAddress()} />
+        {address ? (
+          <DetailRow icon="📍" label="Location" value={address} />
         ) : null}
         {shop.phone ? (
           <DetailRow icon="📞" label="Phone" value={shop.phone} />
@@ -92,7 +115,7 @@ export default function ShopProfileScreen({ route }: any) {
         ) : null}
       </View>
 
-      {/* Description */}
+      {/* ── About ───────────────────────────────────────────────────────────── */}
       {shop.description ? (
         <View style={styles.bioCard}>
           <Text style={styles.cardTitle}>About</Text>
@@ -102,6 +125,10 @@ export default function ShopProfileScreen({ route }: any) {
     </ScrollView>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUB-COMPONENT
+// ─────────────────────────────────────────────────────────────────────────────
 
 function DetailRow({ icon, label, value }: { icon: string; label: string; value: string }) {
   return (
@@ -115,9 +142,15 @@ function DetailRow({ icon, label, value }: { icon: string; label: string; value:
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// STYLES
+// ─────────────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   scroll: { flex: 1, backgroundColor: '#F3F4F6' },
   container: { paddingBottom: 40 },
+
+  // Hero
   hero: {
     backgroundColor: '#fff',
     alignItems: 'center',
@@ -145,7 +178,7 @@ const styles = StyleSheet.create({
     borderColor: '#FED7AA',
   },
   avatarEmoji: { fontSize: 42 },
-  name: { fontSize: 24, fontWeight: '800', color: '#111827', marginBottom: 10 },
+  name: { fontSize: 24, fontWeight: '800', color: '#111827', marginBottom: 10, textAlign: 'center' },
   badge: {
     backgroundColor: '#FFF7ED',
     paddingHorizontal: 14,
@@ -155,6 +188,8 @@ const styles = StyleSheet.create({
     borderColor: '#FED7AA',
   },
   badgeText: { fontSize: 12, color: '#C2410C', fontWeight: '700' },
+
+  // Contact
   contactRow: {
     flexDirection: 'row',
     marginHorizontal: 16,
@@ -175,6 +210,8 @@ const styles = StyleSheet.create({
   },
   contactBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
   contactBtnEmailText: { color: '#111827' },
+
+  // Details card
   detailsCard: {
     backgroundColor: '#fff',
     marginHorizontal: 16,
@@ -206,6 +243,8 @@ const styles = StyleSheet.create({
   detailContent: { flex: 1 },
   detailLabel: { fontSize: 12, color: '#9CA3AF', fontWeight: '600', marginBottom: 2 },
   detailValue: { fontSize: 15, color: '#111827', fontWeight: '500' },
+
+  // Bio card
   bioCard: {
     backgroundColor: '#fff',
     marginHorizontal: 16,

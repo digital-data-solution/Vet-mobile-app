@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 
 const BACKEND_URL = (
-  process.env.EXPO_PUBLIC_BACKEND_URL || 'https://vet-market-place.onrender.com'
+  process.env.EXPO_PUBLIC_BACKEND_URL || 'https://vet-market-place-jsj5.onrender.com'
 ).replace(/\/+$/, '');
 
 const API_TIMEOUT = parseInt(process.env.EXPO_PUBLIC_API_TIMEOUT || '30000', 10);
@@ -14,10 +14,13 @@ const UPLOAD_TIMEOUT = parseInt(process.env.EXPO_PUBLIC_UPLOAD_TIMEOUT || '60000
 
 async function getAuthHeader(): Promise<string | null> {
   try {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    return session?.access_token ? `Bearer ${session.access_token}` : null;
+    // Try getSession first
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) return `Bearer ${session.access_token}`;
+
+    // Fallback: refresh the session
+    const { data: { session: refreshed } } = await supabase.auth.refreshSession();
+    return refreshed?.access_token ? `Bearer ${refreshed.access_token}` : null;
   } catch {
     return null;
   }

@@ -26,23 +26,23 @@ import ShopProfileScreen from '../screens/ShopProfileScreen';
 import KennelProfileScreen from '../screens/KennelProfileScreen';
 import VerifyProfessionalScreen from '../screens/VerifyProfessionalScreen';
 import AddressInputScreen from '../screens/AddressInputScreen';
+import PaystackWebView from '../screens/PaystackWebView'; // ← added
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AUTH CONTEXT
-// Source of truth is the Supabase session. Role comes from user_metadata.
 // ─────────────────────────────────────────────────────────────────────────────
 type AuthContextType = {
-  session: Session | null;
-  userRole: string | null;
+  session:         Session | null;
+  userRole:        string | null;
   isAuthenticated: boolean;
-  signOut: () => Promise<void>;
+  signOut:         () => Promise<void>;
 };
 
 export const AuthContext = createContext<AuthContextType>({
-  session: null,
-  userRole: null,
+  session:         null,
+  userRole:        null,
   isAuthenticated: false,
-  signOut: async () => {},
+  signOut:         async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -51,41 +51,48 @@ export const useAuth = () => useContext(AuthContext);
 // NAVIGATION TYPES
 // ─────────────────────────────────────────────────────────────────────────────
 export type RootStackParamList = {
-  Auth: undefined;
-  Register: undefined;
-  MainTabs: undefined;
+  Auth:                   undefined;
+  Register:               undefined;
+  MainTabs:               undefined;
   ProfessionalOnboarding: { role?: string } | undefined;
-  KennelOnboarding: undefined;
-  ShopOnboarding: undefined;
-  VetProfile: { vetId?: string } | undefined;
-  ShopProfile: { shopId?: string } | undefined;
-  KennelProfile: { kennelId?: string } | undefined;
-  Chat: { recipientId?: string; recipientName?: string } | undefined;
-  ExploreOptions: undefined;
-  VerifyProfessional: undefined;
-  AddressInput: undefined;
-  SubscriptionScreen: undefined;
+  KennelOnboarding:       undefined;
+  ShopOnboarding:         undefined;
+  VetProfile:             { vetId?: string } | undefined;
+  ShopProfile:            { shopId?: string } | undefined;
+  KennelProfile:          { kennelId?: string } | undefined;
+  Chat:                   { recipientId?: string; recipientName?: string } | undefined;
+  ExploreOptions:         undefined;
+  VerifyProfessional:     undefined;
+  AddressInput:           undefined;
+  SubscriptionScreen:     undefined;
+  // ↓ added — functions are NOT in params; only serializable primitives
+  PaystackWebView: {
+    authorization_url: string;
+    reference:         string;
+    amount:            number;
+    callbackKey:       string;
+  };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-const Tab = createBottomTabNavigator();
+const Tab   = createBottomTabNavigator();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED STYLE HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 const tabScreenOptions = {
-  tabBarActiveTintColor: '#007AFF',
+  tabBarActiveTintColor:   '#007AFF',
   tabBarInactiveTintColor: '#8E8E93',
   tabBarStyle: {
     backgroundColor: '#fff',
-    borderTopColor: '#E5E5EA',
-    borderTopWidth: 1,
-    paddingBottom: 5,
-    paddingTop: 5,
-    height: 60,
+    borderTopColor:  '#E5E5EA',
+    borderTopWidth:  1,
+    paddingBottom:   5,
+    paddingTop:      5,
+    height:          60,
   },
-  headerStyle: { backgroundColor: '#007AFF' },
-  headerTintColor: '#fff',
+  headerStyle:      { backgroundColor: '#007AFF' },
+  headerTintColor:  '#fff',
   headerTitleStyle: { fontWeight: 'bold' as const },
 };
 
@@ -163,13 +170,11 @@ export default function AppNavigator() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Grab existing session on mount
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
 
-    // Stay in sync with Supabase auth state changes (login, logout, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
@@ -181,7 +186,7 @@ export default function AppNavigator() {
     await supabase.auth.signOut();
   };
 
-  const userRole = session?.user?.user_metadata?.role ?? null;
+  const userRole       = session?.user?.user_metadata?.role ?? null;
   const isAuthenticated = !!session;
 
   if (loading) return null;
@@ -219,6 +224,10 @@ export default function AppNavigator() {
 
               {/* Subscription */}
               <Stack.Screen name="SubscriptionScreen" component={SubscriptionScreen} options={{ headerShown: true, title: 'Subscription' }} />
+
+              {/* Payment — must live on root stack so SubscriptionScreen can navigate here
+                  from inside a tab via navigation.getParent().navigate('PaystackWebView') */}
+              <Stack.Screen name="PaystackWebView" component={PaystackWebView} options={{ headerShown: false }} />
             </>
           )}
         </Stack.Navigator>
