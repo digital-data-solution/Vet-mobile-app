@@ -10,7 +10,6 @@
  *   reference          – Paystack transaction reference (tx_ref / reference)
  *   amount             – Naira amount (number)
  *   callbackKey        – Key used to look up onSuccess/onCancel from paystackCallbackStore
- *                        (functions cannot be passed through route.params — not serializable)
  *
  * IMPORTANT: Register this screen on your ROOT stack, outside any Tab.Navigator:
  *   <Stack.Screen name="PaystackWebView" component={PaystackWebView} options={{ headerShown: false }} />
@@ -33,9 +32,24 @@ import {
   PaystackCallbacks,
 } from '../utils/paystackCallbackStore';
 
-// ─── Paystack redirects to one of these after payment ────────────────────────
-const SUCCESS_PATTERNS = ['/callback', 'paystack.com/close'];
-const CANCEL_PATTERNS  = ['/cancel',   'paystack.com/cancel'];
+// ─── Paystack URL patterns ────────────────────────────────────────────────────
+//
+// SUCCESS: Paystack closes its own page after a completed charge.
+//   paystack.com/close  — Paystack's own close signal (most reliable)
+//   /callback           — your PAYSTACK_CALLBACK_URL, only reached on success
+//
+// CANCEL: user explicitly abandons the payment.
+//   paystack.com/cancel — Paystack's cancel redirect
+//
+// ORDER MATTERS: check cancel BEFORE success so that if a URL somehow
+// contains both patterns, cancel wins and we don't false-positive a success.
+
+const SUCCESS_PATTERNS = [
+  'paystack.com/close',
+  '/api/subscriptions/verify',   // your PAYSTACK_CALLBACK_URL path
+  'onrender.com/api/subscriptions/verify',
+];
+const CANCEL_PATTERNS  = ['paystack.com/cancel', '/cancel'];
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -53,7 +67,6 @@ interface Props {
 
 export default function PaystackWebView({ route, navigation }: Props) {
 
-  // ─── Guard: screen rendered outside navigator (params undefined) ────────────
   if (!route?.params) {
     console.warn('[PaystackWebView] route.params is undefined — is the screen registered on the root stack?');
     navigation?.goBack();
@@ -65,12 +78,10 @@ export default function PaystackWebView({ route, navigation }: Props) {
   const [loading,  setLoading]  = useState(true);
   const [webError, setWebError] = useState(false);
 
-  // Prevent double-firing (success AND cancel could both match on some URLs)
   const handledRef   = useRef(false);
-  // Cache callbacks so we don't hit the store on every URL change event
   const callbacksRef = useRef<PaystackCallbacks | undefined>(undefined);
 
-  // ─── Resolve callbacks from store on mount ──────────────────────────────────
+  // ─── Resolve callbacks from store on mount ────────────────────────────────
 
   useEffect(() => {
     callbacksRef.current = getPaystackCallbacks(callbackKey);
@@ -81,23 +92,23 @@ export default function PaystackWebView({ route, navigation }: Props) {
       return;
     }
 
-    // Clean up store when screen unmounts — covers swipe-back without URL match
     return () => {
       clearPaystackCallbacks(callbackKey);
     };
   }, [callbackKey, navigation]);
 
-  // ─── Shared finish helper ───────────────────────────────────────────────────
+  // ─── Shared finish helper ─────────────────────────────────────────────────
 
   const finish = useCallback(
     (type: 'success' | 'cancel') => {
       if (handledRef.current) return;
       handledRef.current = true;
 
+      console.log(`[PaystackWebView] finish called: ${type}`);
+
       const callbacks = callbacksRef.current;
       navigation.goBack();
 
-      // Small delay so the screen pops before the parent shows an alert
       setTimeout(() => {
         if (type === 'success') {
           callbacks?.onSuccess(reference);
@@ -109,25 +120,31 @@ export default function PaystackWebView({ route, navigation }: Props) {
     [navigation, reference],
   );
 
-  // ─── URL intercept ──────────────────────────────────────────────────────────
+  // ─── URL intercept ────────────────────────────────────────────────────────
+  //
+  // Check CANCEL first — prevents a URL containing both patterns from
+  // being misclassified as success.
 
   const handleNavChange = useCallback(
     (navState: WebViewNavigation) => {
       if (handledRef.current) return;
       const url = navState.url || '';
 
-      if (SUCCESS_PATTERNS.some(p => url.includes(p))) {
-        finish('success');
-        return;
-      }
+      console.log('[PaystackWebView] navigating to:', url);
+
       if (CANCEL_PATTERNS.some(p => url.includes(p))) {
         finish('cancel');
+        return;
+      }
+
+      if (SUCCESS_PATTERNS.some(p => url.includes(p))) {
+        finish('success');
       }
     },
     [finish],
   );
 
-  // ─── Manual cancel (top-bar button) ─────────────────────────────────────────
+  // ─── Manual cancel (top-bar button) ──────────────────────────────────────
 
   const handleCancel = useCallback(() => {
     if (handledRef.current) return;
@@ -145,12 +162,12 @@ export default function PaystackWebView({ route, navigation }: Props) {
     );
   }, [finish]);
 
-  // ─── Render ─────────────────────────────────────────────────────────────────
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <SafeAreaView style={styles.safe}>
 
-      {/* ── Top bar ──────────────────────────────────────────────────────────── */}
+      {/* Top bar */}
       <View style={styles.topBar}>
         <TouchableOpacity
           onPress={handleCancel}
@@ -170,7 +187,7 @@ export default function PaystackWebView({ route, navigation }: Props) {
         </View>
       </View>
 
-      {/* ── WebView / Error ───────────────────────────────────────────────────── */}
+      {/* WebView / Error */}
       {webError ? (
         <View style={styles.errorContainer}>
           <Text style={styles.errorEmoji}>⚠️</Text>
@@ -206,7 +223,7 @@ export default function PaystackWebView({ route, navigation }: Props) {
         </>
       )}
 
-      {/* ── Powered-by strip ─────────────────────────────────────────────────── */}
+      {/* Footer */}
       <View style={styles.footer}>
         <Text style={styles.footerText}>Secured by Paystack  •  Ref: {reference}</Text>
       </View>
@@ -214,10 +231,6 @@ export default function PaystackWebView({ route, navigation }: Props) {
     </SafeAreaView>
   );
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// STYLES
-// ─────────────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#fff' },

@@ -4,8 +4,9 @@ import {
   Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from '../api/supabase';
+import AsyncStorage             from '@react-native-async-storage/async-storage';
+import { supabase }             from '../api/supabase';
+import { apiFetch }             from '../api/client';
 
 type Step = 'login' | 'forgot';
 
@@ -14,6 +15,35 @@ const STORAGE_KEYS = {
   lastPassword: 'last_password',
   accessToken:  'access_token',
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// syncWithBackend
+// Called immediately after every successful Supabase sign-in.
+// Creates the MongoDB User document if it doesn't exist yet (upsert),
+// or returns the existing one. Silent — never blocks navigation.
+// ─────────────────────────────────────────────────────────────────────────────
+async function syncWithBackend(accessToken: string): Promise<void> {
+  try {
+    const res = await apiFetch('/api/auth/sync', {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!res.ok) {
+      console.warn('[AuthScreen] sync failed — status:', res.status, res.body?.message);
+    } else {
+      console.log('[AuthScreen] sync OK — mongoId:', res.body?.userId);
+    }
+  } catch (err) {
+    // Never crash login over a sync failure — log and continue.
+    console.error('[AuthScreen] sync error:', err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function AuthScreen({ navigation }: { navigation: any }) {
   const [email,              setEmail]              = useState('');
@@ -31,18 +61,42 @@ export default function AuthScreen({ navigation }: { navigation: any }) {
     })();
   }, []);
 
+  // ─── Shared post-login handler ──────────────────────────────────────────────
+  // Single place that saves credentials, syncs MongoDB, then lets
+  // onAuthStateChange in AppNavigator handle navigation.
+
+  const afterLogin = useCallback(
+    async (
+      accessToken: string,
+      userEmail:   string,
+      userPassword: string,
+    ) => {
+      // 1. Persist session
+      await AsyncStorage.multiSet([
+        [STORAGE_KEYS.accessToken,  accessToken],
+        [STORAGE_KEYS.lastEmail,    userEmail],
+        [STORAGE_KEYS.lastPassword, userPassword],
+      ]);
+
+      // 2. Ensure MongoDB document exists — fire-and-forget but awaited
+      //    so the document is ready before any gated route is hit.
+      await syncWithBackend(accessToken);
+
+      // 3. Navigation handled by onAuthStateChange — no navigate() call needed.
+    },
+    [],
+  );
+
+  // ─── Email / password login ─────────────────────────────────────────────────
+
   const handleLogin = useCallback(async () => {
-    if (!email.trim()) {
-      return Alert.alert('Validation', 'Please enter your email address.');
-    }
-    if (!password) {
-      return Alert.alert('Validation', 'Please enter your password.');
-    }
+    if (!email.trim())  return Alert.alert('Validation', 'Please enter your email address.');
+    if (!password)      return Alert.alert('Validation', 'Please enter your password.');
 
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
+        email:    email.trim().toLowerCase(),
         password,
       });
 
@@ -51,19 +105,20 @@ export default function AuthScreen({ navigation }: { navigation: any }) {
       }
 
       if (data.session) {
-        await AsyncStorage.multiSet([
-          [STORAGE_KEYS.accessToken,  data.session.access_token],
-          [STORAGE_KEYS.lastEmail,    email.trim().toLowerCase()],
-          [STORAGE_KEYS.lastPassword, password],
-        ]);
-        // Navigation handled by onAuthStateChange in AppNavigator
+        await afterLogin(
+          data.session.access_token,
+          email.trim().toLowerCase(),
+          password,
+        );
       }
     } catch {
       Alert.alert('Network Error', 'Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
-  }, [email, password]);
+  }, [email, password, afterLogin]);
+
+  // ─── Biometric login ────────────────────────────────────────────────────────
 
   const handleBiometricLogin = useCallback(async () => {
     try {
@@ -79,33 +134,38 @@ export default function AuthScreen({ navigation }: { navigation: any }) {
       ]);
 
       if (!savedEmail || !savedPassword) {
-        return Alert.alert('No Saved Credentials', 'Please sign in manually at least once first.');
+        return Alert.alert(
+          'No Saved Credentials',
+          'Please sign in manually at least once first.',
+        );
       }
 
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: savedEmail,
+        email:    savedEmail,
         password: savedPassword,
       });
 
       if (error) {
         Alert.alert('Biometric Sign In Failed', error.message);
       } else if (data.session) {
-        await AsyncStorage.setItem(STORAGE_KEYS.accessToken, data.session.access_token);
+        await afterLogin(data.session.access_token, savedEmail, savedPassword);
       }
     } catch {
       Alert.alert('Error', 'Biometric authentication failed.');
     }
-  }, []);
+  }, [afterLogin]);
+
+  // ─── Forgot password ────────────────────────────────────────────────────────
 
   const handleForgotPassword = useCallback(async () => {
-    if (!email.trim()) {
-      return Alert.alert('Required', 'Please enter your email address.');
-    }
+    if (!email.trim()) return Alert.alert('Required', 'Please enter your email address.');
+
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-        redirectTo: 'xpressvet://reset-password',  // update to your actual deep link scheme
-      });
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        email.trim().toLowerCase(),
+        { redirectTo: 'xpressvet://reset-password' },
+      );
 
       if (error) {
         Alert.alert('Reset Failed', error.message);
@@ -123,8 +183,13 @@ export default function AuthScreen({ navigation }: { navigation: any }) {
     }
   }, [email]);
 
+  // ─── Render ─────────────────────────────────────────────────────────────────
+
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.container}
@@ -164,19 +229,35 @@ export default function AuthScreen({ navigation }: { navigation: any }) {
                   style={styles.showPasswordBtn}
                   onPress={() => setShowPassword(v => !v)}
                 >
-                  <Text style={styles.showPasswordText}>{showPassword ? 'Hide' : 'Show'}</Text>
+                  <Text style={styles.showPasswordText}>
+                    {showPassword ? 'Hide' : 'Show'}
+                  </Text>
                 </TouchableOpacity>
               </View>
 
-              <TouchableOpacity style={styles.forgotLink} onPress={() => setStep('forgot')}>
+              <TouchableOpacity
+                style={styles.forgotLink}
+                onPress={() => setStep('forgot')}
+              >
                 <Text style={styles.forgotLinkText}>Forgot password?</Text>
               </TouchableOpacity>
 
-              <PrimaryButton label="Sign In" loadingLabel="Signing in..." onPress={handleLogin} loading={loading} />
+              <PrimaryButton
+                label="Sign In"
+                loadingLabel="Signing in..."
+                onPress={handleLogin}
+                loading={loading}
+              />
 
               {biometricAvailable && (
-                <TouchableOpacity style={styles.biometricBtn} onPress={handleBiometricLogin} activeOpacity={0.8}>
-                  <Text style={styles.biometricBtnText}>🔐 Sign In with Biometrics</Text>
+                <TouchableOpacity
+                  style={styles.biometricBtn}
+                  onPress={handleBiometricLogin}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.biometricBtnText}>
+                    🔐 Sign In with Biometrics
+                  </Text>
                 </TouchableOpacity>
               )}
             </>
@@ -185,7 +266,9 @@ export default function AuthScreen({ navigation }: { navigation: any }) {
           {step === 'forgot' && (
             <>
               <Text style={styles.cardTitle}>Reset Password</Text>
-              <Text style={styles.cardSubtitle}>Enter your email and we'll send you a reset link.</Text>
+              <Text style={styles.cardSubtitle}>
+                Enter your email and we'll send you a reset link.
+              </Text>
 
               <FormInput
                 placeholder="Email address"
@@ -196,9 +279,17 @@ export default function AuthScreen({ navigation }: { navigation: any }) {
                 icon="✉️"
               />
 
-              <PrimaryButton label="Send Reset Link" loadingLabel="Sending..." onPress={handleForgotPassword} loading={loading} />
+              <PrimaryButton
+                label="Send Reset Link"
+                loadingLabel="Sending..."
+                onPress={handleForgotPassword}
+                loading={loading}
+              />
 
-              <TouchableOpacity style={styles.textLink} onPress={() => setStep('login')}>
+              <TouchableOpacity
+                style={styles.textLink}
+                onPress={() => setStep('login')}
+              >
                 <Text style={styles.textLinkText}>← Back to Sign In</Text>
               </TouchableOpacity>
             </>
@@ -218,9 +309,18 @@ export default function AuthScreen({ navigation }: { navigation: any }) {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function FormInput({ placeholder, value, onChangeText, keyboardType, secureTextEntry, autoCapitalize, icon, maxLength }: {
-  placeholder: string; value: string; onChangeText: (v: string) => void;
-  keyboardType?: any; secureTextEntry?: boolean; autoCapitalize?: any; icon: string; maxLength?: number;
+function FormInput({
+  placeholder, value, onChangeText, keyboardType,
+  secureTextEntry, autoCapitalize, icon, maxLength,
+}: {
+  placeholder:      string;
+  value:            string;
+  onChangeText:     (v: string) => void;
+  keyboardType?:    any;
+  secureTextEntry?: boolean;
+  autoCapitalize?:  any;
+  icon:             string;
+  maxLength?:       number;
 }) {
   return (
     <View style={styles.inputWrapper}>
@@ -240,8 +340,13 @@ function FormInput({ placeholder, value, onChangeText, keyboardType, secureTextE
   );
 }
 
-function PrimaryButton({ label, loadingLabel, onPress, loading }: {
-  label: string; loadingLabel: string; onPress: () => void; loading: boolean;
+function PrimaryButton({
+  label, loadingLabel, onPress, loading,
+}: {
+  label:        string;
+  loadingLabel: string;
+  onPress:      () => void;
+  loading:      boolean;
 }) {
   return (
     <TouchableOpacity
@@ -261,31 +366,31 @@ function PrimaryButton({ label, loadingLabel, onPress, loading }: {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  scroll:           { flex: 1, backgroundColor: '#F3F4F6' },
-  container:        { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 40 },
-  logoSection:      { alignItems: 'center', marginBottom: 28 },
-  logoEmoji:        { fontSize: 56, marginBottom: 10 },
-  appName:          { fontSize: 30, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
-  appTagline:       { fontSize: 14, color: '#6B7280', marginTop: 4 },
-  card:             { backgroundColor: '#fff', borderRadius: 20, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 4 },
-  cardTitle:        { fontSize: 22, fontWeight: '800', color: '#111827', marginBottom: 16 },
-  cardSubtitle:     { fontSize: 14, color: '#6B7280', lineHeight: 20, marginBottom: 20 },
-  inputWrapper:     { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 10, paddingHorizontal: 12, marginBottom: 14, backgroundColor: '#F9FAFB' },
-  inputIcon:        { fontSize: 16, marginRight: 10 },
-  input:            { flex: 1, paddingVertical: 13, fontSize: 15, color: '#111827' },
-  passwordWrapper:  { position: 'relative' },
-  showPasswordBtn:  { position: 'absolute', right: 14, top: 14 },
-  showPasswordText: { fontSize: 13, color: '#2563EB', fontWeight: '600' },
-  forgotLink:       { alignSelf: 'flex-end', marginBottom: 18, marginTop: -6 },
-  forgotLinkText:   { fontSize: 13, color: '#2563EB', fontWeight: '600' },
-  primaryBtn:       { backgroundColor: '#2563EB', paddingVertical: 15, borderRadius: 12, alignItems: 'center', marginBottom: 12, shadowColor: '#2563EB', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
+  scroll:             { flex: 1, backgroundColor: '#F3F4F6' },
+  container:          { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 40 },
+  logoSection:        { alignItems: 'center', marginBottom: 28 },
+  logoEmoji:          { fontSize: 56, marginBottom: 10 },
+  appName:            { fontSize: 30, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
+  appTagline:         { fontSize: 14, color: '#6B7280', marginTop: 4 },
+  card:               { backgroundColor: '#fff', borderRadius: 20, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 4 },
+  cardTitle:          { fontSize: 22, fontWeight: '800', color: '#111827', marginBottom: 16 },
+  cardSubtitle:       { fontSize: 14, color: '#6B7280', lineHeight: 20, marginBottom: 20 },
+  inputWrapper:       { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 10, paddingHorizontal: 12, marginBottom: 14, backgroundColor: '#F9FAFB' },
+  inputIcon:          { fontSize: 16, marginRight: 10 },
+  input:              { flex: 1, paddingVertical: 13, fontSize: 15, color: '#111827' },
+  passwordWrapper:    { position: 'relative' },
+  showPasswordBtn:    { position: 'absolute', right: 14, top: 14 },
+  showPasswordText:   { fontSize: 13, color: '#2563EB', fontWeight: '600' },
+  forgotLink:         { alignSelf: 'flex-end', marginBottom: 18, marginTop: -6 },
+  forgotLinkText:     { fontSize: 13, color: '#2563EB', fontWeight: '600' },
+  primaryBtn:         { backgroundColor: '#2563EB', paddingVertical: 15, borderRadius: 12, alignItems: 'center', marginBottom: 12, shadowColor: '#2563EB', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
   primaryBtnDisabled: { opacity: 0.7 },
-  primaryBtnText:   { color: '#fff', fontSize: 16, fontWeight: '700' },
-  biometricBtn:     { backgroundColor: '#F0FDF4', paddingVertical: 13, borderRadius: 12, alignItems: 'center', borderWidth: 1.5, borderColor: '#BBF7D0' },
-  biometricBtnText: { color: '#16A34A', fontSize: 15, fontWeight: '700' },
-  textLink:         { alignItems: 'center', marginTop: 8 },
-  textLinkText:     { color: '#2563EB', fontSize: 14, fontWeight: '600' },
-  footer:           { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
-  footerText:       { fontSize: 14, color: '#6B7280' },
-  footerLink:       { fontSize: 14, color: '#2563EB', fontWeight: '700' },
+  primaryBtnText:     { color: '#fff', fontSize: 16, fontWeight: '700' },
+  biometricBtn:       { backgroundColor: '#F0FDF4', paddingVertical: 13, borderRadius: 12, alignItems: 'center', borderWidth: 1.5, borderColor: '#BBF7D0' },
+  biometricBtnText:   { color: '#16A34A', fontSize: 15, fontWeight: '700' },
+  textLink:           { alignItems: 'center', marginTop: 8 },
+  textLinkText:       { color: '#2563EB', fontSize: 14, fontWeight: '600' },
+  footer:             { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
+  footerText:         { fontSize: 14, color: '#6B7280' },
+  footerLink:         { fontSize: 14, color: '#2563EB', fontWeight: '700' },
 });

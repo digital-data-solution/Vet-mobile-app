@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { apiFetch } from '../api/client';
-import { getCurrentUser } from '../api/supabase';
+import { apiFetch as getMe } from '../api/client';
 import { storePaystackCallbacks } from '../utils/paystackCallbackStore';
 
 interface SubscriptionInfo {
@@ -24,21 +24,38 @@ interface SubscriptionInfo {
 const PET_OWNER_PRICE    = 500;
 const PROFESSIONAL_PRICE = 3000;
 
-export default function SubscriptionScreen({ navigation }: any) {
-  const [loading,        setLoading]        = useState(false);
-  const [isProfessional, setIsProfessional] = useState(false);
-  const [checkingRole,   setCheckingRole]   = useState(true);
-  const [currentSub,     setCurrentSub]     = useState<SubscriptionInfo | null>(null);
-  const [subLoading,     setSubLoading]     = useState(false);
+// How long to keep showing "Awaiting Confirmation" UI after a bank transfer
+// before we give up and let the user start over. 24 hours in ms.
+const PENDING_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
-  // ─── Role check ──────────────────────────────────────────────────────────────
+export default function SubscriptionScreen({ navigation }: any) {
+  const [loading,          setLoading]          = useState(false);
+  const [isProfessional,   setIsProfessional]   = useState(false);
+  const [checkingRole,     setCheckingRole]     = useState(true);
+  const [currentSub,       setCurrentSub]       = useState<SubscriptionInfo | null>(null);
+  const [subLoading,       setSubLoading]       = useState(false);
+
+  // ─── Pending bank transfer state ──────────────────────────────────────────
+  // We track these separately from currentSub so closing the WebView
+  // does NOT wipe the pending state. The pending record stays in MongoDB
+  // until the webhook confirms it or the user explicitly cancels.
+
+  const [pendingReference,  setPendingReference]  = useState<string | null>(null);
+  const [pendingInitiatedAt, setPendingInitiatedAt] = useState<number | null>(null);
+
+  // Tracks whether the user closed the WebView mid-transfer (bank transfer case).
+  // When true we show the "Awaiting Confirmation" card even if currentSub is null.
+  const [transferInFlight, setTransferInFlight] = useState(false);
+
+  // ─── Role check ───────────────────────────────────────────────────────────
 
   const checkUserRole = useCallback(async () => {
     try {
-      const { data } = await getCurrentUser();
-      if (!data?.user) return;
-      const role = data.user.user_metadata?.role || data.user.role;
-      setIsProfessional(['vet', 'kennel_owner', 'shop_owner'].includes(role));
+      const res = await getMe('/api/auth/me', { method: 'GET' });
+      if (res.ok && res.body?.data?.role) {
+        const role = res.body.data.role;
+        setIsProfessional(['vet', 'kennel_owner', 'shop_owner'].includes(role));
+      }
     } catch (err) {
       console.error('Error checking user role:', err);
     } finally {
@@ -46,14 +63,26 @@ export default function SubscriptionScreen({ navigation }: any) {
     }
   }, []);
 
-  // ─── Fetch subscription ───────────────────────────────────────────────────────
+  // ─── Fetch subscription ───────────────────────────────────────────────────
 
   const fetchCurrentSubscription = useCallback(async () => {
     setSubLoading(true);
     try {
       const res = await apiFetch('/api/subscriptions/me', { method: 'GET' });
       if (res.ok && res.body?.data) {
-        setCurrentSub(res.body.data as SubscriptionInfo);
+        const sub = res.body.data as SubscriptionInfo;
+        setCurrentSub(sub);
+
+        // If backend now shows active, clear our local transfer-in-flight state
+        if (sub.isActive) {
+          setTransferInFlight(false);
+          setPendingReference(null);
+          setPendingInitiatedAt(null);
+        }
+        // If backend shows pending, make sure our UI reflects that
+        if (sub.status === 'pending') {
+          setTransferInFlight(true);
+        }
       } else {
         setCurrentSub(null);
       }
@@ -69,10 +98,14 @@ export default function SubscriptionScreen({ navigation }: any) {
     fetchCurrentSubscription();
   }, [checkUserRole, fetchCurrentSubscription]);
 
-  // ─── Payment callbacks ────────────────────────────────────────────────────────
+  // ─── Payment callbacks ────────────────────────────────────────────────────
 
   const handlePaymentSuccess = useCallback(
     async (reference: string) => {
+      // Card payment: Paystack redirected to /close, subscription should be active
+      setTransferInFlight(false);
+      setPendingReference(null);
+      setPendingInitiatedAt(null);
       await fetchCurrentSubscription();
       Alert.alert(
         '🎉 Subscription Active!',
@@ -84,47 +117,61 @@ export default function SubscriptionScreen({ navigation }: any) {
   );
 
   const handlePaymentCancel = useCallback(() => {
-    Alert.alert(
-      'Payment Cancelled',
-      'You cancelled the payment. You can subscribe anytime from this screen.',
-      [{ text: 'OK' }],
-    );
-  }, []);
+    // ─── CRITICAL FIX ────────────────────────────────────────────────────────
+    //
+    // For BANK TRANSFERS: Paystack shows "taking longer than expected" and the
+    // user closes the WebView. This is NOT a cancellation — the money may have
+    // already left their account. We must NOT call cancel-pending here.
+    //
+    // Instead we:
+    //   1. Keep transferInFlight = true so the "Awaiting Confirmation" UI shows
+    //   2. Keep pendingReference so "Check Payment Status" can verify
+    //   3. Only call cancel-pending if the user explicitly taps "Cancel & Start Over"
+    //
+    // For CARD PAYMENTS that were genuinely cancelled: the user never sent money,
+    // so cancel-pending is safe. But we have no reliable way to distinguish
+    // the two cases at this point — so we err on the side of caution and
+    // NEVER auto-cancel here. The user can always tap "Cancel & Start Over" manually.
+    //
+    // ─────────────────────────────────────────────────────────────────────────
 
-  // ─── Open PaystackWebView ─────────────────────────────────────────────────────
-  //
-  // React Navigation cannot pass functions through route.params (they are not
-  // serializable). We store callbacks in paystackCallbackStore keyed by a unique
-  // string, then only pass that key as a route param.
-  //
-  // Navigation escalation:
-  //   (A) Tab screen  → navigation.getParent().navigate(...)  (root stack)
-  //   (B) Stack screen → navigation.navigate(...)             (already root stack)
+    console.log('[SubscriptionScreen] WebView closed — preserving pending state');
+
+    // If there is a pending reference, show the awaiting-confirmation UI
+    if (pendingReference) {
+      setTransferInFlight(true);
+      // Re-fetch from backend to get the latest status
+      fetchCurrentSubscription();
+    }
+
+    // Do NOT call cancel-pending here. Do NOT clear pendingReference.
+    // Do NOT show a "payment cancelled" alert — they may have just closed
+    // the WebView after sending the transfer.
+  }, [pendingReference, fetchCurrentSubscription]);
+
+  // ─── Open PaystackWebView ─────────────────────────────────────────────────
 
   const openPaystackWebView = useCallback(
     (authorization_url: string, reference: string, amount: number) => {
-      // Generate a unique key for this payment session
       const callbackKey = `paystack_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
-      // Store callbacks before navigating
       storePaystackCallbacks(callbackKey, {
         onSuccess: handlePaymentSuccess,
         onCancel:  handlePaymentCancel,
       });
 
       const params = { authorization_url, reference, amount, callbackKey };
-
       const parent = navigation.getParent();
       if (typeof parent?.navigate === 'function') {
-        parent.navigate('PaystackWebView', params); // Case A: inside tab
+        parent.navigate('PaystackWebView', params);
       } else {
-        navigation.navigate('PaystackWebView', params); // Case B: already on stack
+        navigation.navigate('PaystackWebView', params);
       }
     },
     [navigation, handlePaymentSuccess, handlePaymentCancel],
   );
 
-  // ─── Subscribe handler ────────────────────────────────────────────────────────
+  // ─── Subscribe handler ────────────────────────────────────────────────────
 
   const subscribe = async () => {
     setLoading(true);
@@ -142,6 +189,11 @@ export default function SubscriptionScreen({ navigation }: any) {
 
       if (res.ok && res.body?.success) {
         const { authorization_url, reference, amount } = res.body.data;
+
+        // Store reference NOW before opening WebView so handlePaymentCancel
+        // can access it if the user closes the WebView mid-transfer
+        setPendingReference(reference);
+        setPendingInitiatedAt(Date.now());
         setLoading(false);
         openPaystackWebView(authorization_url, reference, amount);
       } else {
@@ -154,27 +206,111 @@ export default function SubscriptionScreen({ navigation }: any) {
     }
   };
 
-  // ─── Navigate to Profile ──────────────────────────────────────────────────────
+  // ─── Manual status check ──────────────────────────────────────────────────
 
- const goToProfile = () => {
-  try {
-    const parent = navigation.getParent();
-    if (parent) {
-      parent.navigate('Profile');
-    } else {
-      // We're in a stack — navigate to MainTabs and switch to Profile tab
+  const checkPaymentStatus = useCallback(async () => {
+    setSubLoading(true);
+    try {
+      // First try to verify via reference if we have one
+      if (pendingReference) {
+        const verifyRes = await apiFetch(
+          `/api/subscriptions/verify?reference=${pendingReference}`,
+          { method: 'GET' },
+        );
+
+        if (verifyRes.ok && verifyRes.body?.data?.isActive) {
+          // Payment confirmed — fetch fresh sub data and clear pending state
+          await fetchCurrentSubscription();
+          setTransferInFlight(false);
+          setPendingReference(null);
+          setPendingInitiatedAt(null);
+          Alert.alert(
+            '🎉 Payment Confirmed!',
+            'Your subscription is now active.',
+            [{ text: 'Continue' }],
+          );
+          return;
+        }
+      }
+
+      // Fall back to polling /me to see if webhook already activated it
+      await fetchCurrentSubscription();
+
+      if (!currentSub?.isActive) {
+        Alert.alert(
+          'Not Confirmed Yet',
+          'Your payment is still being processed. Bank transfers can take a few minutes. Please check again shortly.',
+          [{ text: 'OK' }],
+        );
+      }
+    } catch {
+      Alert.alert('Network error', 'Please check your connection and try again.', [{ text: 'OK' }]);
+    } finally {
+      setSubLoading(false);
+    }
+  }, [pendingReference, fetchCurrentSubscription, currentSub]);
+
+  // ─── Explicit cancel & start over (user confirms they did NOT pay) ────────
+
+  const handleCancelAndStartOver = useCallback(() => {
+    Alert.alert(
+      'Cancel Payment',
+      'Did you complete a bank transfer? If yes, tap "Keep Waiting" — your payment may still confirm.\n\nOnly tap "Cancel" if you did NOT send any money.',
+      [
+        { text: 'Keep Waiting', style: 'cancel' },
+        {
+          text: 'Cancel — I Did Not Pay',
+          style: 'destructive',
+          onPress: () => {
+            // User explicitly confirms no money was sent — safe to cancel
+            setPendingReference(null);
+            setPendingInitiatedAt(null);
+            setTransferInFlight(false);
+            setCurrentSub(null);
+            apiFetch('/api/subscriptions/cancel-pending', { method: 'POST' }).catch(() => {});
+          },
+        },
+      ],
+    );
+  }, []);
+
+  // ─── Navigate to Profile ──────────────────────────────────────────────────
+
+  const goToProfile = () => {
+    try {
+      const parent = navigation.getParent();
+      if (parent) {
+        parent.navigate('Profile');
+      } else {
+        navigation.navigate('MainTabs', { screen: 'Profile' } as any);
+      }
+    } catch {
       navigation.navigate('MainTabs', { screen: 'Profile' } as any);
     }
-  } catch {
-    navigation.navigate('MainTabs', { screen: 'Profile' } as any);
-  }
-};
-  // ─── Derived state ────────────────────────────────────────────────────────────
+  };
 
-  const isPending   = !currentSub?.isActive && currentSub?.status === 'pending';
+  // ─── Derived state ────────────────────────────────────────────────────────
+
+  // Show pending UI if:
+  //   (a) backend says status === 'pending', OR
+  //   (b) we locally know a transfer is in flight (user closed WebView)
+  const isPending =
+    (!currentSub?.isActive && currentSub?.status === 'pending') ||
+    (transferInFlight && !currentSub?.isActive);
+
   const expiryLabel = currentSub?.expiresAt
     ? new Date(currentSub.expiresAt).toLocaleDateString('en-NG')
     : 'N/A';
+
+  // Auto-expire local pending state after 24h as a safety net
+  useEffect(() => {
+    if (!pendingInitiatedAt) return;
+    if (Date.now() - pendingInitiatedAt > PENDING_EXPIRY_MS) {
+      setTransferInFlight(false);
+      setPendingReference(null);
+      setPendingInitiatedAt(null);
+    }
+  }, [pendingInitiatedAt]);
 
   if (checkingRole) {
     return (
@@ -222,15 +358,24 @@ export default function SubscriptionScreen({ navigation }: any) {
         <View style={styles.pendingCard}>
           <ActivityIndicator size="small" color="#92400E" style={{ marginBottom: 8 }} />
           <Text style={styles.pendingTitle}>Awaiting Payment Confirmation</Text>
-          <Text style={styles.pendingText}>If you already paid, tap below to check your status.</Text>
+          <Text style={styles.pendingText}>
+            If you already paid via bank transfer, your subscription will activate automatically once confirmed. Tap below to check.
+          </Text>
           <TouchableOpacity
             style={styles.refreshBtn}
-            onPress={() => fetchCurrentSubscription()}
+            onPress={checkPaymentStatus}
             disabled={subLoading}
           >
             <Text style={styles.refreshBtnText}>
               {subLoading ? 'Checking…' : '↻ Check Payment Status'}
             </Text>
+          </TouchableOpacity>
+          {/* Only show cancel after explicit user confirmation they did not pay */}
+          <TouchableOpacity
+            style={[styles.refreshBtn, styles.cancelPendingBtn]}
+            onPress={handleCancelAndStartOver}
+          >
+            <Text style={styles.cancelPendingBtnText}>✕ Cancel & Start Over</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -279,7 +424,7 @@ export default function SubscriptionScreen({ navigation }: any) {
         </View>
       </View>
 
-      {/* Subscribe button */}
+      {/* Subscribe button — hidden while pending or active */}
       {!currentSub?.isActive && !isPending && (
         <TouchableOpacity
           style={[styles.subscribeBtn, loading && styles.subscribeBtnDisabled]}
@@ -417,8 +562,14 @@ const styles = StyleSheet.create({
   refreshBtn: {
     paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10,
     borderWidth: 1.5, borderColor: '#2563EB', backgroundColor: '#EFF6FF',
+    marginTop: 8,
   },
   refreshBtnText: { color: '#2563EB', fontSize: 14, fontWeight: '700' },
+
+  cancelPendingBtn: {
+    borderColor: '#DC2626', backgroundColor: '#FEF2F2',
+  },
+  cancelPendingBtnText: { color: '#DC2626', fontSize: 14, fontWeight: '700' },
 
   valueCard: {
     backgroundColor: '#EFF6FF', marginHorizontal: 16, borderRadius: 12,

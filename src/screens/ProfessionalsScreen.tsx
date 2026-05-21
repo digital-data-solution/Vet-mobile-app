@@ -42,17 +42,20 @@ interface Props {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HELPERS
+// HELPER
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Navigate to SubscriptionScreen regardless of whether we're in a tab or stack. */
+// Always navigate to the root stack's SubscriptionScreen, regardless of
+// whether we're inside a tab or already on the stack. Using getParent()
+// bubbles up from the tab navigator to the root stack navigator, which
+// is where PaystackWebView and SubscriptionScreen are registered.
 function goToSubscription(navigation: any) {
   try {
     const parent = navigation.getParent();
     if (parent) {
-      parent.navigate('Subscription'); // tab name in ProfessionalTabs / KennelOwnerTabs / ShopOwnerTabs
+      parent.navigate('SubscriptionScreen');
     } else {
-      navigation.navigate('SubscriptionScreen'); // stack screen name
+      navigation.navigate('SubscriptionScreen');
     }
   } catch {
     navigation.navigate('SubscriptionScreen');
@@ -91,6 +94,9 @@ export default function ProfessionalsScreen({ navigation }: Props) {
               'You need an active subscription to search for professionals.',
               [
                 { text: 'Not Now', style: 'cancel' },
+                // FIX: was goToSubscription(navigation) which tried the tab
+                // name 'Subscription' — only exists for professional roles.
+                // Now always targets root stack's SubscriptionScreen.
                 { text: 'Subscribe', onPress: () => goToSubscription(navigation) },
               ],
             );

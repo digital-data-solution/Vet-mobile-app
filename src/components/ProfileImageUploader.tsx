@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
+import {
+  View,
   Text,
-  Image, 
-  ActivityIndicator, 
-  Alert, 
-  StyleSheet, 
-  TouchableOpacity 
+  Image,
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  TouchableOpacity,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase, getCurrentUser } from '../api/supabase';
@@ -14,60 +14,57 @@ import { apiFetch } from '../api/client';
 
 interface ProfileImageUploaderProps {
   onUploadSuccess?: (url: string) => void;
-  currentImageUrl?: string;
+  currentImageUrl?: string | null;
 }
 
-export default function ProfileImageUploader({ 
+export default function ProfileImageUploader({
   onUploadSuccess,
-  currentImageUrl 
+  currentImageUrl,
 }: ProfileImageUploaderProps) {
-  const [image, setImage] = useState<string | null>(currentImageUrl || null);
+  const [image, setImage]       = useState<string | null>(currentImageUrl ?? null);
   const [uploading, setUploading] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [userId, setUserId]     = useState<string | null>(null);
 
+  // Fetch the authenticated user ID once
   useEffect(() => {
-    // Get current user ID
     getCurrentUser().then(({ data }) => {
-      if (data?.user?.id) {
-        setUserId(data.user.id);
-      }
+      if (data?.user?.id) setUserId(data.user.id);
     });
   }, []);
 
+  // Keep local state in sync when the parent updates currentImageUrl
   useEffect(() => {
-    // Update image when currentImageUrl changes
-    if (currentImageUrl) {
-      setImage(currentImageUrl);
-    }
+    setImage(currentImageUrl ?? null);
   }, [currentImageUrl]);
 
-  // Request permissions on mount
+  // Request media-library permissions on mount
   useEffect(() => {
     (async () => {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
           'Permission Required',
-          'Please grant camera roll permissions to upload profile photos.'
+          'Please grant camera roll permissions to upload profile photos.',
         );
       }
     })();
   }, []);
 
+  // ─── Pick image ─────────────────────────────────────────────────────────────
   const pickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'], // Updated to new array format
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.7,
       });
 
       if (!result.canceled && result.assets[0]) {
-        const uri = result.assets[0].uri;
-        setImage(uri);
-        // Auto-upload after selection
-        uploadImage(uri);
+        // Show a local preview immediately while uploading
+        const localUri = result.assets[0].uri;
+        setImage(localUri);
+        await uploadImage(localUri);
       }
     } catch (error) {
       console.error('Image picker error:', error);
@@ -75,74 +72,87 @@ export default function ProfileImageUploader({
     }
   };
 
+  // ─── Upload to Cloudinary via backend ──────────────────────────────────────
   const uploadImage = async (imageUri: string) => {
-    if (!imageUri || !userId) {
-      Alert.alert('Error', 'Please select an image first.');
+    if (!imageUri) return;
+
+    if (!userId) {
+      Alert.alert('Error', 'User session not found. Please log in again.');
       return;
     }
 
     setUploading(true);
 
     try {
-      // Get file extension
-      const fileExt = imageUri.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `${userId}-${Date.now()}.${fileExt}`;
+      // Get a fresh session token
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error('Session expired — please log in again.');
 
-      // Upload to backend using Cloudinary
+      const fileExt  = imageUri.split('.').pop()?.toLowerCase() || 'jpg';
+      // Use a deterministic filename so Cloudinary overwrites the old photo
+      const fileName = `profile-${userId}.${fileExt}`;
+
       const formData = new FormData();
       formData.append('image', {
-        uri: imageUri,
+        uri:  imageUri,
         type: `image/${fileExt}`,
         name: fileName,
       } as any);
+      // Tell backend to store in 'profiles' folder and use stable public_id
+      formData.append('folder', 'profiles');
+      formData.append('publicId', `profile-${userId}`);
 
-      const uploadResponse = await fetch('https://vet-market-place.onrender.com/api/upload', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+      // ── Step 1: Upload to Cloudinary ────────────────────────────────────────
+      const uploadResponse = await fetch(
+        'https://vet-market-place.onrender.com/api/upload',
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
         },
-        body: formData,
-      });
+      );
 
       const uploadData = await uploadResponse.json();
-      if (!uploadResponse.ok) {
-        throw new Error(uploadData.message || 'Upload failed');
-      }
-      const publicUrl = uploadData.url;
 
-      // Update user profile in backend
+      if (!uploadResponse.ok) {
+        throw new Error(uploadData.message || 'Image upload failed.');
+      }
+
+      const publicUrl: string = uploadData.url;
+
+      // ── Step 2: Persist the URL on the user's profile ───────────────────────
       const updateRes = await apiFetch('/api/auth/update-profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          profileImage: publicUrl,
-          profileImagePath: fileName 
+        body: JSON.stringify({
+          profileImage:     publicUrl,
+          profileImagePath: uploadData.publicId ?? fileName,
         }),
       });
 
-      if (updateRes.ok) {
-        Alert.alert('Success', 'Profile photo updated successfully! ✓');
-        setImage(publicUrl);
-        
-        if (onUploadSuccess) {
-          onUploadSuccess(publicUrl);
-        }
-      } else {
-        throw new Error(updateRes.body?.message || 'Failed to update profile');
+      // apiFetch resolves with { ok, body } where body is the parsed JSON
+      if (!updateRes.ok) {
+        const msg = updateRes.body?.message ?? 'Failed to save profile image.';
+        throw new Error(msg);
       }
 
+      // Update local state to the final Cloudinary URL (replaces local preview)
+      setImage(publicUrl);
+      onUploadSuccess?.(publicUrl);
+      Alert.alert('Success', 'Profile photo updated successfully! ✓');
     } catch (error: any) {
       console.error('Upload error:', error);
-      Alert.alert(
-        'Upload Failed', 
-        error.message || 'Failed to upload image. Please try again.'
-      );
+      // Roll back preview to the previous remote URL on failure
+      setImage(currentImageUrl ?? null);
+      Alert.alert('Upload Failed', error.message || 'Failed to upload image. Please try again.');
     } finally {
       setUploading(false);
     }
   };
 
-  const removeImage = async () => {
+  // ─── Remove photo ───────────────────────────────────────────────────────────
+  const removeImage = () => {
     Alert.alert(
       'Remove Photo',
       'Are you sure you want to remove your profile photo?',
@@ -154,38 +164,41 @@ export default function ProfileImageUploader({
           onPress: async () => {
             setUploading(true);
             try {
-              // Update backend to remove image
-              const res = await apiFetch('/api/auth/update-profile', {
+              const updateRes = await apiFetch('/api/auth/update-profile', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                  profileImage: null,
-                  profileImagePath: null 
-                }),
+                body: JSON.stringify({ profileImage: null, profileImagePath: null }),
               });
 
-              if (res.ok) {
-                setImage(null);
-                Alert.alert('Success', 'Profile photo removed.');
-                if (onUploadSuccess) {
-                  onUploadSuccess('');
-                }
+              if (!updateRes.ok) {
+                throw new Error(updateRes.body?.message ?? 'Failed to remove photo.');
               }
-            } catch (error) {
-              Alert.alert('Error', 'Failed to remove photo.');
+
+              setImage(null);
+              onUploadSuccess?.('');
+              Alert.alert('Success', 'Profile photo removed.');
+            } catch (error: any) {
+              console.error('Remove error:', error);
+              Alert.alert('Error', error.message || 'Failed to remove photo.');
             } finally {
               setUploading(false);
             }
           },
         },
-      ]
+      ],
     );
   };
 
+  // ─── Render ─────────────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
-      {/* Profile Image Preview */}
-      <View style={styles.imageContainer}>
+      {/* Avatar */}
+      <TouchableOpacity
+        style={styles.imageContainer}
+        onPress={pickImage}
+        disabled={uploading}
+        activeOpacity={0.85}
+      >
         {image ? (
           <Image source={{ uri: image }} style={styles.image} />
         ) : (
@@ -193,15 +206,23 @@ export default function ProfileImageUploader({
             <Text style={styles.placeholderText}>📷</Text>
           </View>
         )}
-        
+
+        {/* Upload overlay */}
         {uploading && (
           <View style={styles.uploadingOverlay}>
             <ActivityIndicator size="large" color="#fff" />
           </View>
         )}
-      </View>
 
-      {/* Action Buttons */}
+        {/* Camera badge */}
+        {!uploading && (
+          <View style={styles.cameraBadge}>
+            <Text style={styles.cameraBadgeText}>✏️</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+
+      {/* Action buttons */}
       <View style={styles.buttonContainer}>
         <TouchableOpacity
           style={[styles.button, styles.buttonPrimary]}
@@ -226,11 +247,13 @@ export default function ProfileImageUploader({
       </View>
 
       {uploading && (
-        <Text style={styles.uploadingText}>Uploading...</Text>
+        <Text style={styles.uploadingText}>Uploading…</Text>
       )}
     </View>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
@@ -259,24 +282,33 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     borderStyle: 'dashed',
   },
-  placeholderText: {
-    fontSize: 40,
-  },
+  placeholderText: { fontSize: 40 },
   uploadingOverlay: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.55)',
     borderRadius: 60,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  buttonContainer: {
-    flexDirection: 'row',
-    gap: 8,
+  cameraBadge: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
+  cameraBadgeText: { fontSize: 14 },
+  buttonContainer: { flexDirection: 'row', gap: 8 },
   button: {
     paddingVertical: 10,
     paddingHorizontal: 20,
@@ -284,24 +316,14 @@ const styles = StyleSheet.create({
     minWidth: 120,
     alignItems: 'center',
   },
-  buttonPrimary: {
-    backgroundColor: '#2563EB',
-  },
+  buttonPrimary: { backgroundColor: '#2563EB' },
   buttonSecondary: {
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: '#E5E7EB',
   },
-  buttonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  buttonTextSecondary: {
-    color: '#6B7280',
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  buttonText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  buttonTextSecondary: { color: '#6B7280', fontSize: 14, fontWeight: '600' },
   uploadingText: {
     marginTop: 8,
     fontSize: 13,

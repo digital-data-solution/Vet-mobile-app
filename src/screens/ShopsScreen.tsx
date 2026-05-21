@@ -34,6 +34,31 @@ interface Props {
   navigation: any;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPER
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Always escape the tab navigator and push SubscriptionScreen on the root
+// stack. navigation.replace() is a stack method — calling it on a tab
+// screen's navigation object does nothing or crashes. getParent() bubbles
+// up to the root Stack.Navigator where SubscriptionScreen is registered.
+function goToSubscription(navigation: any) {
+  try {
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.navigate('SubscriptionScreen');
+    } else {
+      navigation.navigate('SubscriptionScreen');
+    }
+  } catch {
+    navigation.navigate('SubscriptionScreen');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPONENT
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function ShopsScreen({ navigation }: Props) {
   const [shops, setShops] = useState<Shop[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,41 +68,36 @@ export default function ShopsScreen({ navigation }: Props) {
   const [distance, setDistance] = useState('10');
   const [hasSearched, setHasSearched] = useState(false);
 
-  // ✅ FIX: Added subscription guard — ShopsScreen was the only gated screen
-  // that did NOT check subscription on focus, allowing free access.
-  // Using navigation.replace (not navigate) so the user cannot press Back
-  // and re-enter the locked screen without re-validating.
+  // ─── Subscription gate ──────────────────────────────────────────────────────
+
   useFocusEffect(
     React.useCallback(() => {
       let isActive = true;
       const checkSub = async () => {
         try {
           const res = await apiFetch('/api/subscriptions/me', { method: 'GET' });
+          if (!isActive) return;
           if (!res.ok || !res.body?.data?.isActive) {
-            if (isActive) {
-              Alert.alert(
-                'Subscription Required',
-                'You need an active subscription to access this feature.',
-                [
-                  {
-                    text: 'Go to Subscription',
-                    onPress: () => navigation.replace('SubscriptionScreen'),
-                  },
-                ]
-              );
-            }
+            Alert.alert(
+              'Subscription Required',
+              'You need an active subscription to access pet shops.',
+              [
+                { text: 'Not Now', style: 'cancel' },
+                // FIX: was navigation.replace('SubscriptionScreen') —
+                // replace() is a stack method, not valid on a tab screen.
+                // goToSubscription() uses getParent() to reach the root stack.
+                { text: 'Subscribe', onPress: () => goToSubscription(navigation) },
+              ],
+            );
           }
         } catch {
-          if (isActive) {
-            Alert.alert('Error', 'Could not verify subscription.');
-          }
+          if (!isActive) return;
+          Alert.alert('Error', 'Could not verify subscription. Please try again.');
         }
       };
       checkSub();
-      return () => {
-        isActive = false;
-      };
-    }, [navigation])
+      return () => { isActive = false; };
+    }, [navigation]),
   );
 
   useEffect(() => {
@@ -174,18 +194,12 @@ export default function ShopsScreen({ navigation }: Props) {
       !searchTerm.trim() ||
       (getDisplayName(s) + getAddress(s) + (s.description ?? ''))
         .toLowerCase()
-        .includes(searchTerm.toLowerCase())
+        .includes(searchTerm.toLowerCase()),
   );
 
   const renderShop = ({ item }: { item: Shop }) => (
     <TouchableOpacity
       style={styles.card}
-      // ✅ FIX: Pass both the full shop object AND shopId.
-      // ShopProfileScreen can use whichever param it needs — if it
-      // expects route.params.shop it gets the object; if it fetches
-      // its own data via shopId that's also available. Passing only
-      // shopId (as the original code did) caused a blank/crash on
-      // screens that read from route.params.shop directly.
       onPress={() => navigation.navigate('ShopProfile', { shop: item, shopId: item._id })}
       activeOpacity={0.78}
     >

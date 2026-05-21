@@ -22,13 +22,19 @@ interface MediaUploaderProps {
   onImagesUpdate?: (urls: string[]) => void;
 }
 
+// ─── Upload limits per plan ───────────────────────────────────────────────────
+// Each user type has the same per-plan caps for the MVP.
+const PLAN_LIMITS = {
+  free:       5,
+  basic:      10,
+  premium:    20,
+  enterprise: 50,
+} as const;
 
-// Upload limits: 10 for professionals (vet, kennel, shop) on 'basic', 5 for 'free', 20 for 'premium', 50 for 'enterprise'
-const MEDIA_LIMITS = {
-  vet: 10,
-  kennel: 10,
-  shop: 10,
-};
+type PlanKey = keyof typeof PLAN_LIMITS;
+
+// For MVP every professional is on 'basic'. Swap this for real plan data later.
+const CURRENT_PLAN: PlanKey = 'basic';
 
 export default function MediaUploader({
   userType,
@@ -39,42 +45,40 @@ export default function MediaUploader({
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
 
-  // For MVP, everyone gets 'basic' plan limit (10)
-  const maxImages = MEDIA_LIMITS[userType];
+  const maxImages   = PLAN_LIMITS[CURRENT_PLAN];
   const canUploadMore = images.length < maxImages;
 
   useEffect(() => {
     setImages(existingImages);
   }, [existingImages]);
 
+  // Request media-library permissions once on mount
   useEffect(() => {
-    // Request permissions on mount
     (async () => {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
           'Permission Required',
-          'Please grant camera roll permissions to upload images.'
+          'Please grant camera roll permissions to upload images.',
         );
       }
     })();
   }, []);
 
+  // ─── Pick images ────────────────────────────────────────────────────────────
   const pickImages = async () => {
     if (!canUploadMore) {
       Alert.alert(
         'Upload Limit Reached',
-        `You can upload up to ${maxImages} images for now.`,
-        [
-          { text: 'OK', style: 'cancel' },
-        ]
+        `You can upload up to ${maxImages} images on the ${CURRENT_PLAN} plan.`,
+        [{ text: 'OK', style: 'cancel' }],
       );
       return;
     }
 
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'], // Updated to new array format
+        mediaTypes: ['images'],
         allowsMultipleSelection: true,
         allowsEditing: false,
         quality: 0.8,
@@ -82,17 +86,16 @@ export default function MediaUploader({
 
       if (!result.canceled && result.assets.length > 0) {
         const remainingSlots = maxImages - images.length;
-        const selectedImages = result.assets.slice(0, remainingSlots);
+        const selectedAssets = result.assets.slice(0, remainingSlots);
 
         if (result.assets.length > remainingSlots) {
           Alert.alert(
             'Upload Limit',
-            `You can only upload ${remainingSlots} more image(s).`
+            `You can only upload ${remainingSlots} more image(s) on this plan.`,
           );
         }
 
-        // Upload selected images
-        await uploadImagesToCloudinary(selectedImages.map((asset) => asset.uri));
+        await uploadImagesToCloudinary(selectedAssets.map((a) => a.uri));
       }
     } catch (error) {
       console.error('Image picker error:', error);
@@ -100,65 +103,56 @@ export default function MediaUploader({
     }
   };
 
+  // ─── Upload to Cloudinary via backend ──────────────────────────────────────
   const uploadImagesToCloudinary = async (imageUris: string[]) => {
     setUploading(true);
     setUploadProgress(0);
 
     try {
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
-      if (!token) {
-        throw new Error('Not authenticated');
-      }
+      const session = await supabase.auth.getSession();
+      const token   = session.data.session?.access_token;
+      if (!token) throw new Error('Not authenticated');
 
       const uploadedUrls: string[] = [];
-      const totalImages = imageUris.length;
+      const total = imageUris.length;
 
-      for (let i = 0; i < imageUris.length; i++) {
-        const imageUri = imageUris[i];
-        const formData = new FormData();
-
-        // Get file extension
-        const fileExt = imageUri.split('.').pop()?.toLowerCase() || 'jpg';
+      for (let i = 0; i < total; i++) {
+        const uri     = imageUris[i];
+        const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
         const fileName = `${userType}-${Date.now()}-${i}.${fileExt}`;
 
+        const formData = new FormData();
         formData.append('image', {
-          uri: imageUri,
+          uri,
           type: `image/${fileExt}`,
           name: fileName,
         } as any);
+        // Tell backend which Cloudinary folder to use
+        formData.append('folder', userType);
 
-        formData.append('folder', userType); // Organize by user type in Cloudinary
-
-        // Upload to backend which handles Cloudinary
         const response = await fetch(
           'https://vet-market-place.onrender.com/api/upload/media',
           {
             method: 'POST',
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            headers: { Authorization: `Bearer ${token}` },
             body: formData,
-          }
+          },
         );
 
         if (!response.ok) {
-          throw new Error(`Upload failed for image ${i + 1}`);
+          const err = await response.json().catch(() => ({}));
+          throw new Error(err.message || `Upload failed for image ${i + 1}`);
         }
 
         const data = await response.json();
+        // Backend returns { url, publicId } — store the URL
         uploadedUrls.push(data.url);
-
-        // Update progress
-        setUploadProgress(((i + 1) / totalImages) * 100);
+        setUploadProgress(((i + 1) / total) * 100);
       }
 
-      // Update state with new images
       const newImages = [...images, ...uploadedUrls];
       setImages(newImages);
-
-      if (onImagesUpdate) {
-        onImagesUpdate(newImages);
-      }
+      onImagesUpdate?.(newImages);
 
       Alert.alert('Success', `${uploadedUrls.length} image(s) uploaded successfully!`);
     } catch (error: any) {
@@ -170,6 +164,7 @@ export default function MediaUploader({
     }
   };
 
+  // ─── Delete image ───────────────────────────────────────────────────────────
   const deleteImage = async (imageUrl: string, index: number) => {
     Alert.alert('Delete Image', 'Are you sure you want to delete this image?', [
       { text: 'Cancel', style: 'cancel' },
@@ -178,9 +173,9 @@ export default function MediaUploader({
         style: 'destructive',
         onPress: async () => {
           try {
-            const token = (await supabase.auth.getSession()).data.session?.access_token;
+            const session = await supabase.auth.getSession();
+            const token   = session.data.session?.access_token;
 
-            // Call backend to delete from Cloudinary
             const response = await fetch(
               'https://vet-market-place.onrender.com/api/upload/delete',
               {
@@ -189,25 +184,23 @@ export default function MediaUploader({
                   'Content-Type': 'application/json',
                   Authorization: `Bearer ${token}`,
                 },
+                // Send the full Cloudinary URL; backend derives public_id
                 body: JSON.stringify({ imageUrl }),
-              }
+              },
             );
 
-            if (response.ok) {
-              const newImages = images.filter((_, i) => i !== index);
-              setImages(newImages);
-
-              if (onImagesUpdate) {
-                onImagesUpdate(newImages);
-              }
-
-              Alert.alert('Success', 'Image deleted successfully.');
-            } else {
-              throw new Error('Delete failed');
+            if (!response.ok) {
+              const err = await response.json().catch(() => ({}));
+              throw new Error(err.message || 'Delete failed');
             }
-          } catch (error) {
+
+            const newImages = images.filter((_, i) => i !== index);
+            setImages(newImages);
+            onImagesUpdate?.(newImages);
+            Alert.alert('Success', 'Image deleted successfully.');
+          } catch (error: any) {
             console.error('Delete error:', error);
-            Alert.alert('Error', 'Failed to delete image.');
+            Alert.alert('Error', error.message || 'Failed to delete image.');
           }
         },
       },
@@ -215,14 +208,14 @@ export default function MediaUploader({
   };
 
   const navigateToSubscription = () => {
-    // Navigate to subscription screen
-    // This would need navigation prop passed in or use navigation hook
-    Alert.alert('Upgrade', 'Navigate to subscription screen...');
+    // Replace with real navigation once SubscriptionScreen is wired up
+    Alert.alert('Upgrade', 'Navigate to subscription screen to upgrade your plan.');
   };
 
+  // ─── Render ─────────────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
-      {/* Header with plan info */}
+      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.headerTitle}>Gallery</Text>
@@ -231,18 +224,18 @@ export default function MediaUploader({
           </Text>
         </View>
         <View style={styles.planBadge}>
-          <Text style={styles.planText}>BASIC</Text>
+          <Text style={styles.planText}>{CURRENT_PLAN.toUpperCase()}</Text>
         </View>
       </View>
 
-      {/* Image Grid */}
+      {/* Image grid */}
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.imageGrid}>
           {images.map((imageUrl, index) => (
-            <View key={index} style={styles.imageCard}>
+            <View key={`${imageUrl}-${index}`} style={styles.imageCard}>
               <Image source={{ uri: imageUrl }} style={styles.image} />
               <TouchableOpacity
                 style={styles.deleteButton}
@@ -254,7 +247,7 @@ export default function MediaUploader({
             </View>
           ))}
 
-          {/* Upload Button */}
+          {/* Upload slot */}
           {canUploadMore && (
             <TouchableOpacity
               style={styles.uploadCard}
@@ -277,7 +270,7 @@ export default function MediaUploader({
           )}
         </View>
 
-        {/* Upgrade prompt if at limit */}
+        {/* Upgrade prompt when limit reached */}
         {!canUploadMore && (
           <View style={styles.upgradePrompt}>
             <Ionicons name="star" size={24} color="#F59E0B" />
@@ -295,28 +288,49 @@ export default function MediaUploader({
         )}
       </ScrollView>
 
-      {/* Plan Comparison Footer */}
+      {/* ─── Plan limits footer ──────────────────────────────────────────────── */}
+      {/* Now correctly reads from the flat PLAN_LIMITS object, not sub-keys    */}
       <View style={styles.footer}>
         <Text style={styles.footerTitle}>Upload Limits by Plan:</Text>
         <View style={styles.planLimits}>
-          <PlanLimit plan="Free" limit={MEDIA_LIMITS[userType].free} />
-          <PlanLimit plan="Basic" limit={MEDIA_LIMITS[userType].basic} />
-          <PlanLimit plan="Premium" limit={MEDIA_LIMITS[userType].premium} />
-          <PlanLimit plan="Enterprise" limit={MEDIA_LIMITS[userType].enterprise} />
+          {(Object.entries(PLAN_LIMITS) as [PlanKey, number][]).map(([plan, limit]) => (
+            <PlanLimit
+              key={plan}
+              plan={plan.charAt(0).toUpperCase() + plan.slice(1)}
+              limit={limit}
+              isCurrent={plan === CURRENT_PLAN}
+            />
+          ))}
         </View>
       </View>
     </View>
   );
 }
 
-function PlanLimit({ plan, limit }: { plan: string; limit: number }) {
+// ─────────────────────────────────────────────────────────────────────────────
+
+function PlanLimit({
+  plan,
+  limit,
+  isCurrent,
+}: {
+  plan: string;
+  limit: number;
+  isCurrent: boolean;
+}) {
   return (
-    <View style={styles.planLimitItem}>
-      <Text style={styles.planLimitPlan}>{plan}</Text>
-      <Text style={styles.planLimitNumber}>{limit}</Text>
+    <View style={[styles.planLimitItem, isCurrent && styles.planLimitItemActive]}>
+      <Text style={[styles.planLimitPlan, isCurrent && styles.planLimitPlanActive]}>
+        {plan}
+      </Text>
+      <Text style={[styles.planLimitNumber, isCurrent && styles.planLimitNumberActive]}>
+        {limit}
+      </Text>
     </View>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
@@ -333,38 +347,18 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
-  headerLeft: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 2,
-  },
+  headerLeft: { flex: 1 },
+  headerTitle: { fontSize: 20, fontWeight: '700', color: '#111827' },
+  headerSubtitle: { fontSize: 14, color: '#6B7280', marginTop: 2 },
   planBadge: {
     backgroundColor: '#DBEAFE',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
   },
-  planText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#2563EB',
-  },
-  scrollContent: {
-    padding: 16,
-  },
-  imageGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
+  planText: { fontSize: 12, fontWeight: '700', color: '#2563EB' },
+  scrollContent: { padding: 16 },
+  imageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   imageCard: {
     position: 'relative',
     width: (width - 52) / 3,
@@ -378,10 +372,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
+  image: { width: '100%', height: '100%' },
   deleteButton: {
     position: 'absolute',
     top: 6,
@@ -405,21 +396,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  uploadingContainer: {
-    alignItems: 'center',
-  },
-  uploadingText: {
-    marginTop: 8,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2563EB',
-  },
-  uploadText: {
-    marginTop: 8,
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#2563EB',
-  },
+  uploadingContainer: { alignItems: 'center' },
+  uploadingText: { marginTop: 8, fontSize: 14, fontWeight: '600', color: '#2563EB' },
+  uploadText: { marginTop: 8, fontSize: 13, fontWeight: '600', color: '#2563EB' },
   upgradePrompt: {
     marginTop: 24,
     padding: 20,
@@ -429,12 +408,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#FED7AA',
   },
-  upgradeText: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#92400E',
-    textAlign: 'center',
-  },
+  upgradeText: { marginTop: 8, fontSize: 14, color: '#92400E', textAlign: 'center' },
   upgradeButton: {
     marginTop: 12,
     backgroundColor: '#F59E0B',
@@ -442,38 +416,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 8,
   },
-  upgradeButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
+  upgradeButtonText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   footer: {
     backgroundColor: '#fff',
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
   },
-  footerTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 12,
-  },
-  planLimits: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  planLimitItem: {
-    alignItems: 'center',
-  },
-  planLimitPlan: {
-    fontSize: 11,
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  planLimitNumber: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-  },
+  footerTitle: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 12 },
+  planLimits: { flexDirection: 'row', justifyContent: 'space-around' },
+  planLimitItem: { alignItems: 'center', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8 },
+  planLimitItemActive: { backgroundColor: '#DBEAFE' },
+  planLimitPlan: { fontSize: 11, color: '#6B7280', marginBottom: 4 },
+  planLimitPlanActive: { color: '#2563EB', fontWeight: '700' },
+  planLimitNumber: { fontSize: 16, fontWeight: '700', color: '#111827' },
+  planLimitNumberActive: { color: '#2563EB' },
 });

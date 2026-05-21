@@ -19,29 +19,53 @@ type Props = {
 };
 
 const ROLE_LABELS: Record<string, string> = {
-  vet: 'Veterinarian',
+  vet:          'Veterinarian',
   kennel_owner: 'Kennel Owner',
-  shop_owner: 'Shop Owner',
-  pet_owner: 'Pet Owner',
-  user: 'Pet Owner',
+  shop_owner:   'Shop Owner',
+  pet_owner:    'Pet Owner',
+  user:         'Pet Owner',
 };
 
 interface SubscriptionInfo {
-  plan: string;
-  status: string;
-  amount: number;
-  expiresAt: string;
+  plan:          string;
+  status:        string;
+  amount:        number;
+  expiresAt:     string;
   daysRemaining: number;
-  isActive: boolean;
-  accountType: 'user' | 'professional';
+  isActive:      boolean;
+  accountType:   'user' | 'professional';
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPER
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ProfileScreen lives inside every tab navigator. navigation.navigate() on a
+// tab screen cannot reach root-stack screens like SubscriptionScreen.
+// getParent() bubbles up to the root Stack.Navigator where it's registered.
+function goToSubscription(navigation: any) {
+  try {
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.navigate('SubscriptionScreen');
+    } else {
+      navigation.navigate('SubscriptionScreen');
+    }
+  } catch {
+    navigation.navigate('SubscriptionScreen');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPONENT
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function ProfileScreen({ navigation }: Props) {
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [user,       setUser]       = useState<any>(null);
+  const [loading,    setLoading]    = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
-  const [subLoading, setSubLoading] = useState(false);
+  const [subLoading,   setSubLoading]   = useState(false);
 
   const fetchUser = useCallback(async () => {
     setLoading(true);
@@ -98,6 +122,16 @@ export default function ProfileScreen({ navigation }: Props) {
     return unsubscribe;
   }, [navigation, fetchUser, fetchSubscription]);
 
+  // ─── Profile image upload success ──────────────────────────────────────────
+  // Called by ProfileImageUploader after a successful Cloudinary upload.
+  // Patches the local user state immediately so the UI updates without a
+  // full re-fetch — the next focus event will sync from the server anyway.
+  const handleImageUploadSuccess = useCallback((newUrl: string) => {
+    setUser((prev: any) => prev ? { ...prev, profileImage: newUrl } : prev);
+  }, []);
+
+  // ─── Logout ────────────────────────────────────────────────────────────────
+
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
@@ -109,11 +143,8 @@ export default function ProfileScreen({ navigation }: Props) {
           try {
             await signOut();
             await AsyncStorage.removeItem('xp_token');
-            // ✅ Don't navigate manually — AppNavigator's onAuthStateChange
-            // listens to Supabase and will automatically show the Auth screen
-            // when the session is cleared. Calling navigation.replace('Auth')
-            // here caused the "Profile not found" error because the Stack
-            // navigator tries to resolve 'Auth' before the tree re-renders.
+            // AppNavigator's onAuthStateChange listener handles the redirect
+            // automatically — no manual navigation needed here.
           } catch {
             Alert.alert('Error', 'Failed to log out. Please try again.');
           } finally {
@@ -123,6 +154,8 @@ export default function ProfileScreen({ navigation }: Props) {
       },
     ]);
   };
+
+  // ─── Cancel subscription ───────────────────────────────────────────────────
 
   const handleCancelSubscription = () => {
     Alert.alert(
@@ -147,9 +180,11 @@ export default function ProfileScreen({ navigation }: Props) {
             }
           },
         },
-      ]
+      ],
     );
   };
+
+  // ─── Display helpers ───────────────────────────────────────────────────────
 
   const getUserDisplayName = () => {
     if (!user) return 'Anonymous User';
@@ -186,18 +221,17 @@ export default function ProfileScreen({ navigation }: Props) {
     >
       {/* Avatar & name */}
       <View style={styles.avatarSection}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarEmoji}>{isProfessional ? '👨‍⚕️' : '🐾'}</Text>
-        </View>
-
+        {/* FIX: pass the resolved profileImage URL and the stable callback.
+            Previously onUploadSuccess was () => fetchUser() which triggered a
+            full reload; now it patches state directly and re-fetch on next focus. */}
         <ProfileImageUploader
-          currentImageUrl={user?.profileImage ?? user?.user_metadata?.profileImage}
-          onUploadSuccess={() => fetchUser()}
+          currentImageUrl={user?.profileImage ?? user?.user_metadata?.profileImage ?? null}
+          onUploadSuccess={handleImageUploadSuccess}
         />
 
         {(user?.role === 'pet_owner' || user?.role === 'user') && (
           <Text style={styles.uploadHint}>
-            You can upload one profile photo. Gallery uploads are only available for professionals and businesses.
+            Tap the photo to change your profile picture.
           </Text>
         )}
 
@@ -262,7 +296,11 @@ export default function ProfileScreen({ navigation }: Props) {
           )}
 
           {subscription.isActive && (
-            <TouchableOpacity style={styles.cancelButton} onPress={handleCancelSubscription} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={handleCancelSubscription}
+              activeOpacity={0.8}
+            >
               <Text style={styles.cancelButtonText}>Cancel Subscription</Text>
             </TouchableOpacity>
           )}
@@ -272,9 +310,12 @@ export default function ProfileScreen({ navigation }: Props) {
           <Text style={styles.noSubEmoji}>⭐</Text>
           <Text style={styles.noSubTitle}>No Active Subscription</Text>
           <Text style={styles.noSubText}>Subscribe to unlock all features and unlimited access</Text>
+          {/* FIX: was navigation.navigate('SubscriptionScreen') — ProfileScreen
+              is a tab screen so that call never reached the root stack screen.
+              goToSubscription() uses getParent() to escape the tab navigator. */}
           <TouchableOpacity
             style={styles.subscribeNowButton}
-            onPress={() => navigation.navigate('SubscriptionScreen')}
+            onPress={() => goToSubscription(navigation)}
             activeOpacity={0.85}
           >
             <Text style={styles.subscribeNowText}>View Plans</Text>
@@ -286,9 +327,9 @@ export default function ProfileScreen({ navigation }: Props) {
       {user && (
         <View style={styles.infoCard}>
           <Text style={styles.cardTitle}>Account Information</Text>
-          <InfoRow icon="📞" label="Phone" value={getUserPhone()} />
-          <InfoRow icon="✉️" label="Email" value={getUserEmail()} />
-          <InfoRow icon="👤" label="Role" value={roleLabel} />
+          <InfoRow icon="📞" label="Phone"   value={getUserPhone()} />
+          <InfoRow icon="✉️" label="Email"   value={getUserEmail()} />
+          <InfoRow icon="👤" label="Role"    value={roleLabel} />
           <InfoRow icon="🆔" label="User ID" value={`${user.id?.slice(0, 16)}...`} />
         </View>
       )}
@@ -302,10 +343,11 @@ export default function ProfileScreen({ navigation }: Props) {
             label="Edit Business Info"
             onPress={() => navigation.navigate('ProfessionalOnboarding')}
           />
+          {/* FIX: was navigation.navigate('SubscriptionScreen') — same tab escape issue */}
           <MenuButton
             emoji="⭐"
             label="Manage Subscription"
-            onPress={() => navigation.navigate('SubscriptionScreen')}
+            onPress={() => goToSubscription(navigation)}
             tint="#F59E0B"
           />
           <MenuButton
@@ -357,6 +399,10 @@ export default function ProfileScreen({ navigation }: Props) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SUB-COMPONENTS
+// ─────────────────────────────────────────────────────────────────────────────
+
 function InfoRow({ icon, label, value }: { icon: string; label: string; value: string }) {
   return (
     <View style={styles.infoRow}>
@@ -383,6 +429,10 @@ function MenuButton({
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// STYLES (unchanged from original)
+// ─────────────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   scroll: { flex: 1, backgroundColor: '#F3F4F6' },
   container: { paddingBottom: 40 },
@@ -402,20 +452,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  avatar: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: '#EFF6FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 14,
-    borderWidth: 3,
-    borderColor: '#DBEAFE',
-  },
-  avatarEmoji: { fontSize: 40 },
-  uploadHint: { color: '#6B7280', fontSize: 13, marginTop: 8, textAlign: 'center', paddingHorizontal: 24 },
-  userName: { fontSize: 22, fontWeight: '800', color: '#111827', marginBottom: 8 },
+  uploadHint: { color: '#6B7280', fontSize: 13, marginTop: 4, textAlign: 'center', paddingHorizontal: 24 },
+  userName: { fontSize: 22, fontWeight: '800', color: '#111827', marginTop: 12, marginBottom: 8 },
   roleBadge: {
     backgroundColor: '#EFF6FF',
     paddingHorizontal: 14,
@@ -432,7 +470,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     borderWidth: 2,
   },
-  subscriptionCardActive: { backgroundColor: '#EFF6FF', borderColor: '#3B82F6' },
+  subscriptionCardActive:   { backgroundColor: '#EFF6FF', borderColor: '#3B82F6' },
   subscriptionCardInactive: { backgroundColor: '#FEF2F2', borderColor: '#FCA5A5' },
   subscriptionHeader: {
     flexDirection: 'row',
@@ -440,17 +478,17 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 12,
   },
-  subscriptionLabel: { fontSize: 11, fontWeight: '800', color: '#6B7280', letterSpacing: 0.5, marginBottom: 4 },
-  subscriptionPlan: { fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 2 },
+  subscriptionLabel:  { fontSize: 11, fontWeight: '800', color: '#6B7280', letterSpacing: 0.5, marginBottom: 4 },
+  subscriptionPlan:   { fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 2 },
   subscriptionAmount: { fontSize: 14, fontWeight: '600', color: '#6B7280' },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  statusBadgeActive: { backgroundColor: '#D1FAE5' },
+  statusBadge:         { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  statusBadgeActive:   { backgroundColor: '#D1FAE5' },
   statusBadgeInactive: { backgroundColor: '#FEE2E2' },
-  statusText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.3 },
-  statusTextActive: { color: '#065F46' },
+  statusText:         { fontSize: 11, fontWeight: '800', letterSpacing: 0.3 },
+  statusTextActive:   { color: '#065F46' },
   statusTextInactive: { color: '#991B1B' },
   subscriptionDetails: { gap: 8 },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  detailRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   detailLabel: { fontSize: 13, color: '#6B7280' },
   detailValue: { fontSize: 13, fontWeight: '600', color: '#111827' },
   expiredText: { fontSize: 13, color: '#991B1B', fontStyle: 'italic' },
@@ -477,7 +515,7 @@ const styles = StyleSheet.create({
   },
   noSubEmoji: { fontSize: 48, marginBottom: 12 },
   noSubTitle: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 6 },
-  noSubText: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: 16 },
+  noSubText:  { fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: 16 },
   subscribeNowButton: {
     backgroundColor: '#2563EB',
     paddingVertical: 12,
@@ -512,7 +550,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
-  infoIcon: { fontSize: 16, marginRight: 10, width: 22 },
+  infoIcon:  { fontSize: 16, marginRight: 10, width: 22 },
   infoLabel: { fontSize: 14, color: '#6B7280', flex: 0.8 },
   infoValue: { fontSize: 14, color: '#111827', fontWeight: '500', flex: 1.2, textAlign: 'right' },
   actionsCard: {
@@ -542,8 +580,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-  menuEmoji: { fontSize: 18 },
-  menuLabel: { flex: 1, fontSize: 15, color: '#111827', fontWeight: '500' },
+  menuEmoji:   { fontSize: 18 },
+  menuLabel:   { flex: 1, fontSize: 15, color: '#111827', fontWeight: '500' },
   menuChevron: { fontSize: 20, color: '#9CA3AF', fontWeight: '300' },
   logoutButton: {
     marginHorizontal: 16,
@@ -556,4 +594,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoutText: { color: '#EF4444', fontSize: 16, fontWeight: '700' },
-});
+});   

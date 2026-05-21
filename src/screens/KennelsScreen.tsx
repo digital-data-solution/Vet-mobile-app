@@ -28,6 +28,31 @@ interface Kennel {
   isVerified?: boolean;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPER
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Always escape the tab navigator and push SubscriptionScreen on the root
+// stack. navigation.replace() is a stack method — calling it on a tab
+// screen's navigation object does nothing or crashes. getParent() bubbles
+// up to the root Stack.Navigator where SubscriptionScreen is registered.
+function goToSubscription(navigation: any) {
+  try {
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.navigate('SubscriptionScreen');
+    } else {
+      navigation.navigate('SubscriptionScreen');
+    }
+  } catch {
+    navigation.navigate('SubscriptionScreen');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPONENT
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function KennelsScreen({ navigation }: any) {
   const [kennels, setKennels] = useState<Kennel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,39 +60,36 @@ export default function KennelsScreen({ navigation }: any) {
   const [locationLoading, setLocationLoading] = useState(false);
   const [coords, setCoords] = useState({ lat: '6.5244', lng: '3.3792' });
 
-  // ✅ FIX: use navigation.replace (not navigate) so the user cannot
-  // press Back and re-enter a gated screen without re-validating.
+  // ─── Subscription gate ──────────────────────────────────────────────────────
+
   useFocusEffect(
     React.useCallback(() => {
       let isActive = true;
       const checkSub = async () => {
         try {
           const res = await apiFetch('/api/subscriptions/me', { method: 'GET' });
+          if (!isActive) return;
           if (!res.ok || !res.body?.data?.isActive) {
-            if (isActive) {
-              Alert.alert(
-                'Subscription Required',
-                'You need an active subscription to access this feature.',
-                [
-                  {
-                    text: 'Go to Subscription',
-                    onPress: () => navigation.replace('SubscriptionScreen'),
-                  },
-                ]
-              );
-            }
+            Alert.alert(
+              'Subscription Required',
+              'You need an active subscription to access kennels.',
+              [
+                { text: 'Not Now', style: 'cancel' },
+                // FIX: was navigation.replace('SubscriptionScreen') —
+                // replace() is a stack method, not valid on a tab screen.
+                // goToSubscription() uses getParent() to reach the root stack.
+                { text: 'Subscribe', onPress: () => goToSubscription(navigation) },
+              ],
+            );
           }
-        } catch (e) {
-          if (isActive) {
-            Alert.alert('Error', 'Could not verify subscription.');
-          }
+        } catch {
+          if (!isActive) return;
+          Alert.alert('Error', 'Could not verify subscription. Please try again.');
         }
       };
       checkSub();
-      return () => {
-        isActive = false;
-      };
-    }, [navigation])
+      return () => { isActive = false; };
+    }, [navigation]),
   );
 
   useEffect(() => {
@@ -145,16 +167,12 @@ export default function KennelsScreen({ navigation }: any) {
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
-        .includes(searchTerm.toLowerCase())
+        .includes(searchTerm.toLowerCase()),
   );
 
   const renderKennel = ({ item }: { item: Kennel }) => (
     <TouchableOpacity
       style={styles.card}
-      // ✅ FIX: pass the full kennel object so KennelProfile can render
-      // without making an extra fetch for data it already has. If
-      // KennelProfile fetches its own data via _id, both params are
-      // available and it can choose whichever suits it.
       onPress={() => navigation.navigate('KennelProfile', { kennel: item, kennelId: item._id })}
       activeOpacity={0.78}
     >
