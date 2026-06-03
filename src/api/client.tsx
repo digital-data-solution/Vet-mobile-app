@@ -86,6 +86,7 @@ export async function uploadFile(
   fileUri: string,
   fileName: string,
   additionalData?: Record<string, string>,
+  fieldName: string = 'image',
 ) {
   const url = BACKEND_URL + path;
 
@@ -93,7 +94,7 @@ export async function uploadFile(
     const authHeader = await getAuthHeader();
 
     const formData = new FormData();
-    formData.append('file', {
+    formData.append(fieldName, {
       uri: fileUri,
       name: fileName,
       type: 'application/octet-stream',

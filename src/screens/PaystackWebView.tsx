@@ -24,6 +24,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Platform,
 } from 'react-native';
 import { WebView, WebViewNavigation } from 'react-native-webview';
 import {
@@ -125,6 +126,8 @@ export default function PaystackWebView({ route, navigation }: Props) {
   // Check CANCEL first — prevents a URL containing both patterns from
   // being misclassified as success.
 
+  const isWeb = Platform.OS === 'web';
+
   const handleNavChange = useCallback(
     (navState: WebViewNavigation) => {
       if (handledRef.current) return;
@@ -210,16 +213,27 @@ export default function PaystackWebView({ route, navigation }: Props) {
               <Text style={styles.loaderText}>Loading secure payment…</Text>
             </View>
           )}
-          <WebView
-            source={{ uri: authorization_url }}
-            onNavigationStateChange={handleNavChange}
-            onLoadEnd={() => setLoading(false)}
-            onError={() => { setLoading(false); setWebError(true); }}
-            javaScriptEnabled
-            domStorageEnabled
-            startInLoadingState={false}
-            style={[styles.webview, loading && { opacity: 0 }]}
-          />
+          {isWeb ? (
+            <View style={styles.webviewContainer}>
+              <iframe
+                src={authorization_url}
+                title="Paystack Secure Payment"
+                style={styles.iframe}
+                onLoad={() => setLoading(false)}
+              />
+            </View>
+          ) : (
+            <WebView
+              source={{ uri: authorization_url }}
+              onNavigationStateChange={handleNavChange}
+              onLoadEnd={() => setLoading(false)}
+              onError={() => { setLoading(false); setWebError(true); }}
+              javaScriptEnabled
+              domStorageEnabled
+              startInLoadingState={false}
+              style={[styles.webview, loading && { opacity: 0 }]}
+            />
+          )}
         </>
       )}
 
@@ -253,6 +267,8 @@ const styles = StyleSheet.create({
   lockText:   { fontSize: 20 },
 
   webview: { flex: 1 },
+  webviewContainer: { flex: 1, minHeight: 400 },
+  iframe: { width: '100%', height: '100%', borderWidth: 0 },
 
   loaderOverlay: {
     ...StyleSheet.absoluteFillObject,

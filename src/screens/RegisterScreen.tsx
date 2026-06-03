@@ -12,6 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { supabase } from '../api/supabase';
+import { apiFetch } from '../api/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type RegisterMethod = 'email' | 'phone';
@@ -129,7 +130,7 @@ export default function RegisterScreen({ navigation }: Props) {
         : { name: phone.trim(), phone: formatPhone(phone.trim()), password, role: 'pet_owner' };
 
       try {
-        await fetch('https://vet-market-place.onrender.com/api/auth/register', {
+        await apiFetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(backendPayload),

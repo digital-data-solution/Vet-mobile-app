@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../api/supabase';
+import { apiFetch, uploadFile } from '../api/client';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
@@ -121,32 +122,20 @@ export default function MediaUploader({
         const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
         const fileName = `${userType}-${Date.now()}-${i}.${fileExt}`;
 
-        const formData = new FormData();
-        formData.append('image', {
+        const result = await uploadFile(
+          '/api/upload/media',
           uri,
-          type: `image/${fileExt}`,
-          name: fileName,
-        } as any);
-        // Tell backend which Cloudinary folder to use
-        formData.append('folder', userType);
-
-        const response = await fetch(
-          'https://vet-market-place.onrender.com/api/upload/media',
-          {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}` },
-            body: formData,
-          },
+          fileName,
+          { folder: userType },
+          'image',
         );
 
-        if (!response.ok) {
-          const err = await response.json().catch(() => ({}));
-          throw new Error(err.message || `Upload failed for image ${i + 1}`);
+        if (!result.ok) {
+          throw new Error(result.body?.message || `Upload failed for image ${i + 1}`);
         }
 
-        const data = await response.json();
         // Backend returns { url, publicId } — store the URL
-        uploadedUrls.push(data.url);
+        uploadedUrls.push(result.body.url);
         setUploadProgress(((i + 1) / total) * 100);
       }
 
@@ -176,22 +165,14 @@ export default function MediaUploader({
             const session = await supabase.auth.getSession();
             const token   = session.data.session?.access_token;
 
-            const response = await fetch(
-              'https://vet-market-place.onrender.com/api/upload/delete',
-              {
-                method: 'DELETE',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${token}`,
-                },
-                // Send the full Cloudinary URL; backend derives public_id
-                body: JSON.stringify({ imageUrl }),
-              },
-            );
+            const response = await apiFetch('/api/upload/delete', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ imageUrl }),
+            });
 
             if (!response.ok) {
-              const err = await response.json().catch(() => ({}));
-              throw new Error(err.message || 'Delete failed');
+              throw new Error(response.body?.message || 'Delete failed');
             }
 
             const newImages = images.filter((_, i) => i !== index);

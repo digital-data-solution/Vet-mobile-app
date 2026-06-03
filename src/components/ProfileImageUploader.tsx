@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase, getCurrentUser } from '../api/supabase';
-import { apiFetch } from '../api/client';
+import { apiFetch, uploadFile } from '../api/client';
 
 interface ProfileImageUploaderProps {
   onUploadSuccess?: (url: string) => void;
@@ -93,33 +93,23 @@ export default function ProfileImageUploader({
       // Use a deterministic filename so Cloudinary overwrites the old photo
       const fileName = `profile-${userId}.${fileExt}`;
 
-      const formData = new FormData();
-      formData.append('image', {
-        uri:  imageUri,
-        type: `image/${fileExt}`,
-        name: fileName,
-      } as any);
-      // Tell backend to store in 'profiles' folder and use stable public_id
-      formData.append('folder', 'profiles');
-      formData.append('publicId', `profile-${userId}`);
-
-      // ── Step 1: Upload to Cloudinary ────────────────────────────────────────
-      const uploadResponse = await fetch(
-        'https://vet-market-place.onrender.com/api/upload',
+      const result = await uploadFile(
+        '/api/upload',
+        imageUri,
+        fileName,
         {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
+          folder: 'profiles',
+          publicId: `profile-${userId}`,
         },
+        'image',
       );
 
-      const uploadData = await uploadResponse.json();
-
-      if (!uploadResponse.ok) {
-        throw new Error(uploadData.message || 'Image upload failed.');
+      if (!result.ok) {
+        throw new Error(result.body?.message || 'Image upload failed.');
       }
 
-      const publicUrl: string = uploadData.url;
+      const publicUrl: string = result.body.url;
+      const publicId: string | undefined = result.body.publicId;
 
       // ── Step 2: Persist the URL on the user's profile ───────────────────────
       const updateRes = await apiFetch('/api/auth/update-profile', {
