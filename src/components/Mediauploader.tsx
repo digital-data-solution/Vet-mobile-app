@@ -131,7 +131,7 @@ export default function MediaUploader({
         );
 
         if (!result.ok) {
-          throw new Error(result.body?.message || `Upload failed for image ${i + 1}`);
+          throw new Error(result.userMessage || result.body?.message || `Upload failed for image ${i + 1}`);
         }
 
         // Backend returns { url, publicId } — store the URL

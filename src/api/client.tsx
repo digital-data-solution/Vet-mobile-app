@@ -57,6 +57,18 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
     clearTimeout(timeoutId);
 
     const body = parseResponse(await res.text());
+    
+    // Return consistent format: { status, ok, body, error?, userMessage? }
+    if (!res.ok) {
+      return {
+        status: res.status,
+        ok: res.ok,
+        body,
+        error: body?.error || 'Request Failed',
+        userMessage: body?.message || getDefaultErrorMessage(res.status),
+      };
+    }
+
     return { status: res.status, ok: res.ok, body };
   } catch (error: any) {
     if (error.name === 'AbortError') {
@@ -65,6 +77,8 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
         status: 408,
         ok: false,
         body: { success: false, message: 'Request timeout. Please check your internet connection.' },
+        error: 'Timeout',
+        userMessage: 'Request timed out. Please check your connection and try again.',
       };
     }
 
@@ -73,8 +87,24 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
       status: 0,
       ok: false,
       body: { success: false, message: 'Network error. Please check your internet connection.' },
+      error: 'Network Error',
+      userMessage: 'No internet connection. Please check your network and try again.',
     };
   }
+}
+
+function getDefaultErrorMessage(status: number): string {
+  const messages: Record<number, string> = {
+    400: 'Invalid request. Please check your input.',
+    401: 'Your session has expired. Please log in again.',
+    402: 'Subscription required. Please upgrade your plan to continue.',
+    403: 'You don\'t have permission to perform this action.',
+    404: 'The resource you\'re looking for was not found.',
+    408: 'Request timed out. Please try again.',
+    429: 'Too many requests. Please wait a moment and try again.',
+    500: 'Server error. Please try again later.',
+  };
+  return messages[status] || 'An error occurred. Please try again.';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -122,6 +152,18 @@ export async function uploadFile(
     clearTimeout(timeoutId);
 
     const body = parseResponse(await res.text());
+    
+    // Return consistent error format
+    if (!res.ok) {
+      return {
+        status: res.status,
+        ok: res.ok,
+        body,
+        error: body?.error || 'Upload Failed',
+        userMessage: body?.message || getDefaultErrorMessage(res.status),
+      };
+    }
+
     return { status: res.status, ok: res.ok, body };
   } catch (error: any) {
     if (error.name === 'AbortError') {
@@ -130,6 +172,8 @@ export async function uploadFile(
         status: 408,
         ok: false,
         body: { success: false, message: 'Upload timed out. Please check your connection and try again.' },
+        error: 'Timeout',
+        userMessage: 'Upload took too long. Please check your connection and try again.',
       };
     }
 
@@ -138,6 +182,8 @@ export async function uploadFile(
       status: 0,
       ok: false,
       body: { success: false, message: 'Upload failed. Please try again.' },
+      error: 'Network Error',
+      userMessage: 'Upload failed. Please check your connection and try again.',
     };
   }
 }

@@ -105,7 +105,7 @@ export default function ProfileImageUploader({
       );
 
       if (!result.ok) {
-        throw new Error(result.body?.message || 'Image upload failed.');
+        throw new Error(result.userMessage || result.body?.message || 'Image upload failed.');
       }
 
       const publicUrl: string = result.body.url;
@@ -117,7 +117,7 @@ export default function ProfileImageUploader({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           profileImage:     publicUrl,
-          profileImagePath: uploadData.publicId ?? fileName,
+          profileImagePath: publicId ?? fileName,
         }),
       });
 
