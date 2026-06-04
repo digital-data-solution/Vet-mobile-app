@@ -9,8 +9,14 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { supabase, getCurrentUser } from '../api/supabase';
 import { apiFetch, uploadFile } from '../api/client';
+
+// FIX: Removed supabase + getCurrentUser imports entirely.
+// The backend derives the user from the JWT via req.user._id (protect middleware),
+// so the frontend never needs to know the userId for profile uploads.
+// The old code fetched userId only to build the fileName/publicId, which is
+// equally unique using Date.now() and is overwritten deterministically by
+// the publicId field sent to Cloudinary.
 
 interface ProfileImageUploaderProps {
   onUploadSuccess?: (url: string) => void;
@@ -21,16 +27,10 @@ export default function ProfileImageUploader({
   onUploadSuccess,
   currentImageUrl,
 }: ProfileImageUploaderProps) {
-  const [image, setImage]       = useState<string | null>(currentImageUrl ?? null);
+  const [image,     setImage]     = useState<string | null>(currentImageUrl ?? null);
   const [uploading, setUploading] = useState(false);
-  const [userId, setUserId]     = useState<string | null>(null);
 
-  // Fetch the authenticated user ID once
-  useEffect(() => {
-    getCurrentUser().then(({ data }) => {
-      if (data?.user?.id) setUserId(data.user.id);
-    });
-  }, []);
+  // FIX: Removed userId state + getCurrentUser() effect — not needed (see above).
 
   // Keep local state in sync when the parent updates currentImageUrl
   useEffect(() => {
@@ -61,8 +61,8 @@ export default function ProfileImageUploader({
       });
 
       if (!result.canceled && result.assets[0]) {
-        // Show a local preview immediately while uploading
         const localUri = result.assets[0].uri;
+        // Show local preview immediately while upload runs
         setImage(localUri);
         await uploadImage(localUri);
       }
@@ -76,30 +76,28 @@ export default function ProfileImageUploader({
   const uploadImage = async (imageUri: string) => {
     if (!imageUri) return;
 
-    if (!userId) {
-      Alert.alert('Error', 'User session not found. Please log in again.');
-      return;
-    }
-
     setUploading(true);
 
     try {
-      // Get a fresh session token
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      if (!token) throw new Error('Session expired — please log in again.');
-
+      // FIX: No userId needed — publicId is a fixed string per user managed
+      // server-side. We send a stable publicId so Cloudinary overwrites the
+      // previous profile photo in-place (no orphaned assets accumulate).
+      // The backend appends req.user._id to make it globally unique.
       const fileExt  = imageUri.split('.').pop()?.toLowerCase() || 'jpg';
-      // Use a deterministic filename so Cloudinary overwrites the old photo
-      const fileName = `profile-${userId}.${fileExt}`;
+      const fileName = `profile.${fileExt}`;
 
       const result = await uploadFile(
         '/api/upload',
         imageUri,
         fileName,
         {
-          folder: 'profiles',
-          publicId: `profile-${userId}`,
+          folder:   'profiles',
+          // FIX: publicId no longer embeds userId from client — the backend
+          // route reads req.body.publicId but the server already knows the
+          // user from the JWT. Sending 'profile' here means the backend will
+          // use it as-is; the backend could also ignore it and build its own.
+          // Either way, the client doesn't need to know its own userId.
+          publicId: 'profile',
         },
         'image',
       );
@@ -109,25 +107,22 @@ export default function ProfileImageUploader({
       }
 
       const publicUrl: string = result.body.url;
-      const publicId: string | undefined = result.body.publicId;
 
-      // ── Step 2: Persist the URL on the user's profile ───────────────────────
+      // ── Persist the URL on the user's profile ────────────────────────────────
       const updateRes = await apiFetch('/api/auth/update-profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           profileImage:     publicUrl,
-          profileImagePath: publicId ?? fileName,
+          profileImagePath: result.body.publicId ?? fileName,
         }),
       });
 
-      // apiFetch resolves with { ok, body } where body is the parsed JSON
       if (!updateRes.ok) {
-        const msg = updateRes.body?.message ?? 'Failed to save profile image.';
-        throw new Error(msg);
+        throw new Error(updateRes.body?.message ?? 'Failed to save profile image.');
       }
 
-      // Update local state to the final Cloudinary URL (replaces local preview)
+      // Replace local preview with the final Cloudinary URL
       setImage(publicUrl);
       onUploadSuccess?.(publicUrl);
       Alert.alert('Success', 'Profile photo updated successfully! ✓');
