@@ -33,14 +33,10 @@ interface LimitsResponse {
   success:     boolean;
   currentPlan: string;
   maxImages:   number;
-  // FIX: usedImages is now consumed to seed initial image count correctly
   usedImages:  number;
   limits:      PlanLimits;
 }
 
-// FIX: Images are tracked as { url, publicId } objects (matching the User
-// model's mediaImageSchema) instead of bare URL strings. This lets the delete
-// endpoint receive the correct Cloudinary publicId for hard-deletion.
 interface MediaImage {
   url:      string;
   publicId: string;
@@ -48,8 +44,6 @@ interface MediaImage {
 
 interface MediaUploaderProps {
   userType:        'vet' | 'kennel_owner' | 'shop_owner' | 'pet_owner';
-  // FIX: prop updated to accept the richer object shape the backend now returns.
-  // Callers that previously passed string[] should migrate to MediaImage[].
   existingImages?: MediaImage[];
   onImagesUpdate?: (images: MediaImage[]) => void;
 }
@@ -65,16 +59,14 @@ export default function MediaUploader({
 }: MediaUploaderProps) {
   const navigation = useNavigation<any>();
 
-  const [images,          setImages]          = useState<MediaImage[]>(existingImages);
-  const [uploading,       setUploading]       = useState(false);
-  const [uploadProgress,  setUploadProgress]  = useState(0);
-  const [limitsLoading,   setLimitsLoading]   = useState(true);
-  const [currentPlan,     setCurrentPlan]     = useState<string>('free');
-  const [maxImages,       setMaxImages]       = useState<number>(2);
-  const [planLimits,      setPlanLimits]      = useState<PlanLimits>({});
+  const [images,         setImages]         = useState<MediaImage[]>(existingImages);
+  const [uploading,      setUploading]      = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [limitsLoading,  setLimitsLoading]  = useState(true);
+  const [currentPlan,    setCurrentPlan]    = useState<string>('free');
+  const [maxImages,      setMaxImages]      = useState<number>(2);
+  const [planLimits,     setPlanLimits]     = useState<PlanLimits>({});
 
-  // FIX: canUploadMore is derived from images.length which is kept in sync with
-  // the server's usedImages on mount (see fetchLimits below).
   const canUploadMore = images.length < maxImages;
 
   // ── Sync existingImages prop ──────────────────────────────────────────────
@@ -104,20 +96,14 @@ export default function MediaUploader({
         setMaxImages(data.maxImages);
         setPlanLimits(data.limits ?? {});
 
-        // FIX: Reconcile local image count with server's authoritative usedImages.
-        // If the server says 3 images are stored but existingImages only provided 1,
-        // the local state would have allowed 2 extra uploads — now we prevent that
-        // by padding with placeholder entries. The parent should ideally pass all
-        // stored images; this is a safety net for partial prop hydration.
+        // FIX: Use unique sentinel keys with timestamp to avoid duplicate key warnings
         setImages((prev) => {
           if (prev.length < data.usedImages) {
-            // We don't have the actual URLs for the server-known extras, so we
-            // block slots by inserting sentinel objects. The parent should fetch
-            // and pass the full mediaImages array to avoid this path.
             const missing = data.usedImages - prev.length;
             const sentinels: MediaImage[] = Array.from({ length: missing }, (_, i) => ({
-              url:      '',          // empty URL won't render an <Image>
-              publicId: `__sentinel__${i}`,
+              url:      '',
+              // FIX: was __sentinel__0, __sentinel__0 (duplicate) — now uses Date + index
+              publicId: `__sentinel__${Date.now()}_${i}`,
             }));
             return [...prev, ...sentinels];
           }
@@ -183,8 +169,6 @@ export default function MediaUploader({
     setUploading(true);
     setUploadProgress(0);
 
-    // FIX: Snapshot images state before the loop so we have a clean rollback
-    // target if any individual upload fails mid-sequence.
     const imagesBeforeUpload = images;
     const uploadedImages: MediaImage[] = [];
     const total = imageUris.length;
@@ -204,7 +188,6 @@ export default function MediaUploader({
         );
 
         if (!result.ok) {
-          // 402 means plan limit hit server-side — refresh limits and stop
           if (result.status === 402) {
             await fetchLimits();
             Alert.alert('Limit Reached', result.userMessage || result.body?.message || 'Upload limit reached.');
@@ -213,8 +196,6 @@ export default function MediaUploader({
           throw new Error(result.userMessage || result.body?.message || `Upload failed for image ${i + 1}`);
         }
 
-        // FIX: Capture publicId returned by the backend so we can send it on
-        // delete — previously only the URL was stored, leaving publicId unknown.
         uploadedImages.push({
           url:      result.body.url,
           publicId: result.body.publicId,
@@ -232,17 +213,11 @@ export default function MediaUploader({
     } catch (error: any) {
       console.error('Upload error:', error);
 
-      // FIX: Roll back to the pre-upload snapshot so partially-uploaded images
-      // are not silently left in local state without a corresponding server record.
-      // (Successful uploads within the same batch ARE committed server-side, so we
-      // merge only those instead of discarding them.)
       if (uploadedImages.length > 0) {
-        // Some succeeded before the failure — keep those
         const partialState = [...imagesBeforeUpload, ...uploadedImages];
         setImages(partialState);
         onImagesUpdate?.(partialState);
       } else {
-        // Nothing succeeded — full rollback
         setImages(imagesBeforeUpload);
       }
 
@@ -254,6 +229,8 @@ export default function MediaUploader({
   };
 
   // ── Delete image ──────────────────────────────────────────────────────────
+  // Uses apiFetch which now routes DELETE-with-body through XHR internally,
+  // guaranteeing the body is sent on all React Native versions.
   const deleteImage = (image: MediaImage, index: number) => {
     Alert.alert('Delete Image', 'Are you sure you want to delete this image?', [
       { text: 'Cancel', style: 'cancel' },
@@ -263,11 +240,9 @@ export default function MediaUploader({
         onPress: async () => {
           try {
             const response = await apiFetch('/api/upload/delete', {
-              method: 'DELETE',
+              method:  'DELETE',
               headers: { 'Content-Type': 'application/json' },
-              // FIX: Send imageUrl (ownership check) — backend uses URL to locate
-              // the sub-document and derives publicId from it for Cloudinary delete.
-              body: JSON.stringify({ imageUrl: image.url }),
+              body:    JSON.stringify({ imageUrl: image.url }),
             });
 
             if (!response.ok) {
@@ -287,8 +262,19 @@ export default function MediaUploader({
   };
 
   // ── Navigate to subscription screen ──────────────────────────────────────
+  // FIX: Screen is registered as 'SubscriptionScreen' in RootStack, not 'Subscription'.
+  // Use getParent() to escape the tab navigator and reach the root stack.
   const navigateToSubscription = () => {
-    navigation.navigate('Subscription');
+    try {
+      const parent = navigation.getParent();
+      if (parent) {
+        parent.navigate('SubscriptionScreen');
+      } else {
+        navigation.navigate('SubscriptionScreen');
+      }
+    } catch {
+      navigation.navigate('SubscriptionScreen');
+    }
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -320,9 +306,7 @@ export default function MediaUploader({
         <View style={styles.imageGrid}>
 
           {images.map((img, index) => (
-            // FIX: key uses publicId (stable, unique) instead of url+index
-            <View key={img.publicId} style={styles.imageCard}>
-              {/* FIX: Sentinel placeholders (url='') render a grey box, not a broken image */}
+            <View key={`${img.publicId}-${index}`} style={styles.imageCard}>
               {img.url ? (
                 <Image source={{ uri: img.url }} style={styles.image} resizeMode="cover" />
               ) : (
@@ -330,7 +314,6 @@ export default function MediaUploader({
               )}
               <TouchableOpacity
                 style={styles.deleteButton}
-                // FIX: pass full image object so deleteImage can send imageUrl
                 onPress={() => deleteImage(img, index)}
                 activeOpacity={0.8}
                 hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
@@ -340,7 +323,7 @@ export default function MediaUploader({
             </View>
           ))}
 
-          {/* Upload slot — hidden while loading limits so the count isn't misleading */}
+          {/* Upload slot */}
           {!limitsLoading && canUploadMore && (
             <TouchableOpacity
               style={styles.uploadCard}
@@ -451,9 +434,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E5E7EB',
   },
-  headerLeft:    { flex: 1 },
-  headerTitle:   { fontSize: 20, fontWeight: '700', color: '#111827' },
-  headerSubtitle:{ fontSize: 14, color: '#6B7280', marginTop: 2 },
+  headerLeft:     { flex: 1 },
+  headerTitle:    { fontSize: 20, fontWeight: '700', color: '#111827' },
+  headerSubtitle: { fontSize: 14, color: '#6B7280', marginTop: 2 },
   planBadge: {
     backgroundColor: '#DBEAFE',
     paddingHorizontal: 12,
@@ -482,10 +465,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   image: { width: '100%', height: '100%' },
-  // FIX: style for sentinel placeholder slots (server-known images without local URLs)
-  sentinelPlaceholder: {
-    backgroundColor: '#E5E7EB',
-  },
+  sentinelPlaceholder: { backgroundColor: '#E5E7EB' },
   deleteButton: {
     position: 'absolute',
     top: 6,
@@ -549,9 +529,9 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     minWidth: 70,
   },
-  planLimitItemActive:  { backgroundColor: '#DBEAFE', borderColor: '#93C5FD' },
-  planLimitLabel:       { fontSize: 11, color: '#6B7280', marginBottom: 4, textAlign: 'center' },
-  planLimitLabelActive: { color: '#1D4ED8', fontWeight: '600' },
-  planLimitNumber:      { fontSize: 18, fontWeight: '700', color: '#111827' },
-  planLimitNumberActive:{ color: '#2563EB' },
+  planLimitItemActive:   { backgroundColor: '#DBEAFE', borderColor: '#93C5FD' },
+  planLimitLabel:        { fontSize: 11, color: '#6B7280', marginBottom: 4, textAlign: 'center' },
+  planLimitLabelActive:  { color: '#1D4ED8', fontWeight: '600' },
+  planLimitNumber:       { fontSize: 18, fontWeight: '700', color: '#111827' },
+  planLimitNumberActive: { color: '#2563EB' },
 });

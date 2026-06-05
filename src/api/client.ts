@@ -45,16 +45,6 @@ function getDefaultErrorMessage(status: number): string {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // buildFileEntry
-//
-// React Native (iOS / Android):
-//   FormData.append() accepts the RN-specific { uri, name, type } object —
-//   the native networking layer converts it to a proper multipart part.
-//
-// Web:
-//   The same object is treated as a plain JS object, so multer sees an empty
-//   field and responds 400 "No image file provided".
-//   Fix: fetch the URI (works for blob:, data:, and http: URIs) to get a
-//   real Blob, then wrap it in a File so the filename is preserved.
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function buildFileEntry(
@@ -63,28 +53,19 @@ async function buildFileEntry(
   mimeType: string,
 ): Promise<File | { uri: string; name: string; type: string }> {
   if (Platform.OS !== 'web') {
-    // Native path — unchanged behaviour
     return { uri: fileUri, name: fileName, type: mimeType };
   }
 
-  // Web path: resolve the URI to a Blob then wrap in File
   const response = await fetch(fileUri);
   if (!response.ok) {
     throw new Error(`Failed to read local file for upload (status ${response.status}).`);
   }
   const blob = await response.blob();
-  // Use the blob's actual MIME type if we only have a generic fallback
   const resolvedMime = blob.type && blob.type !== 'application/octet-stream'
     ? blob.type
     : mimeType;
   return new File([blob], fileName, { type: resolvedMime });
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Derive a sensible MIME type from the file extension.
-// Multer only cares that it starts with "image/"; this avoids sending
-// application/octet-stream which some proxy configs reject.
-// ─────────────────────────────────────────────────────────────────────────────
 
 function mimeFromFileName(fileName: string): string {
   const ext = fileName.split('.').pop()?.toLowerCase();
@@ -102,10 +83,38 @@ function mimeFromFileName(fileName: string): string {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // apiFetch — standard JSON requests
+//
+// FIX: React Native's Hermes/JSC fetch implementation silently drops the body
+// on DELETE requests in many versions. The only reliable workaround is to use
+// XMLHttpRequest for DELETE calls with a body, which always sends it correctly.
 // ─────────────────────────────────────────────────────────────────────────────
 
+function xhrRequest(
+  url:     string,
+  method:  string,
+  headers: Record<string, string>,
+  body:    string,
+  timeout: number,
+): Promise<{ status: number; text: string }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, url, true);
+    xhr.timeout = timeout;
+
+    Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v));
+
+    xhr.onload  = () => resolve({ status: xhr.status, text: xhr.responseText });
+    xhr.onerror = () => reject(new Error('Network error'));
+    xhr.ontimeout = () => reject(Object.assign(new Error('Timeout'), { name: 'AbortError' }));
+
+    xhr.send(body);
+  });
+}
+
 export async function apiFetch(path: string, options: RequestInit = {}) {
-  const url = BACKEND_URL + path;
+  const url        = BACKEND_URL + path;
+  const method     = (options.method ?? 'GET').toUpperCase();
+  const bodyString = options.body as string | undefined;
 
   try {
     const authHeader = await getAuthHeader();
@@ -116,31 +125,52 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
       ...(authHeader ? { Authorization: authHeader } : {}),
     };
 
-    const controller = new AbortController();
-    const timeoutId  = setTimeout(() => controller.abort(), API_TIMEOUT);
+    let status: number;
+    let rawText: string;
 
-    const res = await fetch(url, { ...options, headers, signal: controller.signal });
-    clearTimeout(timeoutId);
+    // FIX: Use XHR for DELETE-with-body — React Native fetch drops the body
+    // on DELETE requests regardless of how it is attached. XHR sends it reliably.
+    if (method === 'DELETE' && bodyString) {
+      const result = await xhrRequest(url, 'DELETE', headers, bodyString, API_TIMEOUT);
+      status  = result.status;
+      rawText = result.text;
+    } else {
+      const controller = new AbortController();
+      const timeoutId  = setTimeout(() => controller.abort(), API_TIMEOUT);
 
-    const body = parseResponse(await res.text());
+      const res = await fetch(url, {
+        ...options,
+        method,
+        headers,
+        signal: controller.signal,
+      });
 
-    if (!res.ok) {
+      clearTimeout(timeoutId);
+      status  = res.status;
+      rawText = await res.text();
+    }
+
+    const responseBody = parseResponse(rawText);
+    const ok           = status >= 200 && status < 300;
+
+    if (!ok) {
       return {
-        status: res.status,
-        ok:     false,
-        body,
-        error:       body?.error   || 'Request Failed',
-        userMessage: body?.message || getDefaultErrorMessage(res.status),
+        status,
+        ok:          false,
+        body:        responseBody,
+        error:       responseBody?.error   || 'Request Failed',
+        userMessage: responseBody?.message || getDefaultErrorMessage(status),
       };
     }
 
-    return { status: res.status, ok: true, body };
+    return { status, ok: true, body: responseBody };
+
   } catch (error: any) {
     if (error.name === 'AbortError') {
       console.error('API request timeout:', url);
       return {
-        status: 408,
-        ok:     false,
+        status:      408,
+        ok:          false,
         body:        { success: false, message: 'Request timeout.' },
         error:       'Timeout',
         userMessage: 'Request timed out. Please check your connection and try again.',
@@ -149,8 +179,8 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
 
     console.error('API request error:', error);
     return {
-      status: 0,
-      ok:     false,
+      status:      0,
+      ok:          false,
       body:        { success: false, message: 'Network error.' },
       error:       'Network Error',
       userMessage: 'No internet connection. Please check your network and try again.',
@@ -163,21 +193,18 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function uploadFile(
-  path:           string,
-  fileUri:        string,
-  fileName:       string,
+  path:            string,
+  fileUri:         string,
+  fileName:        string,
   additionalData?: Record<string, string>,
-  fieldName:      string = 'image',
+  fieldName:       string = 'image',
 ) {
   const url = BACKEND_URL + path;
 
   try {
     const authHeader = await getAuthHeader();
     const mimeType   = mimeFromFileName(fileName);
-
-    // FIX: on web, convert the URI to a real File object so multipart works.
-    // On native, keep the existing { uri, name, type } object unchanged.
-    const fileEntry = await buildFileEntry(fileUri, fileName, mimeType);
+    const fileEntry  = await buildFileEntry(fileUri, fileName, mimeType);
 
     const formData = new FormData();
     formData.append(fieldName, fileEntry as any);
@@ -192,7 +219,7 @@ export async function uploadFile(
     const timeoutId  = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT);
 
     const res = await fetch(url, {
-      method: 'POST',
+      method:  'POST',
       headers: {
         // Do NOT set Content-Type — fetch must set it with the multipart boundary
         ...(authHeader ? { Authorization: authHeader } : {}),
@@ -207,8 +234,8 @@ export async function uploadFile(
 
     if (!res.ok) {
       return {
-        status: res.status,
-        ok:     false,
+        status:      res.status,
+        ok:          false,
         body,
         error:       body?.error   || 'Upload Failed',
         userMessage: body?.message || getDefaultErrorMessage(res.status),
@@ -220,8 +247,8 @@ export async function uploadFile(
     if (error.name === 'AbortError') {
       console.error('File upload timeout:', url);
       return {
-        status: 408,
-        ok:     false,
+        status:      408,
+        ok:          false,
         body:        { success: false, message: 'Upload timed out.' },
         error:       'Timeout',
         userMessage: 'Upload took too long. Please check your connection and try again.',
@@ -230,8 +257,8 @@ export async function uploadFile(
 
     console.error('File upload error:', error);
     return {
-      status: 0,
-      ok:     false,
+      status:      0,
+      ok:          false,
       body:        { success: false, message: 'Upload failed.' },
       error:       'Network Error',
       userMessage: 'Upload failed. Please check your connection and try again.',

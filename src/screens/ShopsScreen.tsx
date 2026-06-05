@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -34,14 +34,6 @@ interface Props {
   navigation: any;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// HELPER
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Always escape the tab navigator and push SubscriptionScreen on the root
-// stack. navigation.replace() is a stack method — calling it on a tab
-// screen's navigation object does nothing or crashes. getParent() bubbles
-// up to the root Stack.Navigator where SubscriptionScreen is registered.
 function goToSubscription(navigation: any) {
   try {
     const parent = navigation.getParent();
@@ -55,73 +47,76 @@ function goToSubscription(navigation: any) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// COMPONENT
-// ─────────────────────────────────────────────────────────────────────────────
-
 export default function ShopsScreen({ navigation }: Props) {
-  const [shops, setShops] = useState<Shop[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [shops,           setShops]           = useState<Shop[]>([]);
+  const [loading,         setLoading]         = useState(true);
+  const [searchTerm,      setSearchTerm]      = useState('');
   const [locationLoading, setLocationLoading] = useState(false);
-  const [coords, setCoords] = useState({ lat: '6.5244', lng: '3.3792' });
-  const [distance, setDistance] = useState('10');
-  const [hasSearched, setHasSearched] = useState(false);
+  const [coords,          setCoords]          = useState({ lat: '6.5244', lng: '3.3792' });
+  const [distance,        setDistance]        = useState('10');
+  const [hasSearched,     setHasSearched]     = useState(false);
+  const [isSubscribed,    setIsSubscribed]    = useState(false);
 
-  // ─── Subscription gate ──────────────────────────────────────────────────────
-
+  // ── On every focus: check subscription then load shops ──────────────────
+  // FIX: Previously the subscription check could block or show stale data
+  // after the user subscribed and navigated back. Now we re-check on every
+  // focus and re-fetch shops, so returning from SubscriptionScreen always
+  // shows the latest state.
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       let isActive = true;
-      const checkSub = async () => {
+
+      const init = async () => {
         try {
           const res = await apiFetch('/api/subscriptions/me', { method: 'GET' });
           if (!isActive) return;
-          if (!res.ok || !res.body?.data?.isActive) {
+
+          if (res.ok && res.body?.data?.isActive) {
+            setIsSubscribed(true);
+            fetchAllShops();
+          } else {
+            setIsSubscribed(false);
+            setLoading(false);
+            setHasSearched(true);
+            setShops([]);
             Alert.alert(
               'Subscription Required',
               'You need an active subscription to access pet shops.',
               [
                 { text: 'Not Now', style: 'cancel' },
-                // FIX: was navigation.replace('SubscriptionScreen') —
-                // replace() is a stack method, not valid on a tab screen.
-                // goToSubscription() uses getParent() to reach the root stack.
                 { text: 'Subscribe', onPress: () => goToSubscription(navigation) },
               ],
             );
           }
         } catch {
-          if (!isActive) return;
-          Alert.alert('Error', 'Could not verify subscription. Please try again.');
+          // Network error — still try to load shops, backend will gate if needed
+          if (isActive) fetchAllShops();
         }
       };
-      checkSub();
+
+      init();
       return () => { isActive = false; };
     }, [navigation]),
   );
-
-  useEffect(() => {
-    fetchAllShops();
-  }, []);
 
   const fetchAllShops = async () => {
     setLoading(true);
     try {
       const res = await apiFetch('/api/v1/shops/list?limit=50', { method: 'GET' });
 
-      if (
-        res.ok &&
-        (res.body?.success || Array.isArray(res.body?.data) || Array.isArray(res.body))
-      ) {
+      if (res.ok && (res.body?.success || Array.isArray(res.body?.data) || Array.isArray(res.body))) {
         const data = res.body?.data ?? res.body ?? [];
         setShops(Array.isArray(data) ? data : []);
       } else {
-        console.error('[Shop Fetch] Failed:', res.body);
-        Alert.alert('Error', res.body?.message || 'Failed to fetch shops.');
-        setShops([]);
+        if (res.status === 402) {
+          // Subscription required — don't alert, the useFocusEffect already handled it
+          setShops([]);
+        } else {
+          Alert.alert('Error', res.body?.message || 'Failed to fetch shops.');
+          setShops([]);
+        }
       }
     } catch (error) {
-      console.error('[Shop Fetch] Unexpected error:', error);
       Alert.alert('Network Error', 'Could not reach server. Please check your connection.');
       setShops([]);
     } finally {
@@ -157,8 +152,8 @@ export default function ShopsScreen({ navigation }: Props) {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        lng: coords.lng,
-        lat: coords.lat,
+        lng:      coords.lng,
+        lat:      coords.lat,
         distance,
         ...(searchTerm.trim() && { search: searchTerm.trim() }),
       });
@@ -167,13 +162,23 @@ export default function ShopsScreen({ navigation }: Props) {
 
       if (res.ok) {
         const data = res.body?.data ?? res.body ?? [];
-        setShops(Array.isArray(data) ? data : []);
+        const nearby = Array.isArray(data) ? data : [];
+        setShops(nearby);
+        if (nearby.length === 0) {
+          Alert.alert(
+            'No Nearby Shops',
+            'No shops found in your area. Showing all shops instead.',
+            [{ text: 'OK', onPress: fetchAllShops }],
+          );
+        }
       } else {
-        console.error('Failed to fetch nearby shops:', res.body);
-        Alert.alert('Error', res.body?.message || 'Could not find shops nearby.');
+        Alert.alert(
+          'Nearby Search Failed',
+          res.body?.message || 'Could not find shops nearby. Showing all shops.',
+          [{ text: 'OK', onPress: fetchAllShops }],
+        );
       }
-    } catch (error) {
-      console.error('Unexpected error:', error);
+    } catch {
       Alert.alert('Unexpected Error', 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
@@ -231,6 +236,25 @@ export default function ShopsScreen({ navigation }: Props) {
     </TouchableOpacity>
   );
 
+  // ── Unsubscribed empty state ──────────────────────────────────────────────
+  if (!loading && !isSubscribed && hasSearched) {
+    return (
+      <View style={styles.gateContainer}>
+        <Text style={styles.gateEmoji}>🛒</Text>
+        <Text style={styles.gateTitle}>Subscription Required</Text>
+        <Text style={styles.gateText}>
+          Subscribe to browse and contact pet shops near you.
+        </Text>
+        <TouchableOpacity
+          style={styles.gateBtn}
+          onPress={() => goToSubscription(navigation)}
+        >
+          <Text style={styles.gateBtnText}>View Subscription Plans</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
@@ -241,12 +265,7 @@ export default function ShopsScreen({ navigation }: Props) {
         {/* Search */}
         <View style={styles.searchContainer}>
           <View style={styles.searchBar}>
-            <Ionicons
-              name="search-outline"
-              size={18}
-              color="#94A3B8"
-              style={{ marginRight: 8 }}
-            />
+            <Ionicons name="search-outline" size={18} color="#94A3B8" style={{ marginRight: 8 }} />
             <TextInput
               style={styles.searchInput}
               placeholder="Search pet shops..."
@@ -287,12 +306,7 @@ export default function ShopsScreen({ navigation }: Props) {
               style={[styles.distanceChip, distance === d && styles.distanceChipActive]}
               onPress={() => setDistance(d)}
             >
-              <Text
-                style={[
-                  styles.distanceChipText,
-                  distance === d && styles.distanceChipTextActive,
-                ]}
-              >
+              <Text style={[styles.distanceChipText, distance === d && styles.distanceChipTextActive]}>
                 {d}km
               </Text>
             </TouchableOpacity>
@@ -352,6 +366,21 @@ export default function ShopsScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#F8FAFC' },
+
+  // Gate styles
+  gateContainer: {
+    flex: 1, justifyContent: 'center', alignItems: 'center',
+    backgroundColor: '#F8FAFC', paddingHorizontal: 32,
+  },
+  gateEmoji: { fontSize: 56, marginBottom: 16 },
+  gateTitle: { fontSize: 20, fontWeight: '700', color: '#0F172A', marginBottom: 8, textAlign: 'center' },
+  gateText:  { fontSize: 14, color: '#64748B', textAlign: 'center', lineHeight: 22, marginBottom: 24 },
+  gateBtn: {
+    backgroundColor: '#EA580C', paddingHorizontal: 28, paddingVertical: 14,
+    borderRadius: 12,
+  },
+  gateBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+
   searchContainer: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 10 },
   searchBar: {
     flexDirection: 'row',
@@ -394,8 +423,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  distanceChipActive: { backgroundColor: '#FFF7ED', borderColor: '#FED7AA' },
-  distanceChipText: { fontSize: 12, color: '#64748B', fontWeight: '600' },
+  distanceChipActive:     { backgroundColor: '#FFF7ED', borderColor: '#FED7AA' },
+  distanceChipText:       { fontSize: 12, color: '#64748B', fontWeight: '600' },
   distanceChipTextActive: { color: '#EA580C', fontWeight: '700' },
   searchNearbyBtn: {
     flex: 1,
@@ -446,13 +475,13 @@ const styles = StyleSheet.create({
   },
   avatarEmoji: { fontSize: 24 },
   cardBody: { flex: 1, marginRight: 4 },
-  shopName: { fontSize: 15, fontWeight: '700', color: '#0F172A', marginBottom: 3 },
+  shopName:    { fontSize: 15, fontWeight: '700', color: '#0F172A', marginBottom: 3 },
   description: { fontSize: 12, color: '#64748B', marginBottom: 4 },
-  addressRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  addressRow:  { flexDirection: 'row', alignItems: 'center', gap: 3 },
   addressText: { fontSize: 12, color: '#64748B', flex: 1 },
-  distanceText: { fontSize: 12, color: '#EA580C', fontWeight: '600', marginTop: 3 },
-  emptyState: { alignItems: 'center', paddingTop: 60 },
-  emptyEmoji: { fontSize: 52, marginBottom: 16 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#0F172A', marginBottom: 8 },
-  emptyText: { fontSize: 14, color: '#64748B', textAlign: 'center' },
+  distanceText:{ fontSize: 12, color: '#EA580C', fontWeight: '600', marginTop: 3 },
+  emptyState:  { alignItems: 'center', paddingTop: 60 },
+  emptyEmoji:  { fontSize: 52, marginBottom: 16 },
+  emptyTitle:  { fontSize: 18, fontWeight: '700', color: '#0F172A', marginBottom: 8 },
+  emptyText:   { fontSize: 14, color: '#64748B', textAlign: 'center' },
 });

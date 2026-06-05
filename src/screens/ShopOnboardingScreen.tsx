@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -28,48 +28,110 @@ interface FormErrors {
   email?: string;
 }
 
+interface MediaImage {
+  url:      string;
+  publicId: string;
+}
 
+interface ExistingShop {
+  _id:         string;
+  name?:       string;
+  shopName?:   string;
+  ownerName?:  string;
+  address?:    string | { full?: string; city?: string; town?: string };
+  phone?:      string;
+  email?:      string;
+  description?: string;
+  images?:     MediaImage[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+function resolveAddress(address: ExistingShop['address']): string {
+  if (!address) return '';
+  if (typeof address === 'string') return address;
+  return address.full ?? address.city ?? address.town ?? '';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Component
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function ShopOnboardingScreen({ navigation }: Props) {
-  const [galleryImages, setGalleryImages] = useState<string[]>([]);
-  const [shopName, setShopName] = useState('');
-  const [ownerName, setOwnerName] = useState('');
-  const [address, setAddress] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [description, setDescription] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [galleryImages, setGalleryImages] = useState<MediaImage[]>([]);
+  const [shopName,      setShopName]      = useState('');
+  const [ownerName,     setOwnerName]     = useState('');
+  const [address,       setAddress]       = useState('');
+  const [phone,         setPhone]         = useState('');
+  const [email,         setEmail]         = useState('');
+  const [description,   setDescription]   = useState('');
+  const [loading,       setLoading]       = useState(false);
+  const [pageLoading,   setPageLoading]   = useState(true);
+  const [errors,        setErrors]        = useState<FormErrors>({});
 
-  // Subscription check on focus
+  // FIX: track existing shop — null means "not yet loaded", undefined means "none found"
+  const [existingShop,  setExistingShop]  = useState<ExistingShop | null | undefined>(null);
+
+  const isEditMode = !!existingShop;
+
+  // ── Load existing shop + subscription check on focus ─────────────────────
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       let isActive = true;
-      const checkSub = async () => {
+
+      const init = async () => {
+        setPageLoading(true);
         try {
-          const res = await apiFetch('/api/subscriptions/me', { method: 'GET' });
-          if (!res.ok || !res.body?.data?.isActive) {
-            if (isActive) {
-              Alert.alert('Subscription Required', 'You need an active subscription to register a shop.', [
-                { text: 'Go to Subscription', onPress: () => navigation.navigate('SubscriptionScreen') },
-              ]);
-            }
+          // 1. Subscription check
+          const subRes = await apiFetch('/api/subscriptions/me', { method: 'GET' });
+          if (!isActive) return;
+          if (!subRes.ok || !subRes.body?.data?.isActive) {
+            Alert.alert(
+              'Subscription Required',
+              'You need an active subscription to register a shop.',
+              [{ text: 'Go to Subscription', onPress: () => navigation.navigate('SubscriptionScreen') }],
+            );
+          }
+
+          // 2. Check for an existing shop
+          const shopRes = await apiFetch('/api/v1/shops/me/shop', { method: 'GET' });
+          if (!isActive) return;
+
+          if (shopRes.ok && shopRes.body?.success && shopRes.body?.data) {
+            // Shop exists — pre-fill form
+            const shop: ExistingShop = shopRes.body.data;
+            setExistingShop(shop);
+            setShopName(shop.shopName ?? shop.name ?? '');
+            setOwnerName(shop.ownerName ?? '');
+            setAddress(resolveAddress(shop.address));
+            setPhone(shop.phone ?? '');
+            setEmail(shop.email ?? '');
+            setDescription(shop.description ?? '');
+            setGalleryImages(shop.images ?? []);
+          } else {
+            // No shop yet
+            setExistingShop(undefined);
           }
         } catch (e) {
-          if (isActive) {
-            Alert.alert('Error', 'Could not verify subscription.');
-          }
+          if (!isActive) return;
+          console.error('Shop init error:', e);
+        } finally {
+          if (isActive) setPageLoading(false);
         }
       };
-      checkSub();
+
+      init();
       return () => { isActive = false; };
-    }, [navigation])
+    }, [navigation]),
   );
+
+  // ── Validation ────────────────────────────────────────────────────────────
   const validate = (): boolean => {
     const newErrors: FormErrors = {};
     if (!shopName.trim()) newErrors.shopName = 'Shop name is required';
-    if (!address.trim()) newErrors.address = 'Address is required';
-    // Optional but validate format if provided
+    if (!address.trim())  newErrors.address  = 'Address is required';
     if (phone && !/^[\d\s\+\-\(\)]+$/.test(phone)) {
       newErrors.phone = 'Please enter a valid phone number';
     }
@@ -83,53 +145,73 @@ export default function ShopOnboardingScreen({ navigation }: Props) {
   const clearError = (field: keyof FormErrors) =>
     setErrors((prev) => ({ ...prev, [field]: undefined }));
 
-  const registerShop = async () => {
+  // ── Submit — create or update ─────────────────────────────────────────────
+  const handleSubmit = async () => {
     if (!validate()) return;
 
     setLoading(true);
     try {
       const payload = {
-        name: shopName.trim(),
-        ownerName: ownerName.trim() || undefined,
-        address: address.trim(),
-        phone: phone.trim() || undefined,
-        email: email.trim() || undefined,
-        description: description.trim() || undefined,
-        services: description.trim() ? [description.trim()] : [],
+        name:        shopName.trim(),
+        shopName:    shopName.trim(),
+        ownerName:   ownerName.trim()    || undefined,
+        address:     address.trim(),
+        phone:       phone.trim()        || undefined,
+        email:       email.trim()        || undefined,
+        description: description.trim()  || undefined,
+        services:    description.trim()  ? [description.trim()] : [],
       };
 
       let res;
-      try {
-        res = await apiFetch('/api/v1/shops/create', {
-          method: 'POST',
+
+      if (isEditMode && existingShop?._id) {
+        // FIX: shop already exists — use PUT to update instead of POST
+        res = await apiFetch(`/api/v1/shops/${existingShop._id}`, {
+          method:  'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+          body:    JSON.stringify(payload),
         });
-      } catch (err) {
-        console.error('API call failed:', err);
-        Alert.alert('Network Error', 'Could not reach server. Please check your connection.');
-        setLoading(false);
-        return;
+      } else {
+        res = await apiFetch('/api/v1/shops/create', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(payload),
+        });
       }
+
       if (res.ok && res.body?.success) {
-        Alert.alert(
-          'Shop Registered! 🎉',
-          'Your pet shop is now listed and visible to thousands of pet owners nearby.',
-          [{ text: 'Continue', onPress: () => navigation.goBack() }]
-        );
+        const successTitle   = isEditMode ? 'Shop Updated! ✅'   : 'Shop Registered! 🎉';
+        const successMessage = isEditMode
+          ? 'Your shop details have been updated successfully.'
+          : 'Your pet shop is now listed and visible to thousands of pet owners nearby.';
+
+        Alert.alert(successTitle, successMessage, [
+          { text: 'Continue', onPress: () => navigation.goBack() },
+        ]);
       } else {
         const errorMsg = res.body?.message || 'Please check your details and try again.';
-        console.error('Shop registration failed:', res.body);
-        Alert.alert('Registration Failed', errorMsg);
+        console.error('Shop submit failed:', res.body);
+        Alert.alert(isEditMode ? 'Update Failed' : 'Registration Failed', errorMsg);
       }
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error('Submit error:', error);
       Alert.alert('Unexpected Error', 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
+  // ── Loading state while fetching existing shop ────────────────────────────
+  if (pageLoading) {
+    return (
+      <View style={styles.pageLoadingContainer}>
+        <ActivityIndicator size="large" color="#F97316" />
+        <Text style={styles.pageLoadingText}>Loading shop details...</Text>
+      </View>
+    );
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
@@ -144,26 +226,31 @@ export default function ShopOnboardingScreen({ navigation }: Props) {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerEmoji}>🛒</Text>
-          <Text style={styles.title}>Register Your Pet Shop</Text>
+          <Text style={styles.headerEmoji}>{isEditMode ? '✏️' : '🛒'}</Text>
+          <Text style={styles.title}>
+            {isEditMode ? 'Update Your Pet Shop' : 'Register Your Pet Shop'}
+          </Text>
           <Text style={styles.subtitle}>
-            List your shop on Xpress Vet to reach thousands of pet owners nearby.
+            {isEditMode
+              ? 'Update your shop details below.'
+              : 'List your shop on Xpress Vet to reach thousands of pet owners nearby.'}
           </Text>
         </View>
 
-        {/* Media Uploader for shop gallery images */}
+        {/* Media Uploader */}
         <View style={{ marginVertical: 18 }}>
-          <Text style={{ fontWeight: '700', fontSize: 16, marginBottom: 8 }}>
+          <Text style={{ fontWeight: '700', fontSize: 16, marginBottom: 8, paddingHorizontal: 16 }}>
             Shop Gallery (optional)
           </Text>
+          {/* FIX: userType was 'shop' — correct value is 'shop_owner' to match MEDIA_LIMITS keys */}
           <MediaUploader
-            userType={'shop'}
+            userType="shop_owner"
             existingImages={galleryImages}
             onImagesUpdate={setGalleryImages}
           />
         </View>
 
-        {/* Required fields */}
+        {/* Shop Details */}
         <View style={styles.formCard}>
           <Text style={styles.cardTitle}>Shop Details</Text>
 
@@ -192,7 +279,7 @@ export default function ShopOnboardingScreen({ navigation }: Props) {
           />
         </View>
 
-        {/* Optional fields */}
+        {/* Contact Information */}
         <View style={styles.formCard}>
           <Text style={styles.cardTitle}>Contact Information</Text>
 
@@ -227,32 +314,39 @@ export default function ShopOnboardingScreen({ navigation }: Props) {
         <View style={styles.infoBox}>
           <Text style={styles.infoIcon}>ℹ️</Text>
           <Text style={styles.infoText}>
-            Your address will be automatically converted to map coordinates for location-based search. 
-            Your shop will be live immediately!
+            {isEditMode
+              ? 'Changes will be reflected on your public shop profile immediately.'
+              : 'Your address will be automatically converted to map coordinates for location-based search. Your shop will be live immediately!'}
           </Text>
         </View>
 
         {/* Submit */}
         <TouchableOpacity
           style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
-          onPress={registerShop}
+          onPress={handleSubmit}
           disabled={loading}
           activeOpacity={0.85}
         >
           {loading ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.submitBtnText}>Register Shop</Text>
+            <Text style={styles.submitBtnText}>
+              {isEditMode ? 'Update Shop' : 'Register Shop'}
+            </Text>
           )}
         </TouchableOpacity>
 
         <Text style={styles.disclaimer}>
-          By registering, you confirm that all information provided is accurate.
+          By {isEditMode ? 'updating' : 'registering'}, you confirm that all information provided is accurate.
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FormField
+// ─────────────────────────────────────────────────────────────────────────────
 
 function FormField({
   label,
@@ -265,15 +359,15 @@ function FormField({
   multiline,
   numberOfLines,
 }: {
-  label: string;
-  placeholder: string;
-  value: string;
-  onChangeText: (v: string) => void;
-  error?: string;
-  keyboardType?: any;
+  label:           string;
+  placeholder:     string;
+  value:           string;
+  onChangeText:    (v: string) => void;
+  error?:          string;
+  keyboardType?:   any;
   autoCapitalize?: any;
-  multiline?: boolean;
-  numberOfLines?: number;
+  multiline?:      boolean;
+  numberOfLines?:  number;
 }) {
   return (
     <View style={fieldStyles.wrapper}>
@@ -299,71 +393,89 @@ function FormField({
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles
+// ─────────────────────────────────────────────────────────────────────────────
+
 const fieldStyles = StyleSheet.create({
-  wrapper: { marginBottom: 16 },
-  label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 },
+  wrapper:        { marginBottom: 16 },
+  label:          { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 },
   input: {
-    borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    borderRadius: 10,
-    padding: 13,
-    fontSize: 15,
-    color: '#111827',
+    borderWidth:     1.5,
+    borderColor:     '#E5E7EB',
+    borderRadius:    10,
+    padding:         13,
+    fontSize:        15,
+    color:           '#111827',
     backgroundColor: '#F9FAFB',
   },
   inputMultiline: { minHeight: 80, textAlignVertical: 'top' },
-  inputError: { borderColor: '#EF4444', backgroundColor: '#FEF2F2' },
-  errorText: { marginTop: 4, fontSize: 12, color: '#EF4444' },
+  inputError:     { borderColor: '#EF4444', backgroundColor: '#FEF2F2' },
+  errorText:      { marginTop: 4, fontSize: 12, color: '#EF4444' },
 });
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: '#F3F4F6' },
-  container: { paddingBottom: 40 },
+  pageLoadingContainer: {
+    flex:            1,
+    justifyContent:  'center',
+    alignItems:      'center',
+    backgroundColor: '#F3F4F6',
+  },
+  pageLoadingText: { marginTop: 12, fontSize: 15, color: '#6B7280' },
+
+  scroll:     { flex: 1, backgroundColor: '#F3F4F6' },
+  container:  { paddingBottom: 40 },
   header: {
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    paddingTop: 36,
-    paddingBottom: 28,
-    paddingHorizontal: 24,
-    borderBottomLeftRadius: 24,
+    backgroundColor:      '#fff',
+    alignItems:           'center',
+    paddingTop:           36,
+    paddingBottom:        28,
+    paddingHorizontal:    24,
+    borderBottomLeftRadius:  24,
     borderBottomRightRadius: 24,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    marginBottom:         20,
+    shadowColor:          '#000',
+    shadowOffset:         { width: 0, height: 2 },
+    shadowOpacity:        0.06,
+    shadowRadius:         8,
+    elevation:            3,
   },
   headerEmoji: { fontSize: 56, marginBottom: 12 },
-  title: { fontSize: 24, fontWeight: '800', color: '#111827', textAlign: 'center', marginBottom: 8 },
+  title: {
+    fontSize:     24,
+    fontWeight:   '800',
+    color:        '#111827',
+    textAlign:    'center',
+    marginBottom: 8,
+  },
   subtitle: { fontSize: 14, color: '#6B7280', textAlign: 'center', lineHeight: 20 },
   formCard: {
     backgroundColor: '#fff',
     marginHorizontal: 16,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    borderRadius:     16,
+    padding:          20,
+    marginBottom:     16,
+    shadowColor:      '#000',
+    shadowOffset:     { width: 0, height: 1 },
+    shadowOpacity:    0.06,
+    shadowRadius:     4,
+    elevation:        2,
   },
   cardTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#6B7280',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 16,
+    fontSize:        13,
+    fontWeight:      '700',
+    color:           '#6B7280',
+    textTransform:   'uppercase',
+    letterSpacing:   0.5,
+    marginBottom:    16,
   },
   infoBox: {
-    flexDirection: 'row',
+    flexDirection:   'row',
     backgroundColor: '#FFF7ED',
     marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 12,
-    padding: 14,
+    marginBottom:    16,
+    borderRadius:    12,
+    padding:         14,
     borderLeftWidth: 4,
     borderLeftColor: '#F97316',
   },
@@ -372,23 +484,23 @@ const styles = StyleSheet.create({
   submitBtn: {
     backgroundColor: '#F97316',
     marginHorizontal: 16,
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-    shadowColor: '#F97316',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    paddingVertical:  16,
+    borderRadius:     14,
+    alignItems:       'center',
+    shadowColor:      '#F97316',
+    shadowOffset:     { width: 0, height: 4 },
+    shadowOpacity:    0.3,
+    shadowRadius:     8,
+    elevation:        5,
   },
   submitBtnDisabled: { opacity: 0.7 },
   submitBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   disclaimer: {
     marginHorizontal: 24,
-    marginTop: 14,
-    fontSize: 12,
-    color: '#9CA3AF',
-    textAlign: 'center',
-    lineHeight: 18,
+    marginTop:        14,
+    fontSize:         12,
+    color:            '#9CA3AF',
+    textAlign:        'center',
+    lineHeight:       18,
   },
 });
