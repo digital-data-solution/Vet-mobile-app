@@ -36,7 +36,6 @@ import ProfessionalOnboardingScreen from '../screens/ProfessionalOnboardingScree
 import KennelOnboardingScreen      from '../screens/KennelOnboardingScreen';
 import ShopOnboardingScreen        from '../screens/ShopOnboardingScreen';
 import ExploreOptionsScreen        from '../screens/ExploreOptionsScreen';
-import ChatScreen                  from '../screens/ChatScreen';
 import VetProfileScreen            from '../screens/VetProfileScreen';
 import ShopProfileScreen           from '../screens/ShopProfileScreen';
 import KennelProfileScreen         from '../screens/KennelProfileScreen';
@@ -83,7 +82,6 @@ export type RootStackParamList = {
   VetProfile:             { vetId?: string } | undefined;
   ShopProfile:            { shopId?: string } | undefined;
   KennelProfile:          { kennelId?: string } | undefined;
-  Chat:                   { recipientId?: string; recipientName?: string } | undefined;
   ExploreOptions:         undefined;
   VerifyProfessional:     undefined;
   AddressInput:           undefined;
@@ -456,11 +454,6 @@ export default function AppNavigator() {
                   name="KennelProfile"
                   component={KennelProfileScreen}
                   options={{ headerShown: true, title: 'Kennel Profile' }}
-                />
-                <RootStack.Screen
-                  name="Chat"
-                  component={ChatScreen}
-                  options={{ headerShown: true, title: 'Chat' }}
                 />
                 <RootStack.Screen
                   name="ExploreOptions"

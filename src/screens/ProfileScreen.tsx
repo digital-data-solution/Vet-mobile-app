@@ -202,6 +202,7 @@ export default function ProfileScreen({ navigation }: Props) {
   const getUserEmail = () => user?.email ?? user?.user_metadata?.email ?? 'Not provided';
 
   const isProfessional = user?.role === 'vet' || user?.role === 'kennel_owner';
+  const isVet = user?.role === 'vet';
   const roleLabel = ROLE_LABELS[user?.role] ?? 'User';
 
   if (loading) {
@@ -350,12 +351,14 @@ export default function ProfileScreen({ navigation }: Props) {
             onPress={() => goToSubscription(navigation)}
             tint="#F59E0B"
           />
-          <MenuButton
-            emoji="✅"
-            label="Verification Status"
-            onPress={() => navigation.navigate('VetVerification')}
-            tint="#10B981"
-          />
+          {isVet && (
+            <MenuButton
+              emoji="✅"
+              label="Verification Status"
+              onPress={() => navigation.navigate('VetVerification')}
+              tint="#10B981"
+            />
+          )}
         </View>
       )}
 

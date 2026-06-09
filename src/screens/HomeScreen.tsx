@@ -1,69 +1,25 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
   ScrollView,
   StatusBar,
 } from 'react-native';
-import { supabase } from '../api/supabase';
-
-type UserRole = 'vet' | 'kennel_owner' | 'shop_owner' | 'user' | null;
+import { useAuth } from '../navigation';
 
 interface Props {
   navigation: any;
 }
 
 export default function HomeScreen({ navigation }: Props) {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userRole, setUserRole] = useState<UserRole>(null);
-  const [loading, setLoading] = useState(true);
+  const { userRole, isAuthenticated } = useAuth();
 
-  const checkLoginStatus = useCallback(async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setIsLoggedIn(false);
-        setUserRole(null);
-        return;
-      }
-
-      setIsLoggedIn(true);
-      const role = session.user?.user_metadata?.role ?? null;
-      setUserRole(role);
-    } catch (error) {
-      console.error('Error checking login status:', error);
-      setIsLoggedIn(false);
-      setUserRole(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    checkLoginStatus();
-  }, [checkLoginStatus]);
-
-  // Re-check on focus so login/logout reflects immediately
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', checkLoginStatus);
-    return unsubscribe;
-  }, [navigation, checkLoginStatus]);
+  const isLoggedIn = isAuthenticated;
 
   const isProfessional =
     userRole === 'vet' || userRole === 'kennel_owner' || userRole === 'shop_owner';
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
-        <ActivityIndicator size="large" color="#2563EB" />
-        <Text style={styles.loadingText}>Loading...</Text>
-      </View>
-    );
-  }
 
   // ─── Navigation helpers ───────────────────────────────────────────────────
   // ProfessionalTabs uses 'Network' for the professionals list screen.
@@ -251,17 +207,6 @@ const styles = StyleSheet.create({
   },
   container: {
     paddingBottom: 40,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#6B7280',
   },
   header: {
     alignItems: 'center',

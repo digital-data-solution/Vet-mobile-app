@@ -1,231 +1,308 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
   StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
   Linking,
   Alert,
-  ScrollView,
-  ActivityIndicator,
 } from 'react-native';
-import { apiFetch } from '../api/client';
 import { Ionicons } from '@expo/vector-icons';
+import { apiFetch } from '../api/client';
 
-interface VerifyResult {
-  name?: string;
+interface Professional {
+  _id: string;
+  name: string;
+  businessName?: string;
+  role: 'vet' | 'kennel';
   vcnNumber?: string;
   specialization?: string;
-  isVerified?: boolean;
-  status?: string;
+  address: string;
+  phone?: string;
+  email?: string;
+  isVerified: boolean;
+  isActive?: boolean;
+  rating?: number;
+  reviewCount?: number;
+  distance?: number;
+  licenseExpiry?: string;
+  userId?: {
+    name?: string;
+    phone?: string;
+    email?: string;
+    profileImage?: string;
+  };
 }
 
-type CheckStatus = 'idle' | 'checking' | 'found' | 'not_found';
+export default function VetProfileScreen({ route, navigation }: any) {
+  const vetId: string | undefined = route?.params?.vetId;
 
-export default function VerifyProfessionalScreen() {
-  const [vcnNumber, setVcnNumber] = useState('');
-  const [checkStatus, setCheckStatus] = useState<CheckStatus>('idle');
-  const [result, setResult] = useState<VerifyResult | null>(null);
+  const [vet, setVet]           = useState<Professional | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
 
-  const checkInApp = async () => {
-    if (!vcnNumber.trim()) {
-      Alert.alert('Required', 'Please enter a VCN number first.');
+  const fetchVet = useCallback(async () => {
+    if (!vetId) {
+      setError('No professional ID provided.');
+      setLoading(false);
       return;
     }
-    setCheckStatus('checking');
-    setResult(null);
+    setLoading(true);
+    setError(null);
     try {
-      const res = await apiFetch(
-        `/api/v1/professionals/list?vcnNumber=${encodeURIComponent(vcnNumber.trim())}&limit=1`,
-        { method: 'GET' }
-      );
-      if (res.ok && res.body?.data?.length > 0) {
-        setResult(res.body.data[0]);
-        setCheckStatus('found');
+      const res = await apiFetch(`/api/v1/professionals/${vetId}`, { method: 'GET' });
+      if (res.ok && res.body?.success && res.body?.data) {
+        setVet(res.body.data);
       } else {
-        setCheckStatus('not_found');
+        setError(res.body?.message || 'Could not load professional profile.');
       }
     } catch {
-      setCheckStatus('not_found');
+      setError('Network error. Please check your connection.');
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [vetId]);
 
-  const openVcnPortal = () => {
-    const query = vcnNumber.trim()
-      ? `?search=${encodeURIComponent(vcnNumber.trim())}`
-      : '';
-    Linking.openURL(`https://portal.vcn.gov.ng/verify${query}`).catch(() =>
-      Alert.alert('Error', 'Unable to open browser')
+  useEffect(() => {
+    fetchVet();
+  }, [fetchVet]);
+
+  const call = () => {
+    const phone = vet?.phone || vet?.userId?.phone;
+    if (!phone) return;
+    Linking.openURL(`tel:${phone}`).catch(() =>
+      Alert.alert('Error', 'Unable to open phone app.'),
     );
   };
 
-  const reset = () => {
-    setVcnNumber('');
-    setCheckStatus('idle');
-    setResult(null);
+  const emailVet = () => {
+    const emailAddr = vet?.email || vet?.userId?.email;
+    if (!emailAddr) return;
+    Linking.openURL(`mailto:${emailAddr}`).catch(() =>
+      Alert.alert('Error', 'Unable to open mail app.'),
+    );
   };
+
+  const whatsApp = () => {
+    const rawPhone = vet?.phone || vet?.userId?.phone;
+    if (!rawPhone) return;
+    // Normalise to international format: +234XXXXXXXXXX → 234XXXXXXXXXX
+    const digits = rawPhone.replace(/\D/g, '').replace(/^0/, '234');
+    Linking.openURL(`https://wa.me/${digits}`).catch(() =>
+      Alert.alert('WhatsApp', 'Could not open WhatsApp. Make sure it is installed.'),
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#2563EB" />
+        <Text style={styles.loadingText}>Loading profile...</Text>
+      </View>
+    );
+  }
+
+  if (error || !vet) {
+    return (
+      <View style={styles.centered}>
+        <Ionicons name="warning-outline" size={52} color="#F59E0B" />
+        <Text style={styles.errorTitle}>Profile Unavailable</Text>
+        <Text style={styles.errorText}>{error ?? 'Could not load this profile.'}</Text>
+        <TouchableOpacity style={styles.retryBtn} onPress={fetchVet}>
+          <Text style={styles.retryText}>Try Again</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Text style={styles.backText}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const displayName  = vet.businessName || vet.name || vet.userId?.name || 'Professional';
+  const phone        = vet.phone || vet.userId?.phone;
+  const email        = vet.email || vet.userId?.email;
+  const isVet        = vet.role === 'vet';
+  const roleLabel    = isVet ? 'Veterinarian' : 'Kennel';
+  const accentColor  = isVet ? '#2563EB' : '#7C3AED';
+  const heroBg       = isVet ? '#EFF6FF' : '#F5F3FF';
 
   return (
     <ScrollView
       style={styles.scroll}
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerIconWrap}>
-          <Text style={styles.headerEmoji}>🪪</Text>
+      {/* ── Hero ────────────────────────────────────────────────────────────── */}
+      <View style={[styles.hero, { backgroundColor: heroBg }]}>
+        <View style={[styles.avatarWrap, { borderColor: accentColor + '30' }]}>
+          <Text style={styles.avatarEmoji}>{isVet ? '👨‍⚕️' : '🐕'}</Text>
+          {vet.isVerified && (
+            <View style={styles.verifiedRing}>
+              <Ionicons name="checkmark-circle" size={26} color="#10B981" />
+            </View>
+          )}
         </View>
-        <Text style={styles.title}>Verify a Professional</Text>
-        <Text style={styles.subtitle}>
-          Protect your pets — check that your vet is registered with the Veterinary Council of Nigeria (VCN)
-        </Text>
+
+        <Text style={styles.name}>{displayName}</Text>
+        <View style={[styles.roleBadge, { backgroundColor: accentColor + '15', borderColor: accentColor + '30' }]}>
+          <Text style={[styles.roleBadgeText, { color: accentColor }]}>{roleLabel}</Text>
+        </View>
+
+        {vet.specialization ? (
+          <Text style={styles.specialization}>{vet.specialization}</Text>
+        ) : null}
+
+        <View style={styles.badgeRow}>
+          {vet.isVerified && (
+            <View style={styles.verifiedBadge}>
+              <Ionicons name="shield-checkmark-outline" size={13} color="#065F46" />
+              <Text style={styles.verifiedBadgeText}>{isVet ? 'VCN Verified' : 'Verified'}</Text>
+            </View>
+          )}
+          {vet.distance != null && (
+            <View style={styles.distanceBadge}>
+              <Ionicons name="navigate-outline" size={13} color="#2563EB" />
+              <Text style={styles.distanceBadgeText}>{vet.distance.toFixed(1)} km away</Text>
+            </View>
+          )}
+        </View>
       </View>
 
-      {/* Why verify */}
-      <View style={styles.whyCard}>
-        <Text style={styles.cardTitle}>Why Verify?</Text>
-        <ReasonRow icon="shield-checkmark-outline" color="#10B981" text="Avoid unqualified practitioners and quacks" />
-        <ReasonRow icon="medal-outline" color="#F59E0B" text="Confirm active VCN registration status" />
-        <ReasonRow icon="heart-outline" color="#EF4444" text="Ensure the safety and wellbeing of your pet" />
-      </View>
-
-      {/* Search form */}
-      <View style={styles.formCard}>
-        <Text style={styles.cardTitle}>Check a VCN Number</Text>
-
-        <View style={styles.inputWrapper}>
-          <Ionicons name="card-outline" size={18} color="#94A3B8" style={{ marginRight: 10 }} />
-          <TextInput
-            style={styles.input}
-            placeholder="e.g. VCN/2024/001234"
-            placeholderTextColor="#94A3B8"
-            value={vcnNumber}
-            onChangeText={(v) => { setVcnNumber(v); setCheckStatus('idle'); setResult(null); }}
-            autoCapitalize="characters"
-            returnKeyType="search"
-            onSubmitEditing={checkInApp}
-          />
-          {vcnNumber.length > 0 && (
-            <TouchableOpacity onPress={reset}>
-              <Ionicons name="close-circle" size={18} color="#94A3B8" />
+      {/* ── Contact actions ─────────────────────────────────────────────────── */}
+      {(phone || email) ? (
+        <View style={styles.contactRow}>
+          {phone ? (
+            <TouchableOpacity
+              style={[styles.contactBtn, { backgroundColor: accentColor }]}
+              onPress={call}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="call-outline" size={18} color="#fff" />
+              <Text style={styles.contactBtnText}>Call</Text>
             </TouchableOpacity>
-          )}
+          ) : null}
+          {phone ? (
+            <TouchableOpacity
+              style={[styles.contactBtn, { backgroundColor: '#25D366' }]}
+              onPress={whatsApp}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="logo-whatsapp" size={18} color="#fff" />
+              <Text style={styles.contactBtnText}>WhatsApp</Text>
+            </TouchableOpacity>
+          ) : null}
+          {email ? (
+            <TouchableOpacity
+              style={[styles.contactBtn, styles.contactBtnOutline, { borderColor: accentColor }]}
+              onPress={emailVet}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="mail-outline" size={18} color={accentColor} />
+              <Text style={[styles.contactBtnText, { color: accentColor }]}>Email</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
+      ) : null}
 
-        {/* Check in-app */}
-        <TouchableOpacity
-          style={[styles.checkBtn, checkStatus === 'checking' && styles.checkBtnDisabled]}
-          onPress={checkInApp}
-          disabled={checkStatus === 'checking'}
-          activeOpacity={0.85}
-        >
-          {checkStatus === 'checking' ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <>
-              <Ionicons name="search-outline" size={18} color="#fff" />
-              <Text style={styles.checkBtnText}>Check on Xpress Vet</Text>
-            </>
-          )}
-        </TouchableOpacity>
+      {/* ── Details ─────────────────────────────────────────────────────────── */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Details</Text>
 
-        <View style={styles.dividerRow}>
-          <View style={styles.divider} />
-          <Text style={styles.dividerText}>or</Text>
-          <View style={styles.divider} />
-        </View>
+        <InfoRow icon="location-outline" label="Address" value={vet.address} />
 
-        {/* Open VCN portal */}
-        <TouchableOpacity
-          style={styles.portalBtn}
-          onPress={openVcnPortal}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="open-outline" size={16} color="#2563EB" />
-          <Text style={styles.portalBtnText}>Verify on VCN Portal</Text>
-        </TouchableOpacity>
-        <Text style={styles.portalHint}>Opens official vcn.gov.ng in your browser</Text>
+        {phone ? (
+          <InfoRow icon="call-outline" label="Phone" value={phone} />
+        ) : null}
+
+        {email ? (
+          <InfoRow icon="mail-outline" label="Email" value={email} />
+        ) : null}
+
+        {vet.vcnNumber ? (
+          <InfoRow icon="card-outline" label="VCN Number" value={vet.vcnNumber} />
+        ) : null}
+
+        {vet.licenseExpiry ? (
+          <InfoRow
+            icon="calendar-outline"
+            label="License Expires"
+            value={new Date(vet.licenseExpiry).toLocaleDateString('en-NG', {
+              day: 'numeric', month: 'long', year: 'numeric',
+            })}
+          />
+        ) : null}
+
+        {vet.rating != null && vet.reviewCount != null ? (
+          <InfoRow
+            icon="star-outline"
+            label="Rating"
+            value={`${vet.rating.toFixed(1)} / 5 (${vet.reviewCount} review${vet.reviewCount !== 1 ? 's' : ''})`}
+          />
+        ) : null}
       </View>
 
-      {/* Result */}
-      {checkStatus === 'found' && result && (
-        <View style={styles.resultCard}>
-          <View style={styles.resultHeader}>
-            <View style={styles.resultIconWrap}>
-              <Ionicons name="checkmark-circle" size={28} color="#10B981" />
-            </View>
-            <View>
-              <Text style={styles.resultTitle}>Registered Professional</Text>
-              <Text style={styles.resultSubtitle}>Found in Xpress Vet database</Text>
-            </View>
+      {/* ── Verification notice ─────────────────────────────────────────────── */}
+      {vet.isVerified ? (
+        <View style={styles.verifiedCard}>
+          <Ionicons name="shield-checkmark" size={22} color="#065F46" />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.verifiedCardTitle}>
+              {isVet ? 'VCN-Verified Veterinarian' : 'Verified Professional'}
+            </Text>
+            <Text style={styles.verifiedCardText}>
+              {isVet
+                ? 'This vet is registered with the Veterinary Council of Nigeria and has been verified by Xpress Vet.'
+                : 'This kennel has been reviewed and verified by the Xpress Vet team.'}
+            </Text>
           </View>
-          {result.name && (
-            <View style={styles.resultRow}>
-              <Text style={styles.resultLabel}>Name</Text>
-              <Text style={styles.resultValue}>{result.name}</Text>
-            </View>
-          )}
-          {result.vcnNumber && (
-            <View style={styles.resultRow}>
-              <Text style={styles.resultLabel}>VCN Number</Text>
-              <Text style={styles.resultValue}>{result.vcnNumber}</Text>
-            </View>
-          )}
-          {result.specialization && (
-            <View style={styles.resultRow}>
-              <Text style={styles.resultLabel}>Specialization</Text>
-              <Text style={styles.resultValue}>{result.specialization}</Text>
-            </View>
-          )}
-          <View style={styles.resultRow}>
-            <Text style={styles.resultLabel}>Status</Text>
-            <View style={styles.statusBadge}>
-              <Text style={styles.statusBadgeText}>✓ Verified</Text>
-            </View>
-          </View>
-          <TouchableOpacity style={styles.portalBtnSmall} onPress={openVcnPortal}>
-            <Text style={styles.portalBtnSmallText}>Also confirm on VCN Portal →</Text>
-          </TouchableOpacity>
         </View>
-      )}
-
-      {checkStatus === 'not_found' && (
-        <View style={styles.notFoundCard}>
-          <Ionicons name="warning-outline" size={32} color="#F59E0B" />
-          <Text style={styles.notFoundTitle}>Not Found in Xpress Vet</Text>
-          <Text style={styles.notFoundText}>
-            This VCN number isn't in our database. The professional may not be registered here yet, but you can still verify directly on the official VCN portal.
-          </Text>
-          <TouchableOpacity style={styles.portalBtnAlt} onPress={openVcnPortal} activeOpacity={0.8}>
-            <Ionicons name="open-outline" size={15} color="#fff" />
-            <Text style={styles.portalBtnAltText}>Check on VCN Portal</Text>
-          </TouchableOpacity>
+      ) : (
+        <View style={styles.unverifiedCard}>
+          <Ionicons name="information-circle-outline" size={22} color="#92400E" />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.unverifiedCardTitle}>Verification Pending</Text>
+            <Text style={styles.unverifiedCardText}>
+              This professional's credentials are still under review.
+            </Text>
+          </View>
         </View>
       )}
     </ScrollView>
   );
 }
 
-function ReasonRow({ icon, color, text }: { icon: any; color: string; text: string }) {
+function InfoRow({ icon, label, value }: { icon: any; label: string; value: string }) {
   return (
-    <View style={styles.reasonRow}>
-      <View style={[styles.reasonIcon, { backgroundColor: color + '18' }]}>
-        <Ionicons name={icon} size={16} color={color} />
-      </View>
-      <Text style={styles.reasonText}>{text}</Text>
+    <View style={styles.infoRow}>
+      <Ionicons name={icon} size={16} color="#64748B" style={{ width: 22 }} />
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={styles.infoValue} numberOfLines={2}>{value}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: '#F8FAFC' },
-  container: { paddingBottom: 40 },
+  scroll:     { flex: 1, backgroundColor: '#F8FAFC' },
+  container:  { paddingBottom: 40 },
 
-  header: {
-    backgroundColor: '#fff',
+  centered: {
+    flex: 1, justifyContent: 'center', alignItems: 'center',
+    backgroundColor: '#F8FAFC', paddingHorizontal: 32,
+  },
+  loadingText: { marginTop: 12, fontSize: 15, color: '#64748B' },
+  errorTitle:  { fontSize: 20, fontWeight: '700', color: '#0F172A', marginTop: 16, marginBottom: 8 },
+  errorText:   { fontSize: 14, color: '#64748B', textAlign: 'center', lineHeight: 21, marginBottom: 20 },
+  retryBtn: {
+    backgroundColor: '#2563EB', paddingHorizontal: 28, paddingVertical: 12,
+    borderRadius: 10, marginBottom: 10,
+  },
+  retryText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  backBtn:  { paddingVertical: 10 },
+  backText: { color: '#64748B', fontSize: 14 },
+
+  hero: {
     alignItems: 'center',
     paddingTop: 36,
     paddingBottom: 28,
@@ -233,191 +310,96 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
-    elevation: 4,
   },
-  headerIconWrap: {
-    width: 76,
-    height: 76,
-    borderRadius: 22,
-    backgroundColor: '#EFF6FF',
+  avatarWrap: {
+    width: 90,
+    height: 90,
+    borderRadius: 24,
+    backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 2,
-    borderColor: '#DBEAFE',
-  },
-  headerEmoji: { fontSize: 36 },
-  title: { fontSize: 24, fontWeight: '800', color: '#0F172A', marginBottom: 8, textAlign: 'center' },
-  subtitle: { fontSize: 14, color: '#64748B', textAlign: 'center', lineHeight: 20 },
-
-  whyCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    borderRadius: 16,
-    padding: 16,
     marginBottom: 14,
+    borderWidth: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+    position: 'relative',
+  },
+  avatarEmoji: { fontSize: 42 },
+  verifiedRing: {
+    position: 'absolute',
+    bottom: -6,
+    right: -6,
+    backgroundColor: '#fff',
+    borderRadius: 13,
+  },
+  name: { fontSize: 24, fontWeight: '800', color: '#0F172A', marginBottom: 8, textAlign: 'center' },
+  roleBadge: {
+    paddingHorizontal: 14, paddingVertical: 5,
+    borderRadius: 20, borderWidth: 1, marginBottom: 8,
+  },
+  roleBadgeText: { fontSize: 13, fontWeight: '700' },
+  specialization: {
+    fontSize: 14, color: '#64748B', textAlign: 'center',
+    marginBottom: 12, lineHeight: 20,
+  },
+  badgeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'center' },
+  verifiedBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#D1FAE5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8,
+  },
+  verifiedBadgeText: { fontSize: 12, color: '#065F46', fontWeight: '700' },
+  distanceBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#EFF6FF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8,
+  },
+  distanceBadgeText: { fontSize: 12, color: '#2563EB', fontWeight: '600' },
+
+  contactRow: {
+    flexDirection: 'row', marginHorizontal: 16,
+    gap: 10, marginBottom: 16,
+  },
+  contactBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 13, borderRadius: 12, gap: 8,
+  },
+  contactBtnOutline: {
+    backgroundColor: '#fff', borderWidth: 1.5,
+  },
+  contactBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+
+  card: {
+    backgroundColor: '#fff', marginHorizontal: 16, borderRadius: 16,
+    padding: 16, marginBottom: 14,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
   },
   cardTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#94A3B8',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 14,
+    fontSize: 11, fontWeight: '800', color: '#94A3B8',
+    textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 14,
   },
-  reasonRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 12 },
-  reasonIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
+  infoRow: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
   },
-  reasonText: { fontSize: 14, color: '#334155', flex: 1, lineHeight: 20 },
+  infoLabel: { fontSize: 13, color: '#64748B', flex: 0.7, marginLeft: 4 },
+  infoValue: { fontSize: 13, color: '#0F172A', fontWeight: '600', flex: 1.3, textAlign: 'right' },
 
-  formCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+  verifiedCard: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
+    backgroundColor: '#ECFDF5', marginHorizontal: 16, borderRadius: 14,
+    padding: 14, borderWidth: 1, borderColor: '#A7F3D0', marginBottom: 14,
   },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    backgroundColor: '#F8FAFC',
-    marginBottom: 14,
-  },
-  input: { flex: 1, paddingVertical: 14, fontSize: 15, color: '#0F172A', letterSpacing: 0.5 },
-  checkBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#2563EB',
-    paddingVertical: 15,
-    borderRadius: 12,
-    gap: 8,
-    marginBottom: 14,
-    shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  checkBtnDisabled: { opacity: 0.6 },
-  checkBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  verifiedCardTitle: { fontSize: 14, fontWeight: '700', color: '#065F46', marginBottom: 4 },
+  verifiedCardText:  { fontSize: 13, color: '#047857', lineHeight: 19 },
 
-  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
-  divider: { flex: 1, height: 1, backgroundColor: '#E2E8F0' },
-  dividerText: { fontSize: 13, color: '#94A3B8', fontWeight: '600' },
-
-  portalBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#EFF6FF',
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#DBEAFE',
-    marginBottom: 6,
+  unverifiedCard: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
+    backgroundColor: '#FFFBEB', marginHorizontal: 16, borderRadius: 14,
+    padding: 14, borderWidth: 1, borderColor: '#FDE68A', marginBottom: 14,
   },
-  portalBtnText: { color: '#2563EB', fontSize: 15, fontWeight: '700' },
-  portalHint: { fontSize: 12, color: '#94A3B8', textAlign: 'center' },
-
-  // Result card
-  resultCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 14,
-    borderWidth: 1.5,
-    borderColor: '#D1FAE5',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  resultHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ECFDF5',
-  },
-  resultIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: '#ECFDF5',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  resultTitle: { fontSize: 16, fontWeight: '800', color: '#065F46' },
-  resultSubtitle: { fontSize: 12, color: '#6EE7B7', marginTop: 2 },
-  resultRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 9,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0FDF4',
-  },
-  resultLabel: { fontSize: 13, color: '#64748B', fontWeight: '600' },
-  resultValue: { fontSize: 14, color: '#0F172A', fontWeight: '600', flex: 1, textAlign: 'right' },
-  statusBadge: {
-    backgroundColor: '#D1FAE5',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  statusBadgeText: { fontSize: 12, color: '#065F46', fontWeight: '700' },
-  portalBtnSmall: { marginTop: 12, alignItems: 'center' },
-  portalBtnSmallText: { fontSize: 13, color: '#2563EB', fontWeight: '600' },
-
-  // Not found
-  notFoundCard: {
-    backgroundColor: '#FFFBEB',
-    marginHorizontal: 16,
-    borderRadius: 16,
-    padding: 22,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#FDE68A',
-  },
-  notFoundTitle: { fontSize: 17, fontWeight: '800', color: '#92400E', marginTop: 10, marginBottom: 8 },
-  notFoundText: { fontSize: 14, color: '#78350F', textAlign: 'center', lineHeight: 21, marginBottom: 18 },
-  portalBtnAlt: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F59E0B',
-    paddingVertical: 13,
-    paddingHorizontal: 22,
-    borderRadius: 12,
-    gap: 8,
-  },
-  portalBtnAltText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  unverifiedCardTitle: { fontSize: 14, fontWeight: '700', color: '#92400E', marginBottom: 4 },
+  unverifiedCardText:  { fontSize: 13, color: '#78350F', lineHeight: 19 },
 });

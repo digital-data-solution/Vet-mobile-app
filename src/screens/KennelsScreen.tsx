@@ -102,11 +102,15 @@ export default function KennelsScreen({ navigation }: any) {
       const res = await apiFetch('/api/v1/kennels/list?limit=50', { method: 'GET' });
       if (res.ok && res.body?.success) {
         setKennels(res.body.data || []);
+      } else if (res.status === 402) {
+        setKennels([]);
       } else {
-        setKennels(fallbackData);
+        Alert.alert('Error', res.body?.message || 'Failed to load kennels.');
+        setKennels([]);
       }
     } catch {
-      setKennels(fallbackData);
+      Alert.alert('Network Error', 'Could not connect. Please check your connection.');
+      setKennels([]);
     } finally {
       setLoading(false);
     }
@@ -303,30 +307,6 @@ export default function KennelsScreen({ navigation }: any) {
     </KeyboardAvoidingView>
   );
 }
-
-const fallbackData: Kennel[] = [
-  {
-    _id: '1',
-    name: 'Happy Paws Kennel',
-    address: 'Ikeja, Lagos',
-    specialization: 'Boarding, Grooming',
-    isVerified: true,
-  },
-  {
-    _id: '2',
-    name: 'Safe Haven Kennel',
-    address: 'Lekki Phase 1, Lagos',
-    specialization: 'Training, Boarding',
-    isVerified: false,
-  },
-  {
-    _id: '3',
-    name: 'Royal Pet Lodge',
-    address: 'Victoria Island, Lagos',
-    specialization: 'Luxury Boarding, Day Care',
-    isVerified: true,
-  },
-];
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#F8FAFC' },
