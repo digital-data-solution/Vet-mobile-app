@@ -142,7 +142,7 @@ export default function ProfileScreen({ navigation }: Props) {
           setLoggingOut(true);
           try {
             await signOut();
-            await AsyncStorage.removeItem('xp_token');
+            await AsyncStorage.removeItem('access_token');
             // AppNavigator's onAuthStateChange listener handles the redirect
             // automatically — no manual navigation needed here.
           } catch {
