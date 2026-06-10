@@ -2,6 +2,7 @@
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, RealtimeChannel } from '@supabase/supabase-js';
+import { Platform } from 'react-native';
 
 // Get Supabase credentials from environment variables
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
@@ -34,7 +35,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storage,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    // On web, Supabase must read the token_hash from the callback URL.
+    // On native (iOS/Android), URL-based session detection causes errors.
+    detectSessionInUrl: Platform.OS === 'web',
   },
 });
 
@@ -42,132 +45,74 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 // AUTH HELPER FUNCTIONS
 // ==========================================
 
-/**
- * Sign up with phone number
- */
 export const signUpWithPhone = async (phone: string, password: string) => {
-  const { data, error } = await supabase.auth.signUp({
-    phone: phone,
-    password: password,
-  });
+  const { data, error } = await supabase.auth.signUp({ phone, password });
   return { data, error };
 };
 
-/**
- * Sign in with phone number and password
- */
 export const signInWithPhone = async (phone: string, password: string) => {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    phone: phone,
-    password: password,
-  });
+  const { data, error } = await supabase.auth.signInWithPassword({ phone, password });
   return { data, error };
 };
 
-/**
- * Sign in with email and password
- */
 export const signInWithEmail = async (email: string, password: string) => {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: email,
-    password: password,
-  });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   return { data, error };
 };
 
-/**
- * Sign up with email and password
- */
 export const signUpWithEmail = async (email: string, password: string) => {
-  const { data, error } = await supabase.auth.signUp({
-    email: email,
-    password: password,
-  });
+  const { data, error } = await supabase.auth.signUp({ email, password });
   return { data, error };
 };
 
-/**
- * Verify OTP (for phone or email)
- */
 export const verifyOTP = async (phone: string, token: string) => {
   const { data, error } = await supabase.auth.verifyOtp({
-    phone: phone,
-    token: token,
+    phone,
+    token,
     type: 'sms',
   });
   return { data, error };
 };
 
-/**
- * Verify email OTP
- */
 export const verifyEmailOTP = async (email: string, token: string) => {
   const { data, error } = await supabase.auth.verifyOtp({
-    email: email,
-    token: token,
+    email,
+    token,
     type: 'email',
   });
   return { data, error };
 };
 
-/**
- * Sign out current user
- */
 export const signOut = async () => {
-  // scope:'local' clears the session from storage immediately without
-  // requiring a round-trip to Supabase — this makes logout reliable on web
-  // even when the Supabase API call would otherwise be blocked by CSP.
   const { error } = await supabase.auth.signOut({ scope: 'local' });
   return { error };
 };
 
-/**
- * Get current user
- */
 export const getCurrentUser = () => {
   return supabase.auth.getUser();
 };
 
-/**
- * Get current session
- */
 export const getSession = async () => {
   const { data, error } = await supabase.auth.getSession();
   return { data, error };
 };
 
-/**
- * Listen to auth state changes
- */
 export const onAuthStateChange = (callback: (event: string, session: any) => void) => {
   return supabase.auth.onAuthStateChange(callback);
 };
 
-/**
- * Reset password for email
- */
 export const resetPasswordForEmail = async (email: string) => {
   const { data, error } = await supabase.auth.resetPasswordForEmail(email);
   return { data, error };
 };
 
-/**
- * Update user password
- */
 export const updatePassword = async (newPassword: string) => {
-  const { data, error } = await supabase.auth.updateUser({
-    password: newPassword,
-  });
+  const { data, error } = await supabase.auth.updateUser({ password: newPassword });
   return { data, error };
 };
 
-/**
- * Update user email
- */
 export const updateEmail = async (newEmail: string) => {
-  const { data, error } = await supabase.auth.updateUser({
-    email: newEmail,
-  });
+  const { data, error } = await supabase.auth.updateUser({ email: newEmail });
   return { data, error };
 };
 
@@ -175,9 +120,6 @@ export const updateEmail = async (newEmail: string) => {
 // MESSAGING HELPER FUNCTIONS
 // ==========================================
 
-/**
- * Send a message
- */
 export const sendMessage = async (fromUserId: string, toUserId: string, messageText: string) => {
   const { data, error } = await supabase
     .from('messages')
@@ -190,17 +132,11 @@ export const sendMessage = async (fromUserId: string, toUserId: string, messageT
     })
     .select()
     .single();
-
   return { data, error };
 };
 
-/**
- * Listen to new messages for a user
- * Returns a RealtimeChannel that can be unsubscribed
- */
 export const listenMessages = (userId: string, callback: (payload: any) => void): RealtimeChannel => {
   const channel = supabase.channel(`messages-${userId}`);
-  
   channel
     .on(
       'postgres_changes',
@@ -213,13 +149,9 @@ export const listenMessages = (userId: string, callback: (payload: any) => void)
       callback
     )
     .subscribe();
-
   return channel;
 };
 
-/**
- * Get messages between two users
- */
 export const getMessages = async (userId: string, otherUserId: string) => {
   const { data, error } = await supabase
     .from('messages')
@@ -227,19 +159,14 @@ export const getMessages = async (userId: string, otherUserId: string) => {
     .or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`)
     .or(`from_user_id.eq.${otherUserId},to_user_id.eq.${otherUserId}`)
     .order('timestamp', { ascending: true });
-
   return { data, error };
 };
 
-/**
- * Mark message as read
- */
 export const markMessageAsRead = async (messageId: string) => {
   const { data, error } = await supabase
     .from('messages')
     .update({ read_status: true })
     .eq('id', messageId);
-
   return { data, error };
 };
 
@@ -247,52 +174,23 @@ export const markMessageAsRead = async (messageId: string) => {
 // STORAGE HELPER FUNCTIONS
 // ==========================================
 
-/**
- * Upload file to storage
- */
-export const uploadFile = async (
-  bucket: string,
-  path: string,
-  file: any,
-  options?: any
-) => {
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .upload(path, file, options);
-
+export const uploadFile = async (bucket: string, path: string, file: any, options?: any) => {
+  const { data, error } = await supabase.storage.from(bucket).upload(path, file, options);
   return { data, error };
 };
 
-/**
- * Get public URL for file
- */
 export const getPublicUrl = (bucket: string, path: string) => {
-  const { data } = supabase.storage
-    .from(bucket)
-    .getPublicUrl(path);
-
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return data.publicUrl;
 };
 
-/**
- * Delete file from storage
- */
 export const deleteFile = async (bucket: string, path: string) => {
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .remove([path]);
-
+  const { data, error } = await supabase.storage.from(bucket).remove([path]);
   return { data, error };
 };
 
-/**
- * List files in a bucket
- */
 export const listFiles = async (bucket: string, path?: string) => {
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .list(path);
-
+  const { data, error } = await supabase.storage.from(bucket).list(path);
   return { data, error };
 };
 
@@ -300,17 +198,12 @@ export const listFiles = async (bucket: string, path?: string) => {
 // REALTIME HELPER FUNCTIONS
 // ==========================================
 
-/**
- * Subscribe to realtime changes on a table
- * Returns a RealtimeChannel that can be unsubscribed
- */
 export const subscribeToTable = (
   tableName: string,
   callback: (payload: any) => void,
   filter?: string
 ): RealtimeChannel => {
   const channel = supabase.channel(`${tableName}-changes-${Date.now()}`);
-
   channel
     .on(
       'postgres_changes',
@@ -323,54 +216,34 @@ export const subscribeToTable = (
       callback
     )
     .subscribe();
-
   return channel;
 };
 
-/**
- * Unsubscribe from a channel
- */
 export const unsubscribeFromChannel = async (channel: RealtimeChannel) => {
   await channel.unsubscribe();
   return supabase.removeChannel(channel);
 };
 
-/**
- * Remove all channels
- */
 export const removeAllChannels = async () => {
   return await supabase.removeAllChannels();
 };
 
 // ==========================================
-// SUBSCRIPTION HELPER (OPTIONAL)
+// SUBSCRIPTION HELPER
 // ==========================================
 
-/**
- * Check if user has active subscription
- * This calls your backend API to verify subscription
- */
 export const checkSubscription = async () => {
   try {
-    // Get backend URL from environment
     const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://vet-market-place-jsj5.onrender.com';
-    
-    // Get current session
     const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session) {
-      return { subscribed: false, message: 'Not authenticated' };
-    }
 
-    // Call backend to check subscription
+    if (!session) return { subscribed: false, message: 'Not authenticated' };
+
     const response = await fetch(`${backendUrl}/api/subscriptions/me`, {
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`,
-      },
+      headers: { Authorization: `Bearer ${session.access_token}` },
     });
-
     const data = await response.json();
-    
+
     return {
       subscribed: data.success && data.data?.isActive,
       data: data.data,
@@ -381,5 +254,4 @@ export const checkSubscription = async () => {
   }
 };
 
-// Default export
 export default supabase;
