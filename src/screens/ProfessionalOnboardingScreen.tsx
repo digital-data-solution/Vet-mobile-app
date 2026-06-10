@@ -36,55 +36,80 @@ interface FormErrors {
 }
 
 export default function ProfessionalOnboardingScreen({ navigation, route }: Props) {
-  const role: Role = (route?.params?.role as Role) ?? 'vet';
-  const [name, setName] = useState('');
-  const [vcnNumber, setVcnNumber] = useState('');
+  // Role is set from route param OR from the existing profile once loaded
+  const [role, setRole]       = useState<Role>((route?.params?.role as Role) ?? 'vet');
+  const [name, setName]       = useState('');
+  const [vcnNumber, setVcnNumber]     = useState('');
   const [businessName, setBusinessName] = useState('');
   const [address, setAddress] = useState('');
   const [specialization, setSpecialization] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
+  const [phone, setPhone]     = useState('');
+  const [email, setEmail]     = useState('');
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [hasExistingProfile, setHasExistingProfile] = useState(false);
+  const [errors, setErrors]   = useState<FormErrors>({});
   const [galleryImages, setGalleryImages] = useState<MediaImage[]>([]);
 
-  // Subscription check on focus
+  // Load existing profile + check subscription on every focus
   useFocusEffect(
     React.useCallback(() => {
       let isActive = true;
-      const checkSub = async () => {
+
+      const init = async () => {
+        setProfileLoading(true);
+
+        // Load existing profile (non-blocking on error — first-time users have none)
+        try {
+          const profileRes = await apiFetch('/api/v1/professionals/me', { method: 'GET' });
+          if (isActive && profileRes.ok && profileRes.body?.data) {
+            const p = profileRes.body.data;
+            setHasExistingProfile(true);
+            setRole(p.role === 'kennel' ? 'kennel' : 'vet');
+            setName(p.name              ?? '');
+            setVcnNumber(p.vcnNumber    ?? '');
+            setBusinessName(p.businessName ?? '');
+            setAddress(p.address        ?? '');
+            setSpecialization(p.specialization ?? '');
+            setPhone(p.phone            ?? '');
+            setEmail(p.email            ?? '');
+          }
+        } catch {
+          // 404 = no profile yet — normal for first-time users
+        } finally {
+          if (isActive) setProfileLoading(false);
+        }
+
+        // Subscription gate
         try {
           const res = await apiFetch('/api/subscriptions/me', { method: 'GET' });
-          if (!res.ok || !res.body?.data?.isActive) {
-            if (isActive) {
-              Alert.alert('Subscription Required', 'You need an active subscription to register as a professional.', [
-                { text: 'Go to Subscription', onPress: () => navigation.navigate('SubscriptionScreen') },
-              ]);
-            }
+          if (isActive && (!res.ok || !res.body?.data?.isActive)) {
+            Alert.alert(
+              'Subscription Required',
+              'You need an active subscription to register as a professional.',
+              [{ text: 'Go to Subscription', onPress: () => navigation.navigate('SubscriptionScreen') }],
+            );
           }
-        } catch (e) {
-          if (isActive) {
-            Alert.alert('Error', 'Could not verify subscription.');
-          }
+        } catch {
+          // silent — don't block the screen on a subscription check failure
         }
       };
-      checkSub();
+
+      init();
       return () => { isActive = false; };
-    }, [navigation])
+    }, [navigation]),
   );
 
   const validateVet = (): boolean => {
     const newErrors: FormErrors = {};
-    if (!name.trim()) newErrors.name = 'Full name is required';
+    if (!name.trim())      newErrors.name      = 'Full name is required';
     if (!vcnNumber.trim()) newErrors.vcnNumber = 'VCN number is required';
-    if (!address.trim()) newErrors.address = 'Address is required';
+    if (!address.trim())   newErrors.address   = 'Address is required';
 
-    if (phone && !/^[\d\s\+\-\(\)]+$/.test(phone)) {
+    if (phone && !/^[\d\s\+\-\(\)]+$/.test(phone))
       newErrors.phone = 'Please enter a valid phone number';
-    }
-    if (email && !/^\S+@\S+\.\S+$/.test(email)) {
+    if (email && !/^\S+@\S+\.\S+$/.test(email))
       newErrors.email = 'Please enter a valid email address';
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -92,16 +117,14 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
 
   const validateKennel = (): boolean => {
     const newErrors: FormErrors = {};
-    if (!name.trim()) newErrors.name = 'Owner name is required';
+    if (!name.trim())         newErrors.name         = 'Owner name is required';
     if (!businessName.trim()) newErrors.businessName = 'Kennel name is required';
-    if (!address.trim()) newErrors.address = 'Address is required';
+    if (!address.trim())      newErrors.address      = 'Address is required';
 
-    if (phone && !/^[\d\s\+\-\(\)]+$/.test(phone)) {
+    if (phone && !/^[\d\s\+\-\(\)]+$/.test(phone))
       newErrors.phone = 'Please enter a valid phone number';
-    }
-    if (email && !/^\S+@\S+\.\S+$/.test(email)) {
+    if (email && !/^\S+@\S+\.\S+$/.test(email))
       newErrors.email = 'Please enter a valid email address';
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -113,15 +136,14 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
 
     setLoading(true);
     try {
-      const payload = {
-        name: name.trim(),
-        role,
+      const payload: Record<string, any> = {
+        name:    name.trim(),
         address: address.trim(),
         specialization: specialization.trim() || undefined,
-        phone: phone.trim() || undefined,
-        email: email.trim() || undefined,
+        phone:   phone.trim() || undefined,
+        email:   email.trim() || undefined,
         ...(role === 'vet' && {
-          vcnNumber: vcnNumber.trim(),
+          vcnNumber:    vcnNumber.trim(),
           businessName: businessName.trim() || undefined,
         }),
         ...(role === 'kennel' && {
@@ -129,37 +151,70 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
         }),
       };
 
-      const res = await apiFetch('/api/v1/professionals/onboard', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-        headers: { 'Content-Type': 'application/json' },
-      });
+      let res;
+      if (hasExistingProfile) {
+        // Update existing profile
+        res = await apiFetch('/api/v1/professionals/profile', {
+          method:  'PUT',
+          body:    JSON.stringify(payload),
+          headers: { 'Content-Type': 'application/json' },
+        });
+      } else {
+        // Create new profile
+        res = await apiFetch('/api/v1/professionals/onboard', {
+          method:  'POST',
+          body:    JSON.stringify({ ...payload, role }),
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
 
       if (res.ok && res.body?.success) {
-        Alert.alert(
-          'Registration Successful! 🎉',
-          role === 'vet'
-            ? 'Your veterinarian profile has been created and is pending verification. You will be notified once approved.'
-            : 'Your kennel has been registered and is now live!',
-          [{ text: 'Continue', onPress: () => navigation.navigate('MainTabs') }]
-        );
+        if (hasExistingProfile) {
+          Alert.alert('Profile Updated', 'Your profile has been updated successfully.', [
+            { text: 'Done', onPress: () => navigation.goBack() },
+          ]);
+        } else {
+          Alert.alert(
+            'Registration Successful! 🎉',
+            role === 'vet'
+              ? 'Your veterinarian profile has been created and is pending verification. You will be notified once approved.'
+              : 'Your kennel has been registered and is now live!',
+            [{ text: 'Continue', onPress: () => navigation.navigate('MainTabs') }],
+          );
+        }
       } else {
         const errorMsg = res.body?.message || 'Please check your details and try again.';
-        Alert.alert('Registration Failed', errorMsg);
+        Alert.alert(hasExistingProfile ? 'Update Failed' : 'Registration Failed', errorMsg);
       }
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error('Save error:', error);
       Alert.alert('Network Error', 'Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const isVet = role === 'vet';
-  const title = isVet ? 'Register as Veterinarian' : 'Register Your Kennel';
-  const subtitle = isVet
-    ? 'Create your professional profile to start connecting with clients.'
-    : 'List your kennel to reach more pet owners.';
+  const isVet   = role === 'vet';
+  const title   = hasExistingProfile
+    ? (isVet ? 'Edit Veterinarian Profile' : 'Edit Kennel Profile')
+    : (isVet ? 'Register as Veterinarian'  : 'Register Your Kennel');
+  const subtitle = hasExistingProfile
+    ? 'Update your business information below.'
+    : isVet
+      ? 'Create your professional profile to start connecting with clients.'
+      : 'List your kennel to reach more pet owners.';
+  const submitLabel = hasExistingProfile
+    ? 'Save Changes'
+    : isVet ? 'Register as Veterinarian' : 'Register Kennel';
+
+  if (profileLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F4F6' }}>
+        <ActivityIndicator size="large" color="#2563EB" />
+        <Text style={{ marginTop: 12, color: '#6B7280' }}>Loading profile...</Text>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -320,9 +375,7 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
           {loading ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.submitButtonText}>
-              {isVet ? 'Register as Veterinarian' : 'Register Kennel'}
-            </Text>
+            <Text style={styles.submitButtonText}>{submitLabel}</Text>
           )}
         </TouchableOpacity>
 
@@ -377,33 +430,30 @@ function FormField({
 }
 
 const fieldStyles = StyleSheet.create({
-  wrapper: { marginBottom: 16 },
-  label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 },
+  wrapper:       { marginBottom: 16 },
+  label:         { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 6 },
   input: {
     borderWidth: 1.5,
     borderColor: '#E5E7EB',
     borderRadius: 10,
-    padding: 13,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     fontSize: 15,
     color: '#111827',
     backgroundColor: '#F9FAFB',
   },
-  inputMultiline: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  inputError: { borderColor: '#EF4444', backgroundColor: '#FEF2F2' },
-  errorText: { marginTop: 4, fontSize: 12, color: '#EF4444' },
+  inputError:     { borderColor: '#EF4444' },
+  inputMultiline: { minHeight: 80, textAlignVertical: 'top' },
+  errorText:      { color: '#EF4444', fontSize: 12, marginTop: 4 },
 });
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: '#F3F4F6' },
-  container: { paddingBottom: 40 },
+  scroll:     { flex: 1, backgroundColor: '#F3F4F6' },
+  container:  { paddingBottom: 40 },
   header: {
     alignItems: 'center',
     paddingTop: 40,
     paddingBottom: 28,
-    paddingHorizontal: 24,
     backgroundColor: '#fff',
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
@@ -414,32 +464,33 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  emoji: { fontSize: 56, marginBottom: 12 },
-  title: { fontSize: 24, fontWeight: '800', color: '#111827', textAlign: 'center', marginBottom: 8 },
-  subtitle: { fontSize: 14, color: '#6B7280', textAlign: 'center', lineHeight: 20 },
+  emoji:    { fontSize: 52, marginBottom: 10 },
+  title:    { fontSize: 22, fontWeight: '800', color: '#111827', textAlign: 'center', paddingHorizontal: 20 },
+  subtitle: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginTop: 6, paddingHorizontal: 24 },
   formCard: {
     backgroundColor: '#fff',
     marginHorizontal: 16,
-    borderRadius: 16,
+    borderRadius: 14,
     padding: 20,
+    marginBottom: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 4,
     elevation: 2,
-    marginBottom: 16,
   },
   infoBox: {
     flexDirection: 'row',
     backgroundColor: '#EFF6FF',
     marginHorizontal: 16,
-    marginBottom: 16,
     borderRadius: 12,
     padding: 14,
-    borderLeftWidth: 4,
-    borderLeftColor: '#2563EB',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    alignItems: 'flex-start',
   },
-  infoIcon: { fontSize: 18, marginRight: 10, marginTop: 2 },
+  infoIcon: { fontSize: 16, marginRight: 10, marginTop: 1 },
   infoText: { flex: 1, fontSize: 13, color: '#1E40AF', lineHeight: 18 },
   submitButton: {
     backgroundColor: '#2563EB',
@@ -447,6 +498,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: 'center',
+    marginBottom: 14,
     shadowColor: '#2563EB',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -456,11 +508,10 @@ const styles = StyleSheet.create({
   submitButtonDisabled: { opacity: 0.7 },
   submitButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   disclaimer: {
-    marginHorizontal: 24,
-    marginTop: 16,
     fontSize: 12,
     color: '#9CA3AF',
     textAlign: 'center',
+    marginHorizontal: 20,
     lineHeight: 18,
   },
 });
