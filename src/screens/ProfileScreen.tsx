@@ -3,7 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
+  Pressable,
   Alert,
   ActivityIndicator,
   ScrollView,
@@ -39,10 +39,6 @@ interface SubscriptionInfo {
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPER
 // ─────────────────────────────────────────────────────────────────────────────
-
-// ProfileScreen lives inside every tab navigator. navigation.navigate() on a
-// tab screen cannot reach root-stack screens like SubscriptionScreen.
-// getParent() bubbles up to the root Stack.Navigator where it's registered.
 function goToSubscription(navigation: any) {
   try {
     const parent = navigation.getParent();
@@ -59,11 +55,10 @@ function goToSubscription(navigation: any) {
 // ─────────────────────────────────────────────────────────────────────────────
 // COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
-
 export default function ProfileScreen({ navigation }: Props) {
-  const [user,       setUser]       = useState<any>(null);
-  const [loading,    setLoading]    = useState(true);
-  const [loggingOut, setLoggingOut] = useState(false);
+  const [user,         setUser]         = useState<any>(null);
+  const [loading,      setLoading]      = useState(true);
+  const [loggingOut,   setLoggingOut]   = useState(false);
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
   const [subLoading,   setSubLoading]   = useState(false);
 
@@ -122,16 +117,11 @@ export default function ProfileScreen({ navigation }: Props) {
     return unsubscribe;
   }, [navigation, fetchUser, fetchSubscription]);
 
-  // ─── Profile image upload success ──────────────────────────────────────────
-  // Called by ProfileImageUploader after a successful Cloudinary upload.
-  // Patches the local user state immediately so the UI updates without a
-  // full re-fetch — the next focus event will sync from the server anyway.
   const handleImageUploadSuccess = useCallback((newUrl: string) => {
     setUser((prev: any) => prev ? { ...prev, profileImage: newUrl } : prev);
   }, []);
 
   // ─── Logout ────────────────────────────────────────────────────────────────
-
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
@@ -141,10 +131,8 @@ export default function ProfileScreen({ navigation }: Props) {
         onPress: async () => {
           setLoggingOut(true);
           try {
-            await signOut();
             await AsyncStorage.removeItem('access_token');
-            // AppNavigator's onAuthStateChange listener handles the redirect
-            // automatically — no manual navigation needed here.
+            await signOut();
           } catch {
             Alert.alert('Error', 'Failed to log out. Please try again.');
           } finally {
@@ -156,7 +144,6 @@ export default function ProfileScreen({ navigation }: Props) {
   };
 
   // ─── Cancel subscription ───────────────────────────────────────────────────
-
   const handleCancelSubscription = () => {
     Alert.alert(
       'Cancel Subscription',
@@ -185,7 +172,6 @@ export default function ProfileScreen({ navigation }: Props) {
   };
 
   // ─── Display helpers ───────────────────────────────────────────────────────
-
   const getUserDisplayName = () => {
     if (!user) return 'Anonymous User';
     const name =
@@ -202,13 +188,13 @@ export default function ProfileScreen({ navigation }: Props) {
   const getUserEmail = () => user?.email ?? user?.user_metadata?.email ?? 'Not provided';
 
   const isProfessional = user?.role === 'vet' || user?.role === 'kennel_owner';
-  const isVet = user?.role === 'vet';
-  const roleLabel = ROLE_LABELS[user?.role] ?? 'User';
+  const isVet          = user?.role === 'vet';
+  const roleLabel      = ROLE_LABELS[user?.role] ?? 'User';
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color="#E8610A" />
         <Text style={styles.loadingText}>Loading profile...</Text>
       </View>
     );
@@ -220,11 +206,8 @@ export default function ProfileScreen({ navigation }: Props) {
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}
     >
-      {/* Avatar & name */}
+      {/* ── Avatar & name ───────────────────────────────────────────────── */}
       <View style={styles.avatarSection}>
-        {/* FIX: pass the resolved profileImage URL and the stable callback.
-            Previously onUploadSuccess was () => fetchUser() which triggered a
-            full reload; now it patches state directly and re-fetch on next focus. */}
         <ProfileImageUploader
           currentImageUrl={user?.profileImage ?? user?.user_metadata?.profileImage ?? null}
           onUploadSuccess={handleImageUploadSuccess}
@@ -242,10 +225,10 @@ export default function ProfileScreen({ navigation }: Props) {
         </View>
       </View>
 
-      {/* Subscription card */}
+      {/* ── Subscription card ───────────────────────────────────────────── */}
       {subLoading ? (
         <View style={styles.infoCard}>
-          <ActivityIndicator size="small" color="#2563EB" />
+          <ActivityIndicator size="small" color="#E8610A" />
         </View>
       ) : subscription ? (
         <View style={[
@@ -297,34 +280,31 @@ export default function ProfileScreen({ navigation }: Props) {
           )}
 
           {subscription.isActive && (
-            <TouchableOpacity
-              style={styles.cancelButton}
+            <Pressable
+              style={({ pressed }) => [styles.cancelButton, pressed && { opacity: 0.7 }]}
               onPress={handleCancelSubscription}
-              activeOpacity={0.8}
             >
               <Text style={styles.cancelButtonText}>Cancel Subscription</Text>
-            </TouchableOpacity>
+            </Pressable>
           )}
         </View>
       ) : (
         <View style={styles.noSubscriptionCard}>
           <Text style={styles.noSubEmoji}>⭐</Text>
           <Text style={styles.noSubTitle}>No Active Subscription</Text>
-          <Text style={styles.noSubText}>Subscribe to unlock all features and unlimited access</Text>
-          {/* FIX: was navigation.navigate('SubscriptionScreen') — ProfileScreen
-              is a tab screen so that call never reached the root stack screen.
-              goToSubscription() uses getParent() to escape the tab navigator. */}
-          <TouchableOpacity
-            style={styles.subscribeNowButton}
+          <Text style={styles.noSubText}>
+            Subscribe to unlock all features and unlimited access
+          </Text>
+          <Pressable
+            style={({ pressed }) => [styles.subscribeNowButton, pressed && { opacity: 0.7 }]}
             onPress={() => goToSubscription(navigation)}
-            activeOpacity={0.85}
           >
             <Text style={styles.subscribeNowText}>View Plans</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       )}
 
-      {/* Account info */}
+      {/* ── Account info ────────────────────────────────────────────────── */}
       {user && (
         <View style={styles.infoCard}>
           <Text style={styles.cardTitle}>Account Information</Text>
@@ -335,7 +315,7 @@ export default function ProfileScreen({ navigation }: Props) {
         </View>
       )}
 
-      {/* Professional tools */}
+      {/* ── Professional tools ──────────────────────────────────────────── */}
       {isProfessional && (
         <View style={styles.actionsCard}>
           <Text style={styles.cardTitle}>Professional Tools</Text>
@@ -344,7 +324,6 @@ export default function ProfileScreen({ navigation }: Props) {
             label="Edit Business Info"
             onPress={() => navigation.navigate('ProfessionalOnboarding')}
           />
-          {/* FIX: was navigation.navigate('SubscriptionScreen') — same tab escape issue */}
           <MenuButton
             emoji="⭐"
             label="Manage Subscription"
@@ -362,7 +341,7 @@ export default function ProfileScreen({ navigation }: Props) {
         </View>
       )}
 
-      {/* Register a business */}
+      {/* ── Register a business ─────────────────────────────────────────── */}
       <View style={styles.actionsCard}>
         <Text style={styles.cardTitle}>Register a Business</Text>
         <MenuButton
@@ -385,19 +364,21 @@ export default function ProfileScreen({ navigation }: Props) {
         />
       </View>
 
-      {/* Logout */}
-      <TouchableOpacity
-        style={styles.logoutButton}
+      {/* ── Logout ──────────────────────────────────────────────────────── */}
+      <Pressable
+        style={({ pressed }) => [
+          styles.logoutButton,
+          pressed && { opacity: 0.7 },
+        ]}
         onPress={handleLogout}
         disabled={loggingOut}
-        activeOpacity={0.85}
       >
         {loggingOut ? (
           <ActivityIndicator size="small" color="#EF4444" />
         ) : (
           <Text style={styles.logoutText}>🚪 Log Out</Text>
         )}
-      </TouchableOpacity>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -405,7 +386,6 @@ export default function ProfileScreen({ navigation }: Props) {
 // ─────────────────────────────────────────────────────────────────────────────
 // SUB-COMPONENTS
 // ─────────────────────────────────────────────────────────────────────────────
-
 function InfoRow({ icon, label, value }: { icon: string; label: string; value: string }) {
   return (
     <View style={styles.infoRow}>
@@ -422,64 +402,67 @@ function MenuButton({
   emoji: string; label: string; onPress: () => void; tint?: string;
 }) {
   return (
-    <TouchableOpacity style={styles.menuButton} onPress={onPress} activeOpacity={0.7}>
+    <Pressable
+      style={({ pressed }) => [styles.menuButton, pressed && { opacity: 0.7 }]}
+      onPress={onPress}
+    >
       <View style={[styles.menuIconBg, { backgroundColor: tint + '18' }]}>
         <Text style={styles.menuEmoji}>{emoji}</Text>
       </View>
       <Text style={styles.menuLabel}>{label}</Text>
       <Text style={styles.menuChevron}>›</Text>
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// STYLES (unchanged from original)
+// STYLES
 // ─────────────────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: '#F3F4F6' },
-  container: { paddingBottom: 40 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F4F6' },
+  scroll:     { flex: 1, backgroundColor: '#F3F4F6' },
+  container:  { paddingBottom: 40 },
+  loadingContainer: {
+    flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F4F6',
+  },
   loadingText: { marginTop: 12, color: '#6B7280', fontSize: 15 },
+
   avatarSection: {
-    alignItems: 'center',
-    paddingTop: 40,
-    paddingBottom: 28,
-    backgroundColor: '#fff',
-    borderBottomLeftRadius: 24,
+    alignItems:              'center',
+    paddingTop:              40,
+    paddingBottom:           28,
+    backgroundColor:         '#fff',
+    borderBottomLeftRadius:  24,
     borderBottomRightRadius: 24,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    marginBottom:            20,
+    shadowColor:             '#000',
+    shadowOffset:            { width: 0, height: 2 },
+    shadowOpacity:           0.06,
+    shadowRadius:            8,
+    elevation:               3,
   },
-  uploadHint: { color: '#6B7280', fontSize: 13, marginTop: 4, textAlign: 'center', paddingHorizontal: 24 },
-  userName: { fontSize: 22, fontWeight: '800', color: '#111827', marginTop: 12, marginBottom: 8 },
+  uploadHint: {
+    color: '#6B7280', fontSize: 13, marginTop: 4, textAlign: 'center', paddingHorizontal: 24,
+  },
+  userName: {
+    fontSize: 22, fontWeight: '800', color: '#111827', marginTop: 12, marginBottom: 8,
+  },
   roleBadge: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor:  '#FFF4EE',
     paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#DBEAFE',
+    paddingVertical:   5,
+    borderRadius:      20,
+    borderWidth:       1,
+    borderColor:       '#FDDCCC',
   },
-  roleBadgeText: { color: '#2563EB', fontSize: 13, fontWeight: '700' },
+  roleBadgeText: { color: '#E8610A', fontSize: 13, fontWeight: '700' },
+
   subscriptionCard: {
-    marginHorizontal: 16,
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 14,
-    borderWidth: 2,
+    marginHorizontal: 16, borderRadius: 16, padding: 18, marginBottom: 14, borderWidth: 2,
   },
-  subscriptionCardActive:   { backgroundColor: '#EFF6FF', borderColor: '#3B82F6' },
+  subscriptionCardActive:   { backgroundColor: '#FFF4EE', borderColor: '#E8610A' },
   subscriptionCardInactive: { backgroundColor: '#FEF2F2', borderColor: '#FCA5A5' },
   subscriptionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12,
   },
   subscriptionLabel:  { fontSize: 11, fontWeight: '800', color: '#6B7280', letterSpacing: 0.5, marginBottom: 4 },
   subscriptionPlan:   { fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 2 },
@@ -496,105 +479,109 @@ const styles = StyleSheet.create({
   detailValue: { fontSize: 13, fontWeight: '600', color: '#111827' },
   expiredText: { fontSize: 13, color: '#991B1B', fontStyle: 'italic' },
   cancelButton: {
-    marginTop: 12,
+    marginTop:       12,
     paddingVertical: 10,
     backgroundColor: '#fff',
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderRadius:    8,
+    alignItems:      'center',
+    borderWidth:     1,
+    borderColor:     '#E5E7EB',
   },
   cancelButtonText: { fontSize: 13, fontWeight: '600', color: '#EF4444' },
+
   noSubscriptionCard: {
     marginHorizontal: 16,
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 14,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    borderStyle: 'dashed',
+    borderRadius:     16,
+    padding:          24,
+    marginBottom:     14,
+    backgroundColor:  '#fff',
+    alignItems:       'center',
+    borderWidth:      2,
+    borderColor:      '#E5E7EB',
+    borderStyle:      'dashed',
   },
   noSubEmoji: { fontSize: 48, marginBottom: 12 },
   noSubTitle: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 6 },
   noSubText:  { fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: 16 },
   subscribeNowButton: {
-    backgroundColor: '#2563EB',
-    paddingVertical: 12,
+    backgroundColor:   '#E8610A',
+    paddingVertical:   12,
     paddingHorizontal: 32,
-    borderRadius: 10,
+    borderRadius:      10,
   },
   subscribeNowText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+
   infoCard: {
     backgroundColor: '#fff',
     marginHorizontal: 16,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    borderRadius:     14,
+    padding:          16,
+    marginBottom:     14,
+    shadowColor:      '#000',
+    shadowOffset:     { width: 0, height: 1 },
+    shadowOpacity:    0.06,
+    shadowRadius:     4,
+    elevation:        2,
   },
   cardTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#6B7280',
-    marginBottom: 14,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontSize:        13,
+    fontWeight:      '700',
+    color:           '#6B7280',
+    marginBottom:    14,
+    textTransform:   'uppercase',
+    letterSpacing:   0.5,
   },
   infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
+    flexDirection:     'row',
+    alignItems:        'center',
+    paddingVertical:   8,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
   infoIcon:  { fontSize: 16, marginRight: 10, width: 22 },
   infoLabel: { fontSize: 14, color: '#6B7280', flex: 0.8 },
   infoValue: { fontSize: 14, color: '#111827', fontWeight: '500', flex: 1.2, textAlign: 'right' },
+
   actionsCard: {
-    backgroundColor: '#fff',
+    backgroundColor:  '#fff',
     marginHorizontal: 16,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    borderRadius:     14,
+    padding:          16,
+    marginBottom:     14,
+    shadowColor:      '#000',
+    shadowOffset:     { width: 0, height: 1 },
+    shadowOpacity:    0.06,
+    shadowRadius:     4,
+    elevation:        2,
   },
   menuButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
+    flexDirection:     'row',
+    alignItems:        'center',
+    paddingVertical:   12,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
   menuIconBg: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
+    width:           36,
+    height:          36,
+    borderRadius:    10,
+    justifyContent:  'center',
+    alignItems:      'center',
+    marginRight:     12,
   },
   menuEmoji:   { fontSize: 18 },
   menuLabel:   { flex: 1, fontSize: 15, color: '#111827', fontWeight: '500' },
   menuChevron: { fontSize: 20, color: '#9CA3AF', fontWeight: '300' },
+
   logoutButton: {
     marginHorizontal: 16,
-    marginTop: 6,
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1.5,
-    borderColor: '#FECACA',
-    paddingVertical: 15,
-    borderRadius: 14,
-    alignItems: 'center',
+    marginTop:        6,
+    backgroundColor:  '#FEF2F2',
+    borderWidth:      1.5,
+    borderColor:      '#FECACA',
+    paddingVertical:  15,
+    borderRadius:     14,
+    alignItems:       'center',
   },
   logoutText: { color: '#EF4444', fontSize: 16, fontWeight: '700' },
-});   
+});
