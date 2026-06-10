@@ -23,25 +23,26 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../api/supabase';
 import type { Session } from '@supabase/supabase-js';
 
-import HomeScreen                  from '../screens/HomeScreen';
-import AuthScreen                  from '../screens/AuthScreen';
-import RegisterScreen              from '../screens/RegisterScreen';
-import ProfessionalsScreen         from '../screens/ProfessionalsScreen';
-import ShopsScreen                 from '../screens/ShopsScreen';
-import KennelsScreen               from '../screens/KennelsScreen';
-import ProfileScreen               from '../screens/ProfileScreen';
-import SubscriptionScreen          from '../screens/SubscriptionScreen';
-import VetVerificationScreen       from '../screens/VetVerificationScreen';
+import HomeScreen                   from '../screens/HomeScreen';
+import AuthScreen                   from '../screens/AuthScreen';
+import RegisterScreen               from '../screens/RegisterScreen';
+import ProfessionalsScreen          from '../screens/ProfessionalsScreen';
+import ShopsScreen                  from '../screens/ShopsScreen';
+import KennelsScreen                from '../screens/KennelsScreen';
+import ProfileScreen                from '../screens/ProfileScreen';
+import SubscriptionScreen           from '../screens/SubscriptionScreen';
+import VetVerificationScreen        from '../screens/VetVerificationScreen';
 import ProfessionalOnboardingScreen from '../screens/ProfessionalOnboardingScreen';
-import KennelOnboardingScreen      from '../screens/KennelOnboardingScreen';
-import ShopOnboardingScreen        from '../screens/ShopOnboardingScreen';
-import ExploreOptionsScreen        from '../screens/ExploreOptionsScreen';
-import VetProfileScreen            from '../screens/VetProfileScreen';
-import ShopProfileScreen           from '../screens/ShopProfileScreen';
-import KennelProfileScreen         from '../screens/KennelProfileScreen';
-import VerifyProfessionalScreen    from '../screens/VerifyProfessionalScreen';
-import AddressInputScreen          from '../screens/AddressInputScreen';
-import PaystackWebView             from '../screens/PaystackWebView';
+import KennelOnboardingScreen       from '../screens/KennelOnboardingScreen';
+import ShopOnboardingScreen         from '../screens/ShopOnboardingScreen';
+import ExploreOptionsScreen         from '../screens/ExploreOptionsScreen';
+import VetProfileScreen             from '../screens/VetProfileScreen';
+import ShopProfileScreen            from '../screens/ShopProfileScreen';
+import KennelProfileScreen          from '../screens/KennelProfileScreen';
+import VerifyProfessionalScreen     from '../screens/VerifyProfessionalScreen';
+import AddressInputScreen           from '../screens/AddressInputScreen';
+import PaystackWebView              from '../screens/PaystackWebView';
+import EmailVerifiedScreen          from '../screens/EmailVerifiedScreen';
 
 const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://vet-market-place-jsj5.onrender.com';
 
@@ -75,10 +76,11 @@ export const useAuth = () => useContext(AuthContext);
 // NAVIGATION PARAM LISTS
 // ─────────────────────────────────────────────────────────────────────────────
 export type RootStackParamList = {
-  Auth:     undefined;
-  Register: undefined;
-  MainTabs: undefined;
-  // Shared overlay screens (accessible from anywhere without tab nesting)
+  Auth:             undefined;
+  Register:         undefined;
+  MainTabs:         undefined;
+  EmailVerified:    undefined;
+  // Shared overlay screens
   VetProfile:             { vetId?: string } | undefined;
   ShopProfile:            { shopId?: string } | undefined;
   KennelProfile:          { kennelId?: string } | undefined;
@@ -112,13 +114,43 @@ const RootStack = createNativeStackNavigator<RootStackParamList>();
 const Tab       = createBottomTabNavigator<TabParamList>();
 
 // ─────────────────────────────────────────────────────────────────────────────
+// DEEP LINKING CONFIG
+// Maps incoming URLs to screen names in RootStack.
+// Web:    https://xpressvetmarketplace.com/auth/callback  → EmailVerified
+// Native: xpressvet://verify-email                        → EmailVerified
+// ─────────────────────────────────────────────────────────────────────────────
+const linking = {
+  prefixes: [
+    'https://xpressvetmarketplace.com',
+    'http://xpressvetmarketplace.com',
+    'xpressvet://',
+  ],
+  config: {
+    screens: {
+      EmailVerified: 'auth/callback',
+      Auth:          'auth/login',
+      Register:      'auth/register',
+      MainTabs:      {
+        screens: {
+          Home:          'home',
+          Professionals: 'professionals',
+          Kennels:       'kennels',
+          Shops:         'shops',
+          Profile:       'profile',
+        },
+      },
+    },
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // LOADING SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
 function LoadingScreen() {
   return (
     <View style={styles.centered}>
       <Text style={styles.appName}>Xpress Vet</Text>
-      <ActivityIndicator size="large" color="#007AFF" style={{ marginTop: 24 }} />
+      <ActivityIndicator size="large" color="#E8610A" style={{ marginTop: 24 }} />
     </View>
   );
 }
@@ -165,7 +197,7 @@ class NavigationErrorBoundary extends Component<
 // SHARED STYLE HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 const tabScreenOptions = {
-  tabBarActiveTintColor:   '#007AFF',
+  tabBarActiveTintColor:   '#E8610A',
   tabBarInactiveTintColor: '#8E8E93',
   tabBarStyle: {
     backgroundColor: '#fff',
@@ -175,7 +207,7 @@ const tabScreenOptions = {
     paddingTop:      5,
     height:          60,
   },
-  headerStyle:      { backgroundColor: '#007AFF' },
+  headerStyle:      { backgroundColor: '#E8610A' },
   headerTintColor:  '#fff',
   headerTitleStyle: { fontWeight: 'bold' as const },
 };
@@ -188,38 +220,15 @@ function TabIcon(name: keyof typeof Ionicons.glyphMap) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TAB NAVIGATORS
-// Each tab shows only its own root screen. Shared screens (VetProfile, Chat,
-// SubscriptionScreen, PaystackWebView, etc.) live in the RootStack so they
-// are accessible from any tab without duplication.
 // ─────────────────────────────────────────────────────────────────────────────
 function UserTabs() {
   return (
     <Tab.Navigator screenOptions={tabScreenOptions}>
-      <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{ tabBarIcon: TabIcon('home'), headerShown: false }}
-      />
-      <Tab.Screen
-        name="Professionals"
-        component={ProfessionalsScreen}
-        options={{ title: 'Find Vets', tabBarLabel: 'Vets', tabBarIcon: TabIcon('medkit'), headerShown: false }}
-      />
-      <Tab.Screen
-        name="Kennels"
-        component={KennelsScreen}
-        options={{ tabBarIcon: TabIcon('paw'), headerShown: false }}
-      />
-      <Tab.Screen
-        name="Shops"
-        component={ShopsScreen}
-        options={{ title: 'Pet Shops', tabBarLabel: 'Shops', tabBarIcon: TabIcon('basket'), headerShown: false }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{ tabBarIcon: TabIcon('person'), headerShown: false }}
-      />
+      <Tab.Screen name="Home"          component={HomeScreen}          options={{ tabBarIcon: TabIcon('home'),    headerShown: false }} />
+      <Tab.Screen name="Professionals" component={ProfessionalsScreen} options={{ title: 'Find Vets', tabBarLabel: 'Vets', tabBarIcon: TabIcon('medkit'), headerShown: false }} />
+      <Tab.Screen name="Kennels"       component={KennelsScreen}       options={{ tabBarIcon: TabIcon('paw'),     headerShown: false }} />
+      <Tab.Screen name="Shops"         component={ShopsScreen}         options={{ title: 'Pet Shops', tabBarLabel: 'Shops', tabBarIcon: TabIcon('basket'), headerShown: false }} />
+      <Tab.Screen name="Profile"       component={ProfileScreen}       options={{ tabBarIcon: TabIcon('person'),  headerShown: false }} />
     </Tab.Navigator>
   );
 }
@@ -227,36 +236,12 @@ function UserTabs() {
 function ProfessionalTabs() {
   return (
     <Tab.Navigator screenOptions={tabScreenOptions}>
-      <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{ tabBarIcon: TabIcon('home'), headerShown: false }}
-      />
-      <Tab.Screen
-        name="Network"
-        component={ProfessionalsScreen}
-        options={{ tabBarIcon: TabIcon('people'), headerShown: false }}
-      />
-      <Tab.Screen
-        name="Shops"
-        component={ShopsScreen}
-        options={{ title: 'Pet Shops', tabBarLabel: 'Shops', tabBarIcon: TabIcon('basket'), headerShown: false }}
-      />
-      <Tab.Screen
-        name="Subscription"
-        component={SubscriptionScreen}
-        options={{ title: 'Subscription', tabBarIcon: TabIcon('star'), headerShown: false }}
-      />
-      <Tab.Screen
-        name="VetVerification"
-        component={VetVerificationScreen}
-        options={{ title: 'Get Verified', tabBarLabel: 'Verify', tabBarIcon: TabIcon('checkmark-circle'), headerShown: false }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{ tabBarIcon: TabIcon('person'), headerShown: false }}
-      />
+      <Tab.Screen name="Home"            component={HomeScreen}           options={{ tabBarIcon: TabIcon('home'),             headerShown: false }} />
+      <Tab.Screen name="Network"         component={ProfessionalsScreen}  options={{ tabBarIcon: TabIcon('people'),            headerShown: false }} />
+      <Tab.Screen name="Shops"           component={ShopsScreen}          options={{ title: 'Pet Shops', tabBarLabel: 'Shops', tabBarIcon: TabIcon('basket'), headerShown: false }} />
+      <Tab.Screen name="Subscription"    component={SubscriptionScreen}   options={{ title: 'Subscription', tabBarIcon: TabIcon('star'),            headerShown: false }} />
+      <Tab.Screen name="VetVerification" component={VetVerificationScreen} options={{ title: 'Get Verified', tabBarLabel: 'Verify', tabBarIcon: TabIcon('checkmark-circle'), headerShown: false }} />
+      <Tab.Screen name="Profile"         component={ProfileScreen}        options={{ tabBarIcon: TabIcon('person'),            headerShown: false }} />
     </Tab.Navigator>
   );
 }
@@ -264,26 +249,10 @@ function ProfessionalTabs() {
 function KennelOwnerTabs() {
   return (
     <Tab.Navigator screenOptions={tabScreenOptions}>
-      <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{ tabBarIcon: TabIcon('home'), headerShown: false }}
-      />
-      <Tab.Screen
-        name="Kennels"
-        component={KennelsScreen}
-        options={{ tabBarIcon: TabIcon('paw'), headerShown: false }}
-      />
-      <Tab.Screen
-        name="Subscription"
-        component={SubscriptionScreen}
-        options={{ title: 'Subscription', tabBarIcon: TabIcon('star'), headerShown: false }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{ tabBarIcon: TabIcon('person'), headerShown: false }}
-      />
+      <Tab.Screen name="Home"         component={HomeScreen}         options={{ tabBarIcon: TabIcon('home'),  headerShown: false }} />
+      <Tab.Screen name="Kennels"      component={KennelsScreen}      options={{ tabBarIcon: TabIcon('paw'),   headerShown: false }} />
+      <Tab.Screen name="Subscription" component={SubscriptionScreen} options={{ title: 'Subscription', tabBarIcon: TabIcon('star'),   headerShown: false }} />
+      <Tab.Screen name="Profile"      component={ProfileScreen}      options={{ tabBarIcon: TabIcon('person'), headerShown: false }} />
     </Tab.Navigator>
   );
 }
@@ -291,26 +260,10 @@ function KennelOwnerTabs() {
 function ShopOwnerTabs() {
   return (
     <Tab.Navigator screenOptions={tabScreenOptions}>
-      <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{ tabBarIcon: TabIcon('home'), headerShown: false }}
-      />
-      <Tab.Screen
-        name="Shops"
-        component={ShopsScreen}
-        options={{ title: 'My Shops', tabBarIcon: TabIcon('basket'), headerShown: false }}
-      />
-      <Tab.Screen
-        name="Subscription"
-        component={SubscriptionScreen}
-        options={{ title: 'Subscription', tabBarIcon: TabIcon('star'), headerShown: false }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{ tabBarIcon: TabIcon('person'), headerShown: false }}
-      />
+      <Tab.Screen name="Home"         component={HomeScreen}         options={{ tabBarIcon: TabIcon('home'),   headerShown: false }} />
+      <Tab.Screen name="Shops"        component={ShopsScreen}        options={{ title: 'My Shops', tabBarIcon: TabIcon('basket'), headerShown: false }} />
+      <Tab.Screen name="Subscription" component={SubscriptionScreen} options={{ title: 'Subscription', tabBarIcon: TabIcon('star'),    headerShown: false }} />
+      <Tab.Screen name="Profile"      component={ProfileScreen}      options={{ tabBarIcon: TabIcon('person'), headerShown: false }} />
     </Tab.Navigator>
   );
 }
@@ -333,51 +286,31 @@ export default function AppNavigator() {
   const [userRole, setUserRole] = useState<UserRole>(null);
   const [loading,  setLoading]  = useState(true);
 
-  // ------------------------------------------------------------------
-  // Fetch the canonical role from MongoDB via GET /api/auth/me.
-  // Falls back to Supabase user_metadata role if the backend is down.
-  // ------------------------------------------------------------------
   const fetchRoleFromBackend = useCallback(async (currentSession: Session | null) => {
     if (!currentSession) {
       setUserRole(null);
       return;
     }
-
     try {
-      const token = currentSession.access_token;
-      const res   = await fetch(`${BASE_URL}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch(`${BASE_URL}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${currentSession.access_token}` },
       });
-
       if (res.ok) {
         const json = await res.json();
-        // Response shape: { user: { role, ... } }
-        const role = json?.user?.role as UserRole ?? null;
-        setUserRole(role);
+        setUserRole((json?.user?.role as UserRole) ?? null);
       } else {
-        // Backend unreachable or user not synced yet — fall back to metadata
-        const metaRole = (currentSession.user?.user_metadata?.role as UserRole) ?? 'pet_owner';
-        setUserRole(metaRole);
+        setUserRole((currentSession.user?.user_metadata?.role as UserRole) ?? 'pet_owner');
       }
     } catch {
-      // Network error — fall back gracefully
-      const metaRole = (currentSession.user?.user_metadata?.role as UserRole) ?? 'pet_owner';
-      setUserRole(metaRole);
+      setUserRole((currentSession.user?.user_metadata?.role as UserRole) ?? 'pet_owner');
     }
   }, []);
 
-  // ------------------------------------------------------------------
-  // Exposed via context so any screen (e.g. after onboarding completes)
-  // can trigger a role refresh without requiring a full sign-out/sign-in.
-  // ------------------------------------------------------------------
   const refreshRole = useCallback(async () => {
     const { data: { session: current } } = await supabase.auth.getSession();
     await fetchRoleFromBackend(current);
   }, [fetchRoleFromBackend]);
 
-  // ------------------------------------------------------------------
-  // Bootstrap: load session + role on mount, then subscribe to changes
-  // ------------------------------------------------------------------
   useEffect(() => {
     let mounted = true;
 
@@ -405,10 +338,6 @@ export default function AppNavigator() {
     };
   }, [fetchRoleFromBackend]);
 
-  // ------------------------------------------------------------------
-  // signOut — wrapped in useCallback so context consumers don't
-  // re-render unnecessarily.
-  // ------------------------------------------------------------------
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setUserRole(null);
@@ -421,25 +350,29 @@ export default function AppNavigator() {
   return (
     <AuthContext.Provider value={{ session, userRole, isAuthenticated, signOut, refreshRole }}>
       <NavigationErrorBoundary>
-        <NavigationContainer>
+        <NavigationContainer linking={linking}>
           <RootStack.Navigator screenOptions={{ headerShown: false }}>
+
+            {/*
+             * EmailVerified is ALWAYS registered regardless of auth state.
+             * The email confirmation link hits /auth/callback whether the
+             * user is logged in or not — so it must be reachable from both.
+             */}
+            <RootStack.Screen
+              name="EmailVerified"
+              component={EmailVerifiedScreen}
+              options={{ headerShown: false }}
+            />
+
             {!isAuthenticated ? (
-              // ── Auth screens ──────────────────────────────────────────────
               <>
                 <RootStack.Screen name="Auth"     component={AuthScreen} />
                 <RootStack.Screen name="Register" component={RegisterScreen} />
               </>
             ) : (
-              // ── Authenticated screens ─────────────────────────────────────
               <>
-                {/* Bottom tabs (flat root screens only) */}
                 <RootStack.Screen name="MainTabs" component={MainTabs} />
 
-                {/*
-                 * Shared overlay screens — defined ONCE here in RootStack.
-                 * Any tab can reach these via navigation.navigate('VetProfile')
-                 * without needing getParent() hacks or duplicate registrations.
-                 */}
                 <RootStack.Screen
                   name="VetProfile"
                   component={VetProfileScreen}
@@ -516,9 +449,9 @@ const styles = StyleSheet.create({
     padding:         24,
   },
   appName: {
-    fontSize:   28,
-    fontWeight: '700',
-    color:      '#007AFF',
+    fontSize:      28,
+    fontWeight:    '700',
+    color:         '#E8610A',
     letterSpacing: 0.5,
   },
   errorTitle: {
@@ -528,17 +461,17 @@ const styles = StyleSheet.create({
     marginTop:  16,
   },
   errorMessage: {
-    fontSize:   14,
-    color:      '#8E8E93',
-    marginTop:  8,
-    textAlign:  'center',
+    fontSize:  14,
+    color:     '#8E8E93',
+    marginTop: 8,
+    textAlign: 'center',
   },
   retryButton: {
-    marginTop:       24,
-    backgroundColor: '#007AFF',
+    marginTop:         24,
+    backgroundColor:   '#E8610A',
     paddingHorizontal: 32,
     paddingVertical:   12,
-    borderRadius:    10,
+    borderRadius:      10,
   },
   retryText: {
     color:      '#fff',
