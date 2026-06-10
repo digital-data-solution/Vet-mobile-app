@@ -60,10 +60,12 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
         setProfileLoading(true);
 
         // Load existing profile (non-blocking on error — first-time users have none)
+        let hasExisting = false;
         try {
           const profileRes = await apiFetch('/api/v1/professionals/me', { method: 'GET' });
           if (isActive && profileRes.ok && profileRes.body?.data) {
             const p = profileRes.body.data;
+            hasExisting = true;
             setHasExistingProfile(true);
             setRole(p.role === 'kennel' ? 'kennel' : 'vet');
             setName(p.name              ?? '');
@@ -80,18 +82,20 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
           if (isActive) setProfileLoading(false);
         }
 
-        // Subscription gate
-        try {
-          const res = await apiFetch('/api/subscriptions/me', { method: 'GET' });
-          if (isActive && (!res.ok || !res.body?.data?.isActive)) {
-            Alert.alert(
-              'Subscription Required',
-              'You need an active subscription to register as a professional.',
-              [{ text: 'Go to Subscription', onPress: () => navigation.navigate('SubscriptionScreen') }],
-            );
+        // Subscription gate — only for new profiles, not for editing existing ones
+        if (!hasExisting) {
+          try {
+            const res = await apiFetch('/api/subscriptions/me', { method: 'GET' });
+            if (isActive && (!res.ok || !res.body?.data?.isActive)) {
+              Alert.alert(
+                'Subscription Required',
+                'You need an active subscription to register as a professional.',
+                [{ text: 'Go to Subscription', onPress: () => navigation.navigate('SubscriptionScreen') }],
+              );
+            }
+          } catch {
+            // silent — don't block the screen on a subscription check failure
           }
-        } catch {
-          // silent — don't block the screen on a subscription check failure
         }
       };
 
