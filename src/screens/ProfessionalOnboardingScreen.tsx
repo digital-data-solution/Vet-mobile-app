@@ -15,11 +15,16 @@ import {
 } from 'react-native';
 import { apiFetch } from '../api/client';
 import MediaUploader from '../components/Mediauploader';
-import { RootStackParamList } from '../navigation/AppNavigator';
+import type { RootStackParamList } from '../navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProfessionalOnboarding'>;
 
 type Role = 'vet' | 'kennel';
+
+interface MediaImage {
+  url:      string;
+  publicId: string;
+}
 
 interface FormErrors {
   name?: string;
@@ -41,7 +46,7 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
-  const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  const [galleryImages, setGalleryImages] = useState<MediaImage[]>([]);
 
   // Subscription check on focus
   useFocusEffect(
@@ -289,7 +294,7 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
             {isVet ? 'Clinic Gallery (optional)' : 'Kennel Gallery (optional)'}
           </Text>
           <MediaUploader
-            userType={isVet ? 'vet' : 'kennel'}
+            userType={isVet ? 'vet' : 'kennel_owner'}
             existingImages={galleryImages}
             onImagesUpdate={setGalleryImages}
           />

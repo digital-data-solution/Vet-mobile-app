@@ -1,8 +1,9 @@
 {
   "expo": {
-    "name": "mobile_app",
-    "slug": "mobile_app",
+    "name": "Xpress Vet",
+    "slug": "xpress-vet",
     "version": "1.0.0",
+    "scheme": "xpressvet",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -14,16 +15,22 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.xpressvet.marketplace"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "package": "com.xpressvet.marketplace",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
-    "web": {}
+    "web": {
+      "title": "Xpress Vet — Nigeria's Pet Care Marketplace",
+      "description": "Find trusted vets, kennels, and pet shops near you across Nigeria.",
+      "favicon": "./assets/icon.png"
+    }
   }
 }

@@ -162,9 +162,14 @@ export default function AuthScreen({ navigation }: { navigation: any }) {
 
     setLoading(true);
     try {
+      // On web redirect to the website; on native deep-link back to the app
+      const resetRedirect = Platform.OS === 'web'
+        ? 'https://xpressvetmarketplace.com/reset-password'
+        : 'xpressvet://reset-password';
+
       const { error } = await supabase.auth.resetPasswordForEmail(
         email.trim().toLowerCase(),
-        { redirectTo: 'xpressvet://reset-password' },
+        { redirectTo: resetRedirect },
       );
 
       if (error) {

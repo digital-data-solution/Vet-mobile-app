@@ -165,8 +165,7 @@ export default function ShopOnboardingScreen({ navigation }: Props) {
       let res;
 
       if (isEditMode && existingShop?._id) {
-        // FIX: shop already exists — use PUT to update instead of POST
-        res = await apiFetch(`/api/v1/shops/${existingShop._id}`, {
+        res = await apiFetch('/api/v1/shops/me/shop', {
           method:  'PUT',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify(payload),

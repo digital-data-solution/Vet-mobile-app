@@ -25,9 +25,11 @@ function isValidEmail(e: string): boolean {
   return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
 }
 
-const DEEP_LINK_SCHEME     = 'xpressvet';
-const EMAIL_VERIFY_REDIRECT = `${DEEP_LINK_SCHEME}://verify-email`;
-const COOLDOWN_MS           = 60_000;
+const COOLDOWN_MS = 60_000;
+// On web the redirect must be a real URL; on native use the deep link scheme
+const EMAIL_VERIFY_REDIRECT = Platform.OS === 'web'
+  ? 'https://xpressvetmarketplace.com/verify-email'
+  : 'xpressvet://verify-email';
 
 export default function RegisterScreen({ navigation }: Props) {
   const [email,           setEmail]           = useState('');

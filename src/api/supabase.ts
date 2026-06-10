@@ -114,7 +114,10 @@ export const verifyEmailOTP = async (email: string, token: string) => {
  * Sign out current user
  */
 export const signOut = async () => {
-  const { error } = await supabase.auth.signOut();
+  // scope:'local' clears the session from storage immediately without
+  // requiring a round-trip to Supabase — this makes logout reliable on web
+  // even when the Supabase API call would otherwise be blocked by CSP.
+  const { error } = await supabase.auth.signOut({ scope: 'local' });
   return { error };
 };
 
@@ -350,7 +353,7 @@ export const removeAllChannels = async () => {
 export const checkSubscription = async () => {
   try {
     // Get backend URL from environment
-    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://vet-market-place.onrender.com';
+    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://vet-market-place-jsj5.onrender.com';
     
     // Get current session
     const { data: { session } } = await supabase.auth.getSession();

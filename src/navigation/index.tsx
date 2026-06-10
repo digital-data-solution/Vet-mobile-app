@@ -43,7 +43,7 @@ import VerifyProfessionalScreen    from '../screens/VerifyProfessionalScreen';
 import AddressInputScreen          from '../screens/AddressInputScreen';
 import PaystackWebView             from '../screens/PaystackWebView';
 
-const BASE_URL = 'https://vet-market-place-jsj5.onrender.com';
+const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://vet-market-place-jsj5.onrender.com';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
