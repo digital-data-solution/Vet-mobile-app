@@ -514,7 +514,7 @@ function PlanCard({
 }
 
 function ActiveSubscriptionCard({ sub }: { sub: SubscriptionInfo }) {
-  const planLabel = sub.plan
+  const planLabel = (sub.plan ?? 'Free')
     .replace('_', ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase());
 

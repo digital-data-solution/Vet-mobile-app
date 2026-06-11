@@ -248,7 +248,7 @@ export default function ProfileScreen({ navigation }: Props) {
             <View>
               <Text style={styles.subscriptionLabel}>SUBSCRIPTION</Text>
               <Text style={styles.subscriptionPlan}>
-                {subscription.plan.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                {(subscription.plan ?? 'Free').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
               </Text>
               <Text style={styles.subscriptionAmount}>
                 ₦{subscription.amount.toLocaleString()}/month
