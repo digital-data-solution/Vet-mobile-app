@@ -11,10 +11,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  TouchableOpacity,
+  Pressable,
 } from 'react-native';
 import { apiFetch } from '../api/client';
 import MediaUploader from '../components/Mediauploader';
+import { useAuth } from '../navigation';
 import type { RootStackParamList } from '../navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProfessionalOnboarding'>;
@@ -36,6 +37,8 @@ interface FormErrors {
 }
 
 export default function ProfessionalOnboardingScreen({ navigation, route }: Props) {
+  const { refreshRole } = useAuth();
+
   // Role is set from route param OR from the existing profile once loaded
   const [role, setRole]       = useState<Role>((route?.params?.role as Role) ?? 'vet');
   const [name, setName]       = useState('');
@@ -178,6 +181,8 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
             { text: 'Done', onPress: () => navigation.goBack() },
           ]);
         } else {
+          // Refresh role in navigation context so tabs switch immediately
+          await refreshRole();
           Alert.alert(
             'Registration Successful! 🎉',
             role === 'vet'
@@ -370,18 +375,17 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
         </View>
 
         {/* Submit */}
-        <TouchableOpacity
-          style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+        <Pressable
+          style={({ pressed }) => [styles.submitButton, loading && styles.submitButtonDisabled, { opacity: pressed ? 0.85 : 1 }]}
           onPress={register}
           disabled={loading}
-          activeOpacity={0.85}
         >
           {loading ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
             <Text style={styles.submitButtonText}>{submitLabel}</Text>
           )}
-        </TouchableOpacity>
+        </Pressable>
 
         <Text style={styles.disclaimer}>
           By registering, you confirm that all information provided is accurate and you agree to our terms of service.

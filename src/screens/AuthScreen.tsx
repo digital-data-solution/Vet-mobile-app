@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  View, Text, TextInput, Pressable, StyleSheet,
   Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
@@ -162,10 +162,11 @@ export default function AuthScreen({ navigation }: { navigation: any }) {
 
     setLoading(true);
     try {
-      // On web redirect to the website; on native deep-link back to the app
+      // /auth/callback is registered in the navigation deep-link config
+      // and renders EmailVerifiedScreen which handles both verify + recovery flows
       const resetRedirect = Platform.OS === 'web'
-        ? 'https://xpressvetmarketplace.com/reset-password'
-        : 'xpressvet://reset-password';
+        ? 'https://xpressvetmarketplace.com/auth/callback'
+        : 'xpressvet://auth/callback';
 
       const { error } = await supabase.auth.resetPasswordForEmail(
         email.trim().toLowerCase(),
@@ -230,22 +231,22 @@ export default function AuthScreen({ navigation }: { navigation: any }) {
                   secureTextEntry={!showPassword}
                   icon="🔒"
                 />
-                <TouchableOpacity
+                <Pressable
                   style={styles.showPasswordBtn}
                   onPress={() => setShowPassword(v => !v)}
                 >
                   <Text style={styles.showPasswordText}>
                     {showPassword ? 'Hide' : 'Show'}
                   </Text>
-                </TouchableOpacity>
+                </Pressable>
               </View>
 
-              <TouchableOpacity
+              <Pressable
                 style={styles.forgotLink}
                 onPress={() => setStep('forgot')}
               >
                 <Text style={styles.forgotLinkText}>Forgot password?</Text>
-              </TouchableOpacity>
+              </Pressable>
 
               <PrimaryButton
                 label="Sign In"
@@ -255,15 +256,14 @@ export default function AuthScreen({ navigation }: { navigation: any }) {
               />
 
               {biometricAvailable && (
-                <TouchableOpacity
-                  style={styles.biometricBtn}
+                <Pressable
+                  style={({ pressed }) => [styles.biometricBtn, { opacity: pressed ? 0.8 : 1 }]}
                   onPress={handleBiometricLogin}
-                  activeOpacity={0.8}
                 >
                   <Text style={styles.biometricBtnText}>
                     🔐 Sign In with Biometrics
                   </Text>
-                </TouchableOpacity>
+                </Pressable>
               )}
             </>
           )}
@@ -291,21 +291,21 @@ export default function AuthScreen({ navigation }: { navigation: any }) {
                 loading={loading}
               />
 
-              <TouchableOpacity
+              <Pressable
                 style={styles.textLink}
                 onPress={() => setStep('login')}
               >
                 <Text style={styles.textLinkText}>← Back to Sign In</Text>
-              </TouchableOpacity>
+              </Pressable>
             </>
           )}
         </View>
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>Don't have an account?</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+          <Pressable onPress={() => navigation.navigate('Register')}>
             <Text style={styles.footerLink}> Create one</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -354,17 +354,16 @@ function PrimaryButton({
   loading:      boolean;
 }) {
   return (
-    <TouchableOpacity
-      style={[styles.primaryBtn, loading && styles.primaryBtnDisabled]}
+    <Pressable
+      style={({ pressed }) => [styles.primaryBtn, loading && styles.primaryBtnDisabled, { opacity: pressed ? 0.85 : 1 }]}
       onPress={onPress}
       disabled={loading}
-      activeOpacity={0.85}
     >
       {loading
         ? <ActivityIndicator size="small" color="#fff" />
         : <Text style={styles.primaryBtnText}>{label}</Text>
       }
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 

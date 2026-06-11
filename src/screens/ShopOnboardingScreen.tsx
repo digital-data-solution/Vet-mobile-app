@@ -4,7 +4,7 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   StyleSheet,
   Alert,
   ActivityIndicator,
@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { apiFetch } from '../api/client';
 import MediaUploader from '../components/Mediauploader';
+import { useAuth } from '../navigation';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 type Props = {
@@ -60,6 +61,7 @@ function resolveAddress(address: ExistingShop['address']): string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function ShopOnboardingScreen({ navigation }: Props) {
+  const { refreshRole } = useAuth();
   const [galleryImages, setGalleryImages] = useState<MediaImage[]>([]);
   const [shopName,      setShopName]      = useState('');
   const [ownerName,     setOwnerName]     = useState('');
@@ -179,6 +181,8 @@ export default function ShopOnboardingScreen({ navigation }: Props) {
       }
 
       if (res.ok && res.body?.success) {
+        if (!isEditMode) await refreshRole();
+
         const successTitle   = isEditMode ? 'Shop Updated! ✅'   : 'Shop Registered! 🎉';
         const successMessage = isEditMode
           ? 'Your shop details have been updated successfully.'
@@ -320,11 +324,10 @@ export default function ShopOnboardingScreen({ navigation }: Props) {
         </View>
 
         {/* Submit */}
-        <TouchableOpacity
-          style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
+        <Pressable
+          style={({ pressed }) => [styles.submitBtn, loading && styles.submitBtnDisabled, { opacity: pressed ? 0.85 : 1 }]}
           onPress={handleSubmit}
           disabled={loading}
-          activeOpacity={0.85}
         >
           {loading ? (
             <ActivityIndicator size="small" color="#fff" />
@@ -333,7 +336,7 @@ export default function ShopOnboardingScreen({ navigation }: Props) {
               {isEditMode ? 'Update Shop' : 'Register Shop'}
             </Text>
           )}
-        </TouchableOpacity>
+        </Pressable>
 
         <Text style={styles.disclaimer}>
           By {isEditMode ? 'updating' : 'registering'}, you confirm that all information provided is accurate.

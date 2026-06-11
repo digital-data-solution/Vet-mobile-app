@@ -3,7 +3,7 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   StyleSheet,
   Alert,
   ActivityIndicator,
@@ -26,10 +26,11 @@ function isValidEmail(e: string): boolean {
 }
 
 const COOLDOWN_MS = 60_000;
-// On web the redirect must be a real URL; on native use the deep link scheme
+// Both web and native point to /auth/callback which is registered in the navigation
+// deep-link config and renders EmailVerifiedScreen (handles both verify + reset flows)
 const EMAIL_VERIFY_REDIRECT = Platform.OS === 'web'
-  ? 'https://xpressvetmarketplace.com/verify-email'
-  : 'xpressvet://verify-email';
+  ? 'https://xpressvetmarketplace.com/auth/callback'
+  : 'xpressvet://auth/callback';
 
 export default function RegisterScreen({ navigation }: Props) {
   const [email,           setEmail]           = useState('');
@@ -185,12 +186,12 @@ export default function RegisterScreen({ navigation }: Props) {
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
                 />
-                <TouchableOpacity
+                <Pressable
                   style={styles.showPasswordBtn}
                   onPress={() => setShowPassword((v) => !v)}
                 >
                   <Text style={styles.showPasswordText}>{showPassword ? 'Hide' : 'Show'}</Text>
-                </TouchableOpacity>
+                </Pressable>
               </View>
 
               <FormInput
@@ -235,7 +236,7 @@ export default function RegisterScreen({ navigation }: Props) {
                 loading={false}
               />
 
-              <TouchableOpacity
+              <Pressable
                 style={styles.textLink}
                 onPress={handleResendEmail}
                 disabled={loading}
@@ -243,14 +244,14 @@ export default function RegisterScreen({ navigation }: Props) {
                 <Text style={styles.textLinkText}>
                   {loading ? 'Sending...' : "Didn't receive it? Resend email"}
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
 
-              <TouchableOpacity
+              <Pressable
                 style={[styles.textLink, { marginTop: 4 }]}
                 onPress={() => setStep('register')}
               >
                 <Text style={[styles.textLinkText, { color: '#6B7280' }]}>← Use a different email</Text>
-              </TouchableOpacity>
+              </Pressable>
             </>
           )}
         </View>
@@ -258,9 +259,9 @@ export default function RegisterScreen({ navigation }: Props) {
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>Already have an account?</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Auth')}>
+          <Pressable onPress={() => navigation.navigate('Auth')}>
             <Text style={styles.footerLink}> Sign In</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -300,17 +301,16 @@ function PrimaryButton({
   label: string; loadingLabel: string; onPress: () => void; loading: boolean;
 }) {
   return (
-    <TouchableOpacity
-      style={[styles.primaryBtn, loading && styles.primaryBtnDisabled]}
+    <Pressable
+      style={({ pressed }) => [styles.primaryBtn, loading && styles.primaryBtnDisabled, { opacity: pressed ? 0.85 : 1 }]}
       onPress={onPress}
       disabled={loading}
-      activeOpacity={0.85}
     >
       {loading
         ? <ActivityIndicator size="small" color="#fff" />
         : <Text style={styles.primaryBtnText}>{label}</Text>
       }
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 

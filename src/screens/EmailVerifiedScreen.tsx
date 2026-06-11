@@ -4,78 +4,106 @@ import {
   Text,
   ActivityIndicator,
   StyleSheet,
-  TouchableOpacity,
+  TextInput,
+  Pressable,
 } from 'react-native';
 import { supabase } from '../api/supabase';
 
+type Stage = 'loading' | 'verified' | 'reset_form' | 'reset_success' | 'error';
+
 export default function EmailVerifiedScreen({ navigation }: any) {
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [message, setMessage] = useState('Verifying your email...');
+  const [stage,     setStage]     = useState<Stage>('loading');
+  const [message,   setMessage]   = useState('');
+  const [newPw,     setNewPw]     = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [saving,    setSaving]    = useState(false);
 
   useEffect(() => {
-    const handleWebCallback = async () => {
-      try {
-        // On web, Supabase auto-handles the token from the URL
-        // We just need to check if a session exists after it processes
-        const { data: { session }, error } = await supabase.auth.getSession();
+    let authSub: any;
 
+    const handleCallback = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
         if (error) throw error;
 
         if (session) {
-          setStatus('success');
-          setMessage('Your email has been verified successfully!');
-
-          // Wait 2 seconds then navigate to main app
+          // Session already established — it's an email verification success
+          setStage('verified');
           setTimeout(() => {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'Home' }], // adjust to your home screen name
-            });
+            navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
           }, 2000);
-        } else {
-          // Token may still be processing — listen for auth state change
-          const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            (event, session) => {
-              if (event === 'SIGNED_IN' && session) {
-                setStatus('success');
-                setMessage('Your email has been verified successfully!');
-                subscription.unsubscribe();
-
-                setTimeout(() => {
-                  navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'Home' }],
-                  });
-                }, 2000);
-              }
-            }
-          );
-
-          // Timeout fallback
-          setTimeout(() => {
-            setStatus('error');
-            setMessage('Verification timed out. Please try signing in.');
-          }, 8000);
+          return;
         }
-      } catch (err) {
-        setStatus('error');
+
+        // No session yet — wait for Supabase to process the token from the URL hash
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+          (event, sess) => {
+            if (event === 'PASSWORD_RECOVERY') {
+              // User clicked a password reset link
+              setStage('reset_form');
+              subscription.unsubscribe();
+            } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && sess) {
+              // User clicked an email verification link
+              setStage('verified');
+              subscription.unsubscribe();
+              setTimeout(() => {
+                navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+              }, 2000);
+            }
+          },
+        );
+        authSub = subscription;
+
+        // Fallback: if nothing happens in 10s show error
+        setTimeout(() => {
+          setStage((prev) => prev === 'loading' ? 'error' : prev);
+          setMessage('Verification timed out. Please try signing in.');
+        }, 10000);
+      } catch {
+        setStage('error');
         setMessage('Verification failed. Please try again.');
       }
     };
 
-    handleWebCallback();
+    handleCallback();
+    return () => authSub?.unsubscribe();
   }, []);
+
+  const handleSetPassword = async () => {
+    if (newPw.length < 6 || newPw !== confirmPw) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPw });
+      if (error) {
+        setMessage(error.message);
+        setStage('error');
+      } else {
+        setStage('reset_success');
+      }
+    } catch {
+      setStage('error');
+      setMessage('Failed to update password. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const pwTooShort   = newPw.length > 0 && newPw.length < 6;
+  const pwMismatch   = confirmPw.length > 0 && newPw !== confirmPw;
+  const canSubmit    = newPw.length >= 6 && newPw === confirmPw;
 
   return (
     <View style={styles.container}>
-      {status === 'loading' && (
+
+      {stage === 'loading' && (
         <>
           <ActivityIndicator size="large" color="#E8610A" />
-          <Text style={styles.message}>{message}</Text>
+          <Text style={styles.message}>Processing your link...</Text>
         </>
       )}
 
-      {status === 'success' && (
+      {stage === 'verified' && (
         <>
           <Text style={styles.icon}>🎉</Text>
           <Text style={styles.title}>Email Verified!</Text>
@@ -85,57 +113,117 @@ export default function EmailVerifiedScreen({ navigation }: any) {
         </>
       )}
 
-      {status === 'error' && (
+      {stage === 'reset_form' && (
         <>
-          <Text style={styles.icon}>❌</Text>
-          <Text style={styles.title}>Verification Failed</Text>
-          <Text style={styles.message}>{message}</Text>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={() => navigation.navigate('Auth')}
+          <Text style={styles.icon}>🔒</Text>
+          <Text style={styles.title}>Set New Password</Text>
+          <Text style={styles.message}>Enter and confirm your new password below.</Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="New password (min 6 characters)"
+            placeholderTextColor="#9CA3AF"
+            secureTextEntry
+            value={newPw}
+            onChangeText={setNewPw}
+            autoCapitalize="none"
+          />
+          {pwTooShort && (
+            <Text style={styles.error}>Password must be at least 6 characters</Text>
+          )}
+
+          <TextInput
+            style={styles.input}
+            placeholder="Confirm new password"
+            placeholderTextColor="#9CA3AF"
+            secureTextEntry
+            value={confirmPw}
+            onChangeText={setConfirmPw}
+            autoCapitalize="none"
+          />
+          {pwMismatch && (
+            <Text style={styles.error}>Passwords do not match</Text>
+          )}
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.button,
+              !canSubmit && styles.buttonDisabled,
+              { opacity: pressed ? 0.8 : 1 },
+            ]}
+            onPress={handleSetPassword}
+            disabled={saving || !canSubmit}
           >
-            <Text style={styles.buttonText}>Go to Login</Text>
-          </TouchableOpacity>
+            <Text style={styles.buttonText}>{saving ? 'Saving...' : 'Set Password'}</Text>
+          </Pressable>
         </>
       )}
+
+      {stage === 'reset_success' && (
+        <>
+          <Text style={styles.icon}>✅</Text>
+          <Text style={styles.title}>Password Updated!</Text>
+          <Text style={styles.message}>You can now sign in with your new password.</Text>
+          <Pressable
+            style={({ pressed }) => [styles.button, { opacity: pressed ? 0.8 : 1 }]}
+            onPress={() => navigation.navigate('Auth')}
+          >
+            <Text style={styles.buttonText}>Go to Sign In</Text>
+          </Pressable>
+        </>
+      )}
+
+      {stage === 'error' && (
+        <>
+          <Text style={styles.icon}>❌</Text>
+          <Text style={styles.title}>Something went wrong</Text>
+          <Text style={styles.message}>{message || 'Please try signing in manually.'}</Text>
+          <Pressable
+            style={({ pressed }) => [styles.button, { opacity: pressed ? 0.8 : 1 }]}
+            onPress={() => navigation.navigate('Auth')}
+          >
+            <Text style={styles.buttonText}>Go to Sign In</Text>
+          </Pressable>
+        </>
+      )}
+
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    flex:            1,
+    justifyContent:  'center',
+    alignItems:      'center',
     backgroundColor: '#fff',
-    padding: 24,
+    padding:         24,
   },
-  icon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1C0F00',
-    marginBottom: 12,
-  },
-  message: {
-    fontSize: 15,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 12,
+  icon:          { fontSize: 64, marginBottom: 16 },
+  title:         { fontSize: 24, fontWeight: 'bold', color: '#1C0F00', marginBottom: 12, textAlign: 'center' },
+  message:       { fontSize: 15, color: '#666', textAlign: 'center', marginTop: 8, marginBottom: 8 },
+  error:         { fontSize: 12, color: '#EF4444', alignSelf: 'stretch', marginBottom: 4, marginLeft: 4 },
+  input: {
+    alignSelf:         'stretch',
+    borderWidth:       1.5,
+    borderColor:       '#E5E7EB',
+    borderRadius:      10,
+    paddingHorizontal: 14,
+    paddingVertical:   13,
+    fontSize:          15,
+    color:             '#111827',
+    backgroundColor:   '#F9FAFB',
+    marginTop:         12,
   },
   button: {
-    marginTop: 24,
-    backgroundColor: '#E8610A',
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    borderRadius: 8,
+    marginTop:         20,
+    backgroundColor:   '#E8610A',
+    paddingVertical:   14,
+    paddingHorizontal: 40,
+    borderRadius:      10,
+    alignSelf:         'stretch',
+    alignItems:        'center',
   },
-  buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 15,
-  },
+  buttonDisabled: { backgroundColor: '#D1D5DB' },
+  buttonText:     { color: '#fff', fontWeight: 'bold', fontSize: 15 },
 });

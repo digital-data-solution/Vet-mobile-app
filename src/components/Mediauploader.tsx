@@ -4,7 +4,7 @@ import {
   Text,
   Image,
   StyleSheet,
-  TouchableOpacity,
+  Pressable,
   ActivityIndicator,
   Alert,
   ScrollView,
@@ -229,36 +229,38 @@ export default function MediaUploader({
   };
 
   // ── Delete image ──────────────────────────────────────────────────────────
-  // Uses apiFetch which now routes DELETE-with-body through XHR internally,
-  // guaranteeing the body is sent on all React Native versions.
+  // Alert.alert with multi-button doesn't work on web — use window.confirm there.
   const deleteImage = (image: MediaImage, index: number) => {
-    Alert.alert('Delete Image', 'Are you sure you want to delete this image?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            const response = await apiFetch('/api/upload/delete', {
-              method:  'DELETE',
-              headers: { 'Content-Type': 'application/json' },
-              body:    JSON.stringify({ imageUrl: image.url }),
-            });
+    const doDelete = async () => {
+      try {
+        const response = await apiFetch('/api/upload/delete', {
+          method:  'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ imageUrl: image.url }),
+        });
 
-            if (!response.ok) {
-              throw new Error(response.body?.message || 'Delete failed.');
-            }
+        if (!response.ok) {
+          throw new Error(response.body?.message || 'Delete failed.');
+        }
 
-            const newImages = images.filter((_, i) => i !== index);
-            setImages(newImages);
-            onImagesUpdate?.(newImages);
-          } catch (error: any) {
-            console.error('Delete error:', error);
-            Alert.alert('Error', error.message || 'Failed to delete image.');
-          }
-        },
-      },
-    ]);
+        const newImages = images.filter((_, i) => i !== index);
+        setImages(newImages);
+        onImagesUpdate?.(newImages);
+      } catch (error: any) {
+        console.error('Delete error:', error);
+        Alert.alert('Error', error.message || 'Failed to delete image.');
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      // eslint-disable-next-line no-alert
+      if ((window as any).confirm('Delete this image?')) doDelete();
+    } else {
+      Alert.alert('Delete Image', 'Are you sure you want to delete this image?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: doDelete },
+      ]);
+    }
   };
 
   // ── Navigate to subscription screen ──────────────────────────────────────
@@ -312,24 +314,22 @@ export default function MediaUploader({
               ) : (
                 <View style={[styles.image, styles.sentinelPlaceholder]} />
               )}
-              <TouchableOpacity
-                style={styles.deleteButton}
+              <Pressable
+                style={({ pressed }) => [styles.deleteButton, { opacity: pressed ? 0.8 : 1 }]}
                 onPress={() => deleteImage(img, index)}
-                activeOpacity={0.8}
                 hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
               >
                 <Ionicons name="close-circle" size={24} color="#EF4444" />
-              </TouchableOpacity>
+              </Pressable>
             </View>
           ))}
 
           {/* Upload slot */}
           {!limitsLoading && canUploadMore && (
-            <TouchableOpacity
-              style={styles.uploadCard}
+            <Pressable
+              style={({ pressed }) => [styles.uploadCard, { opacity: pressed ? 0.7 : 1 }]}
               onPress={pickImages}
               disabled={uploading}
-              activeOpacity={0.7}
             >
               {uploading ? (
                 <View style={styles.uploadingContainer}>
@@ -342,7 +342,7 @@ export default function MediaUploader({
                   <Text style={styles.uploadText}>Add Photos</Text>
                 </>
               )}
-            </TouchableOpacity>
+            </Pressable>
           )}
 
         </View>
@@ -354,13 +354,12 @@ export default function MediaUploader({
             <Text style={styles.upgradeText}>
               Upgrade your plan to upload more images
             </Text>
-            <TouchableOpacity
-              style={styles.upgradeButton}
+            <Pressable
+              style={({ pressed }) => [styles.upgradeButton, { opacity: pressed ? 0.8 : 1 }]}
               onPress={navigateToSubscription}
-              activeOpacity={0.8}
             >
               <Text style={styles.upgradeButtonText}>View Plans</Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         )}
       </ScrollView>

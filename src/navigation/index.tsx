@@ -13,7 +13,7 @@ import {
   Text,
   ActivityIndicator,
   StyleSheet,
-  TouchableOpacity,
+  Pressable,
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -183,9 +183,9 @@ class NavigationErrorBoundary extends Component<
           <Ionicons name="warning-outline" size={48} color="#FF3B30" />
           <Text style={styles.errorTitle}>Something went wrong</Text>
           <Text style={styles.errorMessage}>{this.state.message}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={this.handleRetry}>
+          <Pressable style={styles.retryButton} onPress={this.handleRetry}>
             <Text style={styles.retryText}>Try Again</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       );
     }
