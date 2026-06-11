@@ -224,11 +224,12 @@ function TabIcon(name: keyof typeof Ionicons.glyphMap) {
 function UserTabs() {
   return (
     <Tab.Navigator screenOptions={tabScreenOptions}>
-      <Tab.Screen name="Home"          component={HomeScreen}          options={{ tabBarIcon: TabIcon('home'),    headerShown: false }} />
-      <Tab.Screen name="Professionals" component={ProfessionalsScreen} options={{ title: 'Find Vets', tabBarLabel: 'Vets', tabBarIcon: TabIcon('medkit'), headerShown: false }} />
-      <Tab.Screen name="Kennels"       component={KennelsScreen}       options={{ tabBarIcon: TabIcon('paw'),     headerShown: false }} />
+      <Tab.Screen name="Home"          component={HomeScreen}          options={{ tabBarIcon: TabIcon('home'),     headerShown: false }} />
+      <Tab.Screen name="Professionals" component={ProfessionalsScreen} options={{ title: 'Find Vets', tabBarLabel: 'Vets', tabBarIcon: TabIcon('medkit'),  headerShown: false }} />
+      <Tab.Screen name="Kennels"       component={KennelsScreen}       options={{ tabBarIcon: TabIcon('paw'),      headerShown: false }} />
       <Tab.Screen name="Shops"         component={ShopsScreen}         options={{ title: 'Pet Shops', tabBarLabel: 'Shops', tabBarIcon: TabIcon('basket'), headerShown: false }} />
-      <Tab.Screen name="Profile"       component={ProfileScreen}       options={{ tabBarIcon: TabIcon('person'),  headerShown: false }} />
+      <Tab.Screen name="Subscription"  component={SubscriptionScreen}  options={{ title: 'Subscription', tabBarLabel: 'Plans', tabBarIcon: TabIcon('star'), headerShown: false }} />
+      <Tab.Screen name="Profile"       component={ProfileScreen}       options={{ tabBarIcon: TabIcon('person'),   headerShown: false }} />
     </Tab.Navigator>
   );
 }
