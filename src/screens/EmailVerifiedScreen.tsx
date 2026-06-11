@@ -8,6 +8,7 @@ import {
   Pressable,
 } from 'react-native';
 import { supabase } from '../api/supabase';
+import { useAuth } from '../navigation';
 
 type Stage = 'loading' | 'verified' | 'reset_form' | 'reset_success' | 'error';
 
@@ -18,6 +19,20 @@ export default function EmailVerifiedScreen({ navigation }: any) {
   const [confirmPw, setConfirmPw] = useState('');
   const [saving,    setSaving]    = useState(false);
 
+  const { isAuthenticated } = useAuth();
+
+  // Navigate to MainTabs only once auth context has confirmed the session is
+  // active — avoids "Cannot navigate to MainTabs" when the state hasn't
+  // propagated yet at the moment we call navigation.reset.
+  useEffect(() => {
+    if (stage !== 'verified') return;
+    if (!isAuthenticated) return;
+    const timer = setTimeout(() => {
+      navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [stage, isAuthenticated, navigation]);
+
   useEffect(() => {
     let authSub: any;
 
@@ -27,28 +42,20 @@ export default function EmailVerifiedScreen({ navigation }: any) {
         if (error) throw error;
 
         if (session) {
-          // Session already established — it's an email verification success
+          // Session already established — email verification success
           setStage('verified');
-          setTimeout(() => {
-            navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
-          }, 2000);
           return;
         }
 
-        // No session yet — wait for Supabase to process the token from the URL hash
+        // No session yet — wait for Supabase to process the token from the URL
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           (event, sess) => {
             if (event === 'PASSWORD_RECOVERY') {
-              // User clicked a password reset link
               setStage('reset_form');
               subscription.unsubscribe();
             } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && sess) {
-              // User clicked an email verification link
               setStage('verified');
               subscription.unsubscribe();
-              setTimeout(() => {
-                navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
-              }, 2000);
             }
           },
         );

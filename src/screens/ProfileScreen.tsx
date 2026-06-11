@@ -150,30 +150,34 @@ export default function ProfileScreen({ navigation }: Props) {
 
   // ─── Cancel subscription ───────────────────────────────────────────────────
   const handleCancelSubscription = () => {
-    Alert.alert(
-      'Cancel Subscription',
-      'Are you sure you want to cancel? You will retain access until the end of your billing period.',
-      [
-        { text: 'Keep Subscription', style: 'cancel' },
-        {
-          text: 'Cancel',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const res = await apiFetch('/api/subscriptions/cancel', { method: 'DELETE' });
-              if (res.ok) {
-                Alert.alert('Subscription Cancelled', res.body?.message || 'Your subscription has been cancelled.');
-                fetchSubscription();
-              } else {
-                Alert.alert('Error', res.body?.message || 'Failed to cancel subscription.');
-              }
-            } catch {
-              Alert.alert('Error', 'Failed to cancel subscription. Please try again.');
-            }
-          },
-        },
-      ],
-    );
+    const doCancel = async () => {
+      try {
+        const res = await apiFetch('/api/subscriptions/cancel', { method: 'DELETE' });
+        if (res.ok) {
+          Alert.alert('Subscription Cancelled', res.body?.message || 'Your subscription has been cancelled.');
+          fetchSubscription();
+        } else {
+          Alert.alert('Error', res.body?.message || 'Failed to cancel subscription.');
+        }
+      } catch {
+        Alert.alert('Error', 'Failed to cancel subscription. Please try again.');
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if ((window as any).confirm('Cancel your subscription? You will retain access until the end of your billing period.')) {
+        doCancel();
+      }
+    } else {
+      Alert.alert(
+        'Cancel Subscription',
+        'Are you sure you want to cancel? You will retain access until the end of your billing period.',
+        [
+          { text: 'Keep Subscription', style: 'cancel' },
+          { text: 'Cancel', style: 'destructive', onPress: doCancel },
+        ],
+      );
+    }
   };
 
   // ─── Display helpers ───────────────────────────────────────────────────────
