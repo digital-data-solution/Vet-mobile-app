@@ -230,13 +230,15 @@ export default function MediaUploader({
 
   // ── Delete image ──────────────────────────────────────────────────────────
   // Alert.alert with multi-button doesn't work on web — use window.confirm there.
+  // imageUrl is sent as a query param because some proxies (Render) strip DELETE bodies.
   const deleteImage = (image: MediaImage, index: number) => {
+    if (!image.url) return; // sentinel placeholder — nothing to delete on server
+
     const doDelete = async () => {
       try {
-        const response = await apiFetch('/api/upload/delete', {
-          method:  'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ imageUrl: image.url }),
+        const encoded  = encodeURIComponent(image.url);
+        const response = await apiFetch(`/api/upload/delete?imageUrl=${encoded}`, {
+          method: 'DELETE',
         });
 
         if (!response.ok) {
@@ -314,13 +316,15 @@ export default function MediaUploader({
               ) : (
                 <View style={[styles.image, styles.sentinelPlaceholder]} />
               )}
-              <Pressable
-                style={({ pressed }) => [styles.deleteButton, { opacity: pressed ? 0.8 : 1 }]}
-                onPress={() => deleteImage(img, index)}
-                hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
-              >
-                <Ionicons name="close-circle" size={24} color="#EF4444" />
-              </Pressable>
+              {img.url ? (
+                <Pressable
+                  style={({ pressed }) => [styles.deleteButton, { opacity: pressed ? 0.8 : 1 }]}
+                  onPress={() => deleteImage(img, index)}
+                  hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
+                >
+                  <Ionicons name="close-circle" size={24} color="#EF4444" />
+                </Pressable>
+              ) : null}
             </View>
           ))}
 
