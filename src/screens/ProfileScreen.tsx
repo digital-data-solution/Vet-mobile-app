@@ -7,6 +7,7 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { getCurrentUser, signOut } from '../api/supabase';
 import { apiFetch } from '../api/client';
@@ -122,25 +123,29 @@ export default function ProfileScreen({ navigation }: Props) {
   }, []);
 
   // ─── Logout ────────────────────────────────────────────────────────────────
+  // Alert.alert multi-button is broken on web — use window.confirm there.
   const handleLogout = () => {
-    Alert.alert('Log Out', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Log Out',
-        style: 'destructive',
-        onPress: async () => {
-          setLoggingOut(true);
-          try {
-            await AsyncStorage.removeItem('access_token');
-            await signOut();
-          } catch {
-            Alert.alert('Error', 'Failed to log out. Please try again.');
-          } finally {
-            setLoggingOut(false);
-          }
-        },
-      },
-    ]);
+    const doLogout = async () => {
+      setLoggingOut(true);
+      try {
+        await AsyncStorage.removeItem('access_token');
+        await signOut();
+      } catch {
+        Alert.alert('Error', 'Failed to log out. Please try again.');
+      } finally {
+        setLoggingOut(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      // eslint-disable-next-line no-alert
+      if ((window as any).confirm('Are you sure you want to log out?')) doLogout();
+    } else {
+      Alert.alert('Log Out', 'Are you sure you want to log out?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Log Out', style: 'destructive', onPress: doLogout },
+      ]);
+    }
   };
 
   // ─── Cancel subscription ───────────────────────────────────────────────────

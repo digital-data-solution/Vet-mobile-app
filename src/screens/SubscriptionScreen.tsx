@@ -6,7 +6,7 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
-  TouchableOpacity,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../api/client';
@@ -70,19 +70,52 @@ const PET_OWNER_PLANS = [
 
 const PROFESSIONAL_PLANS = [
   {
+    id:       'free',
+    name:     'Free',
+    price:    0,
+    tagline:  'Build your profile at no cost',
+    color:    '#64748B',
+    bgColor:  '#F8FAFC',
+    features: [
+      { text: 'Create full professional profile',     included: true  },
+      { text: 'Upload up to 3 gallery photos',        included: true  },
+      { text: 'Listed in search results',             included: false },
+      { text: 'Contact info visible to pet owners',   included: false },
+      { text: 'Appear in GPS nearby searches',        included: false },
+      { text: 'Featured badge on profile',            included: false },
+    ],
+  },
+  {
+    id:       'basic',
+    name:     'Basic',
+    price:    1500,
+    tagline:  'Get listed and discovered',
+    color:    '#059669',
+    bgColor:  '#ECFDF5',
+    features: [
+      { text: 'Listed in search results',             included: true  },
+      { text: 'Upload up to 5 gallery photos',        included: true  },
+      { text: 'Profile visible to all users',         included: true  },
+      { text: 'Contact info visible to pet owners',   included: false },
+      { text: 'Appear in GPS nearby searches',        included: false },
+      { text: 'Featured badge on profile',            included: false },
+    ],
+  },
+  {
     id:       'starter',
     name:     'Starter',
     price:    2500,
-    tagline:  'Get listed and found',
+    tagline:  'Full visibility + contact access',
     color:    '#7C3AED',
     bgColor:  '#F5F3FF',
+    badge:    'Most Popular',
     features: [
-      { text: 'Listed in search results',              included: true  },
-      { text: 'Full profile visible to subscribers',   included: true  },
-      { text: 'Phone & email shown to Premium users',  included: true  },
-      { text: 'Appear in nearby searches',             included: true  },
-      { text: 'Featured badge on profile',             included: false },
-      { text: 'Sorted to top of search results',       included: false },
+      { text: 'Listed in search results',             included: true  },
+      { text: 'Upload up to 10 gallery photos',       included: true  },
+      { text: 'Phone & email shown to Premium users', included: true  },
+      { text: 'Appear in GPS nearby searches',        included: true  },
+      { text: 'Featured badge on profile',            included: false },
+      { text: 'Sorted to top of search results',      included: false },
     ],
   },
   {
@@ -94,12 +127,12 @@ const PROFESSIONAL_PLANS = [
     bgColor:  '#FFFBEB',
     badge:    'Best Value',
     features: [
-      { text: 'Listed in search results',              included: true },
-      { text: 'Full profile visible to subscribers',   included: true },
-      { text: 'Phone & email shown to Premium users',  included: true },
-      { text: 'Appear in nearby searches',             included: true },
-      { text: 'Featured badge on profile',             included: true },
-      { text: 'Sorted to top of search results',       included: true },
+      { text: 'Listed in search results',             included: true },
+      { text: 'Upload up to 30 gallery photos',       included: true },
+      { text: 'Phone & email shown to Premium users', included: true },
+      { text: 'Appear in GPS nearby searches',        included: true },
+      { text: 'Featured badge on profile',            included: true },
+      { text: 'Sorted to top of search results',      included: true },
     ],
   },
 ] as const;
@@ -452,15 +485,14 @@ function PlanCard({
       </View>
 
       {!isFree && (
-        <TouchableOpacity
-          style={[
+        <Pressable
+          style={({ pressed }) => [
             styles.subscribeBtn,
             { backgroundColor: plan.color },
-            disabled && styles.subscribeBtnDisabled,
+            (disabled || pressed) && styles.subscribeBtnDisabled,
           ]}
           onPress={() => onSubscribe(plan.id)}
           disabled={disabled}
-          activeOpacity={0.85}
         >
           {loading ? (
             <ActivityIndicator size="small" color="#fff" />
@@ -469,7 +501,7 @@ function PlanCard({
               Subscribe — ₦{plan.price.toLocaleString()}/mo
             </Text>
           )}
-        </TouchableOpacity>
+        </Pressable>
       )}
 
       {isFree && (
@@ -526,12 +558,19 @@ function PendingCard({
       <Text style={styles.pendingText}>
         If you paid via bank transfer your subscription will activate automatically once confirmed.
       </Text>
-      <TouchableOpacity style={styles.checkBtn} onPress={onCheck} disabled={loading}>
+      <Pressable
+        style={({ pressed }) => [styles.checkBtn, { opacity: pressed ? 0.8 : 1 }]}
+        onPress={onCheck}
+        disabled={loading}
+      >
         <Text style={styles.checkBtnText}>{loading ? 'Checking…' : '↻ Check Payment Status'}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
+      </Pressable>
+      <Pressable
+        style={({ pressed }) => [styles.cancelBtn, { opacity: pressed ? 0.8 : 1 }]}
+        onPress={onCancel}
+      >
         <Text style={styles.cancelBtnText}>✕ Cancel & Start Over</Text>
-      </TouchableOpacity>
+      </Pressable>
     </View>
   );
 }
@@ -548,13 +587,13 @@ function TrustBadge({ icon, text }: { icon: any; text: string }) {
 function FaqItem({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <TouchableOpacity style={styles.faqItem} onPress={() => setOpen(!open)} activeOpacity={0.7}>
+    <Pressable style={({ pressed }) => [styles.faqItem, { opacity: pressed ? 0.7 : 1 }]} onPress={() => setOpen(!open)}>
       <View style={styles.faqQuestion}>
         <Text style={styles.faqQ}>{q}</Text>
         <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color="#64748B" />
       </View>
       {open && <Text style={styles.faqA}>{a}</Text>}
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 

@@ -6,7 +6,8 @@ import {
   ActivityIndicator,
   Alert,
   StyleSheet,
-  TouchableOpacity,
+  Pressable,
+  Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { apiFetch, uploadFile } from '../api/client';
@@ -138,51 +139,45 @@ export default function ProfileImageUploader({
 
   // ─── Remove photo ───────────────────────────────────────────────────────────
   const removeImage = () => {
-    Alert.alert(
-      'Remove Photo',
-      'Are you sure you want to remove your profile photo?',
-      [
+    const doRemove = async () => {
+      setUploading(true);
+      try {
+        const updateRes = await apiFetch('/api/auth/update-profile', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profileImage: null, profileImagePath: null }),
+        });
+        if (!updateRes.ok) throw new Error(updateRes.body?.message ?? 'Failed to remove photo.');
+        setImage(null);
+        onUploadSuccess?.('');
+        Alert.alert('Success', 'Profile photo removed.');
+      } catch (error: any) {
+        console.error('Remove error:', error);
+        Alert.alert('Error', error.message || 'Failed to remove photo.');
+      } finally {
+        setUploading(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      // eslint-disable-next-line no-alert
+      if ((window as any).confirm('Remove your profile photo?')) doRemove();
+    } else {
+      Alert.alert('Remove Photo', 'Are you sure you want to remove your profile photo?', [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            setUploading(true);
-            try {
-              const updateRes = await apiFetch('/api/auth/update-profile', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ profileImage: null, profileImagePath: null }),
-              });
-
-              if (!updateRes.ok) {
-                throw new Error(updateRes.body?.message ?? 'Failed to remove photo.');
-              }
-
-              setImage(null);
-              onUploadSuccess?.('');
-              Alert.alert('Success', 'Profile photo removed.');
-            } catch (error: any) {
-              console.error('Remove error:', error);
-              Alert.alert('Error', error.message || 'Failed to remove photo.');
-            } finally {
-              setUploading(false);
-            }
-          },
-        },
-      ],
-    );
+        { text: 'Remove', style: 'destructive', onPress: doRemove },
+      ]);
+    }
   };
 
   // ─── Render ─────────────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
       {/* Avatar */}
-      <TouchableOpacity
-        style={styles.imageContainer}
+      <Pressable
+        style={({ pressed }) => [styles.imageContainer, { opacity: pressed ? 0.85 : 1 }]}
         onPress={pickImage}
         disabled={uploading}
-        activeOpacity={0.85}
       >
         {image ? (
           <Image source={{ uri: image }} style={styles.image} />
@@ -205,29 +200,27 @@ export default function ProfileImageUploader({
             <Text style={styles.cameraBadgeText}>✏️</Text>
           </View>
         )}
-      </TouchableOpacity>
+      </Pressable>
 
       {/* Action buttons */}
       <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={[styles.button, styles.buttonPrimary]}
+        <Pressable
+          style={({ pressed }) => [styles.button, styles.buttonPrimary, { opacity: pressed ? 0.8 : 1 }]}
           onPress={pickImage}
           disabled={uploading}
-          activeOpacity={0.8}
         >
           <Text style={styles.buttonText}>
             {image ? '📷 Change Photo' : '📷 Add Photo'}
           </Text>
-        </TouchableOpacity>
+        </Pressable>
 
         {image && !uploading && (
-          <TouchableOpacity
-            style={[styles.button, styles.buttonSecondary]}
+          <Pressable
+            style={({ pressed }) => [styles.button, styles.buttonSecondary, { opacity: pressed ? 0.8 : 1 }]}
             onPress={removeImage}
-            activeOpacity={0.8}
           >
             <Text style={styles.buttonTextSecondary}>🗑️ Remove</Text>
-          </TouchableOpacity>
+          </Pressable>
         )}
       </View>
 
