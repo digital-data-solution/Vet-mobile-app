@@ -352,7 +352,10 @@ export default function AppNavigator() {
     <AuthContext.Provider value={{ session, userRole, isAuthenticated, signOut, refreshRole }}>
       <NavigationErrorBoundary>
         <NavigationContainer linking={linking}>
-          <RootStack.Navigator screenOptions={{ headerShown: false }}>
+          <RootStack.Navigator
+            screenOptions={{ headerShown: false }}
+            initialRouteName={isAuthenticated ? 'MainTabs' : 'Auth'}
+          >
 
             {/*
              * EmailVerified is ALWAYS registered regardless of auth state.

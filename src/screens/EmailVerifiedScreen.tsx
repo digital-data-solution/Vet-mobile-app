@@ -31,7 +31,7 @@ export default function EmailVerifiedScreen({ navigation }: any) {
     if (!isAuthenticated) return;
     const timer = setTimeout(() => {
       navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
-    }, 1500);
+    }, 800);
     return () => clearTimeout(timer);
   }, [stage, isAuthenticated, navigation]);
 
