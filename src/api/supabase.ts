@@ -144,9 +144,15 @@ export const listenMessages = (userId: string, callback: (payload: any) => void)
         event: '*',
         schema: 'public',
         table: 'messages',
-        filter: `from_user_id=eq.${userId},to_user_id=eq.${userId}`,
+        // Realtime filters don't support OR reliably — no server-side filter here;
+        // filter client-side so we only invoke the caller for messages in this user's conversations.
       },
-      callback
+      (payload: any) => {
+        const row = payload.new ?? payload.old;
+        if (row?.from_user_id === userId || row?.to_user_id === userId) {
+          callback(payload);
+        }
+      }
     )
     .subscribe();
   return channel;
@@ -156,8 +162,10 @@ export const getMessages = async (userId: string, otherUserId: string) => {
   const { data, error } = await supabase
     .from('messages')
     .select('*')
-    .or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`)
-    .or(`from_user_id.eq.${otherUserId},to_user_id.eq.${otherUserId}`)
+    .or(
+      `and(from_user_id.eq.${userId},to_user_id.eq.${otherUserId}),` +
+      `and(from_user_id.eq.${otherUserId},to_user_id.eq.${userId})`
+    )
     .order('timestamp', { ascending: true });
   return { data, error };
 };

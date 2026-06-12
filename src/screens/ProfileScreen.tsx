@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Platform,
+  Share,
 } from 'react-native';
 import { getCurrentUser, signOut } from '../api/supabase';
 import { apiFetch } from '../api/client';
@@ -57,11 +58,15 @@ function goToSubscription(navigation: any) {
 // COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ProfileScreen({ navigation }: Props) {
-  const [user,         setUser]         = useState<any>(null);
-  const [loading,      setLoading]      = useState(true);
-  const [loggingOut,   setLoggingOut]   = useState(false);
-  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
-  const [subLoading,   setSubLoading]   = useState(false);
+  const [user,                 setUser]                 = useState<any>(null);
+  const [loading,              setLoading]              = useState(true);
+  const [loggingOut,           setLoggingOut]           = useState(false);
+  const [subscription,         setSubscription]         = useState<SubscriptionInfo | null>(null);
+  const [subLoading,           setSubLoading]           = useState(false);
+  const [referralCode,         setReferralCode]         = useState<string | null>(null);
+  const [referralRewards,      setReferralRewards]      = useState(0);
+  const [shareMessage,         setShareMessage]         = useState('');
+  const [referralLoading,      setReferralLoading]      = useState(false);
 
   const fetchUser = useCallback(async () => {
     setLoading(true);
@@ -105,22 +110,72 @@ export default function ProfileScreen({ navigation }: Props) {
     }
   }, []);
 
+  const fetchReferralInfo = useCallback(async () => {
+    setReferralLoading(true);
+    try {
+      const res = await apiFetch('/api/auth/referral-info', { method: 'GET' });
+      if (res.ok && res.body?.data) {
+        setReferralCode(res.body.data.referralCode ?? null);
+        setReferralRewards(res.body.data.referralRewardsEarned ?? 0);
+        setShareMessage(res.body.data.shareMessage ?? '');
+      }
+    } catch {
+      // silent — referral info is non-critical
+    } finally {
+      setReferralLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchUser();
     fetchSubscription();
-  }, [fetchUser, fetchSubscription]);
+    fetchReferralInfo();
+  }, [fetchUser, fetchSubscription, fetchReferralInfo]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       fetchUser();
       fetchSubscription();
+      fetchReferralInfo();
     });
     return unsubscribe;
-  }, [navigation, fetchUser, fetchSubscription]);
+  }, [navigation, fetchUser, fetchSubscription, fetchReferralInfo]);
 
   const handleImageUploadSuccess = useCallback((newUrl: string) => {
     setUser((prev: any) => prev ? { ...prev, profileImage: newUrl } : prev);
   }, []);
+
+  const handleCopyCode = useCallback(async () => {
+    if (!referralCode) return;
+    if (Platform.OS === 'web') {
+      try {
+        await (navigator as any).clipboard.writeText(referralCode);
+        Alert.alert('Copied!', 'Share this code with friends.');
+      } catch {
+        Alert.alert('Your Code', referralCode);
+      }
+    } else {
+      // Native: open share sheet — Copy is the first action on iOS/Android
+      try { await Share.share({ message: referralCode }); } catch {}
+    }
+  }, [referralCode]);
+
+  const handleShare = useCallback(async () => {
+    if (!shareMessage) return;
+    try {
+      await Share.share({ message: shareMessage });
+    } catch {
+      // Share API unsupported (older web) — fall back to clipboard copy
+      if (Platform.OS === 'web') {
+        try {
+          await (navigator as any).clipboard.writeText(shareMessage);
+          Alert.alert('Copied!', 'Share this with friends.');
+        } catch {
+          Alert.alert('Share', shareMessage);
+        }
+      }
+    }
+  }, [shareMessage]);
 
   // ─── Logout ────────────────────────────────────────────────────────────────
   // Alert.alert multi-button is broken on web — use window.confirm there.
@@ -321,6 +376,41 @@ export default function ProfileScreen({ navigation }: Props) {
           <InfoRow icon="✉️" label="Email"   value={getUserEmail()} />
           <InfoRow icon="👤" label="Role"    value={roleLabel} />
           <InfoRow icon="🆔" label="User ID" value={`${user.id?.slice(0, 16)}...`} />
+        </View>
+      )}
+
+      {/* ── Referrals ───────────────────────────────────────────────────── */}
+      {user && (
+        <View style={styles.referralCard}>
+          <Text style={styles.cardTitle}>Refer &amp; Earn</Text>
+          <Text style={styles.referralDescription}>
+            Share your code — you earn a free month every time a friend subscribes.
+          </Text>
+          {referralLoading ? (
+            <ActivityIndicator size="small" color="#E8610A" style={{ marginVertical: 12 }} />
+          ) : referralCode ? (
+            <>
+              <View style={styles.referralCodeBox}>
+                <Text style={styles.referralCodeLabel}>YOUR CODE</Text>
+                <Text selectable style={styles.referralCodeText}>{referralCode}</Text>
+              </View>
+              <Text style={styles.referralRewardsText}>
+                Free months earned: {referralRewards}
+              </Text>
+              <Pressable
+                style={({ pressed }) => [styles.copyButton, pressed && { opacity: 0.8 }]}
+                onPress={handleCopyCode}
+              >
+                <Text style={styles.copyButtonText}>Copy Code</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.shareButton, pressed && { opacity: 0.8 }]}
+                onPress={handleShare}
+              >
+                <Text style={styles.shareButtonText}>Share Invite</Text>
+              </Pressable>
+            </>
+          ) : null}
         </View>
       )}
 
@@ -593,4 +683,55 @@ const styles = StyleSheet.create({
     alignItems:       'center',
   },
   logoutText: { color: '#EF4444', fontSize: 16, fontWeight: '700' },
+
+  referralCard: {
+    backgroundColor:  '#fff',
+    marginHorizontal: 16,
+    borderRadius:     14,
+    padding:          16,
+    marginBottom:     14,
+    shadowColor:      '#000',
+    shadowOffset:     { width: 0, height: 1 },
+    shadowOpacity:    0.06,
+    shadowRadius:     4,
+    elevation:        2,
+  },
+  referralDescription: {
+    fontSize: 13, color: '#6B7280', lineHeight: 18, marginBottom: 14,
+  },
+  referralCodeBox: {
+    backgroundColor:   '#FFF4EE',
+    borderRadius:      12,
+    paddingVertical:   14,
+    paddingHorizontal: 20,
+    alignItems:        'center',
+    borderWidth:       1.5,
+    borderColor:       '#FDDCCC',
+    marginBottom:      10,
+  },
+  referralCodeLabel: {
+    fontSize: 10, fontWeight: '800', color: '#E8610A', letterSpacing: 1.2, marginBottom: 4,
+  },
+  referralCodeText: {
+    fontSize: 30, fontWeight: '900', color: '#111827', letterSpacing: 8,
+  },
+  referralRewardsText: {
+    fontSize: 13, color: '#6B7280', textAlign: 'center', marginBottom: 10,
+  },
+  copyButton: {
+    borderWidth:     1.5,
+    borderColor:     '#E8610A',
+    borderRadius:    10,
+    paddingVertical: 12,
+    alignItems:      'center',
+    marginBottom:    8,
+  },
+  copyButtonText: { color: '#E8610A', fontSize: 15, fontWeight: '700' },
+  shareButton: {
+    backgroundColor: '#E8610A',
+    borderRadius:    10,
+    paddingVertical: 13,
+    alignItems:      'center',
+  },
+  shareButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });
