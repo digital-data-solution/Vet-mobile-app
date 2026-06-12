@@ -29,20 +29,22 @@ export default function SubscriptionPrompt({
     navigation?.navigate('SubscriptionScreen');
   };
 
-  const price = isProfessional ? '₦3,000' : '₦500';
+  // Professional entry plan is ₦1,500 (basic), up to ₦5,000 (pro).
+  // Pet owner premium is ₦1,500/month.
+  const price = isProfessional ? 'from ₦1,500' : '₦1,500';
 
   const features = isProfessional
     ? [
         'Your business listed in search results',
         'Receive unlimited client messages',
         'Full business profile visible to pet owners',
-        'Contact info shown to all users',
+        'Contact info shown to Premium pet owners',
         'Reach thousands of active pet owners',
       ]
     : [
         'Search all vets, kennels, and pet shops',
-        'Unlimited messaging with professionals',
-        'View full business profiles and contact info',
+        'View full contact details for every listing',
+        'Exact address and GPS nearby search',
         'Find verified services near you',
         'Cancel anytime — no commitment',
       ];
