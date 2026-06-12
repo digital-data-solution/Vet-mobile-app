@@ -6,6 +6,8 @@ import {
   StyleSheet,
   TextInput,
   Pressable,
+  Platform,
+  Linking,
 } from 'react-native';
 import { supabase } from '../api/supabase';
 import { useAuth } from '../navigation';
@@ -38,6 +40,30 @@ export default function EmailVerifiedScreen({ navigation }: any) {
 
     const handleCallback = async () => {
       try {
+        // On native, detectSessionInUrl is false so Supabase never auto-exchanges
+        // the PKCE code from the deep link. Do it manually before falling through
+        // to the getSession() / onAuthStateChange path.
+        if (Platform.OS !== 'web') {
+          const url = await Linking.getInitialURL();
+          if (url) {
+            const parsed = new URL(url);
+            const code = parsed.searchParams.get('code');
+            const type = parsed.searchParams.get('type');
+            if (code) {
+              const { error: exchErr } = await supabase.auth.exchangeCodeForSession(code);
+              if (exchErr) {
+                setStage('error');
+                setMessage(exchErr.message);
+              } else if (type === 'recovery') {
+                setStage('reset_form');
+              } else {
+                setStage('verified');
+              }
+              return;
+            }
+          }
+        }
+
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) throw error;
 
