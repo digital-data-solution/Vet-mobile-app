@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Pressable,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../api/client';
@@ -304,24 +305,28 @@ export default function SubscriptionScreen({ navigation }: any) {
   }, [pendingReference, fetchSubscription, currentSub]);
 
   const handleCancelAndStartOver = useCallback(() => {
-    Alert.alert(
-      'Cancel Payment',
-      'Only tap "Cancel" if you did NOT send any money.',
-      [
-        { text: 'Keep Waiting', style: 'cancel' },
-        {
-          text: 'Cancel — I Did Not Pay',
-          style: 'destructive',
-          onPress: () => {
-            setPendingReference(null);
-            setPendingInitiatedAt(null);
-            setTransferInFlight(false);
-            setCurrentSub(null);
-            apiFetch('/api/subscriptions/cancel-pending', { method: 'POST' }).catch(() => {});
-          },
-        },
-      ],
-    );
+    const doCancel = () => {
+      setPendingReference(null);
+      setPendingInitiatedAt(null);
+      setTransferInFlight(false);
+      setCurrentSub(null);
+      apiFetch('/api/subscriptions/cancel-pending', { method: 'POST' }).catch(() => {});
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Only press OK if you did NOT send any money.\n\nCancel this payment?')) {
+        doCancel();
+      }
+    } else {
+      Alert.alert(
+        'Cancel Payment',
+        'Only tap "Cancel" if you did NOT send any money.',
+        [
+          { text: 'Keep Waiting', style: 'cancel' },
+          { text: 'Cancel — I Did Not Pay', style: 'destructive', onPress: doCancel },
+        ],
+      );
+    }
   }, []);
 
   // ── Derived state ──────────────────────────────────────────────────────────
