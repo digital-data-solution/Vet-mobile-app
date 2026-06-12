@@ -45,22 +45,36 @@ export default function EmailVerifiedScreen({ navigation }: any) {
         // to the getSession() / onAuthStateChange path.
         if (Platform.OS !== 'web') {
           const url = await Linking.getInitialURL();
+          let code: string | null = null;
+          let type: string | null = null;
+          let isAuthCallback = false;
+
           if (url) {
-            const parsed = new URL(url);
-            const code = parsed.searchParams.get('code');
-            const type = parsed.searchParams.get('type');
-            if (code) {
-              const { error: exchErr } = await supabase.auth.exchangeCodeForSession(code);
-              if (exchErr) {
-                setStage('error');
-                setMessage(exchErr.message);
-              } else if (type === 'recovery') {
-                setStage('reset_form');
-              } else {
-                setStage('verified');
-              }
-              return;
+            try {
+              const parsed = new URL(url);
+              code = parsed.searchParams.get('code');
+              type = parsed.searchParams.get('type');
+              isAuthCallback = parsed.pathname.includes('auth/callback') || !!code;
+            } catch { /* malformed URL — not a callback */ }
+          }
+
+          if (!isAuthCallback) {
+            // Not opened via an auth deep link — redirect to the correct landing screen.
+            navigation.reset({ index: 0, routes: [{ name: isAuthenticated ? 'MainTabs' : 'Auth' }] });
+            return;
+          }
+
+          if (code) {
+            const { error: exchErr } = await supabase.auth.exchangeCodeForSession(code);
+            if (exchErr) {
+              setStage('error');
+              setMessage(exchErr.message);
+            } else if (type === 'recovery') {
+              setStage('reset_form');
+            } else {
+              setStage('verified');
             }
+            return;
           }
         }
 
