@@ -86,7 +86,7 @@ export type RootStackParamList = {
   KennelProfile:          { kennelId?: string } | undefined;
   ExploreOptions:         undefined;
   VerifyProfessional:     undefined;
-  AddressInput:           undefined;
+  AddressInput:           { mode?: 'professional' } | undefined;
   SubscriptionScreen:     undefined;
   ProfessionalOnboarding: { role?: string } | undefined;
   KennelOnboarding:       undefined;

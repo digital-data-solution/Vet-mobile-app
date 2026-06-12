@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  Image,
   TouchableOpacity,
   Linking,
   Alert,
@@ -22,6 +23,7 @@ interface Shop {
   address?: string | { city?: string; town?: string; full?: string };
   description?: string;
   distance?: number;
+  images?: { url: string; publicId: string }[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -73,6 +75,22 @@ export default function ShopProfileScreen({ route }: any) {
           </View>
         ) : null}
       </View>
+
+      {/* ── Gallery ─────────────────────────────────────────────────────────── */}
+      {shop.images && shop.images.length > 0 ? (
+        <View style={styles.gallerySection}>
+          <Text style={styles.gallerySectionTitle}>Gallery</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryRow}>
+            {shop.images.map((img, i) => (
+              <Image
+                key={img.publicId || String(i)}
+                source={{ uri: img.url }}
+                style={styles.galleryImage}
+              />
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
 
       {/* ── Contact actions ─────────────────────────────────────────────────── */}
       {(shop.phone || shop.email) ? (
@@ -257,4 +275,15 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   bioText: { fontSize: 15, color: '#374151', lineHeight: 24 },
+
+  gallerySection: { marginHorizontal: 16, marginBottom: 16 },
+  gallerySectionTitle: {
+    fontSize: 11, fontWeight: '700', color: '#9CA3AF',
+    textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10,
+  },
+  galleryRow: { gap: 10, paddingRight: 4 },
+  galleryImage: {
+    width: 100, height: 100, borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+  },
 });

@@ -78,6 +78,7 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
             setSpecialization(p.specialization ?? '');
             setPhone(p.phone            ?? '');
             setEmail(p.email            ?? '');
+            setGalleryImages(p.images   ?? []);
           }
         } catch {
           // 404 = no profile yet — normal for first-time users
@@ -181,15 +182,33 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
             { text: 'Done', onPress: () => navigation.goBack() },
           ]);
         } else {
-          // Refresh role in navigation context so tabs switch immediately
           await refreshRole();
-          Alert.alert(
-            'Registration Successful! 🎉',
-            role === 'vet'
-              ? 'Your veterinarian profile has been created and is pending verification. You will be notified once approved.'
-              : 'Your kennel has been registered and is now live!',
-            [{ text: 'Continue', onPress: () => navigation.navigate('MainTabs') }],
-          );
+          const locationSet = !!res.body?.data?.location;
+          if (!locationSet) {
+            Alert.alert(
+              'Profile Created',
+              "We couldn't automatically locate your address for map-based search. You can set it manually now so clients can find you nearby.",
+              [
+                {
+                  text: 'Set Location Manually',
+                  onPress: () => navigation.navigate('AddressInput', { mode: 'professional' }),
+                },
+                {
+                  text: 'Skip for Now',
+                  style: 'cancel',
+                  onPress: () => navigation.navigate('MainTabs'),
+                },
+              ],
+            );
+          } else {
+            Alert.alert(
+              'Registration Successful!',
+              role === 'vet'
+                ? 'Your veterinarian profile has been created and is pending verification. You will be notified once approved.'
+                : 'Your kennel has been registered and is now live!',
+              [{ text: 'Continue', onPress: () => navigation.navigate('MainTabs') }],
+            );
+          }
         }
       } else {
         const errorMsg = res.body?.message || 'Please check your details and try again.';

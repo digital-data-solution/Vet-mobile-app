@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  Image,
   TouchableOpacity,
   ActivityIndicator,
   Linking,
@@ -28,6 +29,7 @@ interface Professional {
   reviewCount?: number;
   distance?: number;
   licenseExpiry?: string;
+  images?: { url: string; publicId: string }[];
   userId?: {
     name?: string;
     phone?: string;
@@ -169,6 +171,22 @@ export default function VetProfileScreen({ route, navigation }: any) {
           )}
         </View>
       </View>
+
+      {/* ── Gallery ─────────────────────────────────────────────────────────── */}
+      {vet.images && vet.images.length > 0 ? (
+        <View style={styles.gallerySection}>
+          <Text style={styles.gallerySectionTitle}>Gallery</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryRow}>
+            {vet.images.map((img, i) => (
+              <Image
+                key={img.publicId || String(i)}
+                source={{ uri: img.url }}
+                style={styles.galleryImage}
+              />
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
 
       {/* ── Contact actions ─────────────────────────────────────────────────── */}
       {(phone || email) ? (
@@ -402,4 +420,15 @@ const styles = StyleSheet.create({
   },
   unverifiedCardTitle: { fontSize: 14, fontWeight: '700', color: '#92400E', marginBottom: 4 },
   unverifiedCardText:  { fontSize: 13, color: '#78350F', lineHeight: 19 },
+
+  gallerySection: { marginHorizontal: 16, marginBottom: 16 },
+  gallerySectionTitle: {
+    fontSize: 11, fontWeight: '800', color: '#94A3B8',
+    textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10,
+  },
+  galleryRow: { gap: 10, paddingRight: 4 },
+  galleryImage: {
+    width: 100, height: 100, borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+  },
 });

@@ -12,6 +12,7 @@ import {
   Modal,
   FlatList,
 } from 'react-native';
+import { apiFetch } from '../api/client';
 
 const NIGERIAN_STATES = [
   'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue',
@@ -41,10 +42,11 @@ interface FormErrors {
 
 interface Props {
   navigation: any;
+  route?: { params?: { mode?: 'professional' } };
   onSave?: (address: AddressData) => void;
 }
 
-export default function AddressInputScreen({ navigation, onSave }: Props) {
+export default function AddressInputScreen({ navigation, route, onSave }: Props) {
   const [state, setState] = useState('Lagos');
   const [lga, setLga] = useState('');
   const [city, setCity] = useState('');
@@ -69,7 +71,7 @@ export default function AddressInputScreen({ navigation, onSave }: Props) {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!validate()) return;
 
     const address: AddressData = {
@@ -81,6 +83,28 @@ export default function AddressInputScreen({ navigation, onSave }: Props) {
       houseNumber: houseNumber.trim(),
       zipCode: zipCode.trim(),
     };
+
+    if (route?.params?.mode === 'professional') {
+      const parts = [houseNumber.trim(), street.trim(), town.trim() || city.trim(), lga.trim(), state].filter(Boolean);
+      const assembledString = parts.join(', ');
+      try {
+        const res = await apiFetch('/api/v1/professionals/profile', {
+          method: 'PUT',
+          body: JSON.stringify({ address: assembledString }),
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (res.ok && res.body?.success) {
+          Alert.alert('Location Saved', 'Your address has been updated.', [
+            { text: 'OK', onPress: () => navigation.goBack() },
+          ]);
+        } else {
+          Alert.alert('Update Failed', res.body?.message || 'Could not save address. Please try again.');
+        }
+      } catch {
+        Alert.alert('Network Error', 'Please check your connection and try again.');
+      }
+      return;
+    }
 
     if (onSave) onSave(address);
     navigation.goBack();
