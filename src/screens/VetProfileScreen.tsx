@@ -31,6 +31,7 @@ interface Professional {
   licenseExpiry?: string;
   images?: { url: string; publicId: string }[];
   userId?: {
+    supabaseId?: string;   // ← added: populated by backend
     name?: string;
     phone?: string;
     email?: string;
@@ -90,11 +91,23 @@ export default function VetProfileScreen({ route, navigation }: any) {
   const whatsApp = () => {
     const rawPhone = vet?.phone || vet?.userId?.phone;
     if (!rawPhone) return;
-    // Normalise to international format: +234XXXXXXXXXX → 234XXXXXXXXXX
     const digits = rawPhone.replace(/\D/g, '').replace(/^0/, '234');
     Linking.openURL(`https://wa.me/${digits}`).catch(() =>
       Alert.alert('WhatsApp', 'Could not open WhatsApp. Make sure it is installed.'),
     );
+  };
+
+  const openChat = () => {
+    const supabaseId = vet?.userId?.supabaseId;
+    if (!supabaseId) {
+      Alert.alert('Unavailable', 'This professional cannot be messaged yet.');
+      return;
+    }
+    const displayName = vet?.businessName || vet?.name || vet?.userId?.name || 'Professional';
+    navigation.navigate('Chat', {
+      otherUserId:   supabaseId,
+      otherUserName: displayName,
+    });
   };
 
   if (loading) {
@@ -129,6 +142,7 @@ export default function VetProfileScreen({ route, navigation }: any) {
   const roleLabel    = isVet ? 'Veterinarian' : 'Kennel';
   const accentColor  = isVet ? '#2563EB' : '#7C3AED';
   const heroBg       = isVet ? '#EFF6FF' : '#F5F3FF';
+  const canMessage   = !!vet.userId?.supabaseId;
 
   return (
     <ScrollView
@@ -189,7 +203,7 @@ export default function VetProfileScreen({ route, navigation }: any) {
       ) : null}
 
       {/* ── Contact actions ─────────────────────────────────────────────────── */}
-      {(phone || email) ? (
+      {(phone || email || canMessage) ? (
         <View style={styles.contactRow}>
           {phone ? (
             <TouchableOpacity
@@ -201,6 +215,7 @@ export default function VetProfileScreen({ route, navigation }: any) {
               <Text style={styles.contactBtnText}>Call</Text>
             </TouchableOpacity>
           ) : null}
+
           {phone ? (
             <TouchableOpacity
               style={[styles.contactBtn, { backgroundColor: '#25D366' }]}
@@ -211,7 +226,20 @@ export default function VetProfileScreen({ route, navigation }: any) {
               <Text style={styles.contactBtnText}>WhatsApp</Text>
             </TouchableOpacity>
           ) : null}
-          {email ? (
+
+          {canMessage ? (
+            <TouchableOpacity
+              style={[styles.contactBtn, styles.contactBtnOutline, { borderColor: accentColor }]}
+              onPress={openChat}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="chatbubble-outline" size={18} color={accentColor} />
+              <Text style={[styles.contactBtnText, { color: accentColor }]}>Message</Text>
+            </TouchableOpacity>
+          ) : null}
+
+          {email && !canMessage ? (
+            // Only show Email button if there's no Message button (avoids 4-button overflow)
             <TouchableOpacity
               style={[styles.contactBtn, styles.contactBtnOutline, { borderColor: accentColor }]}
               onPress={emailVet}

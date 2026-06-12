@@ -43,6 +43,8 @@ import VerifyProfessionalScreen     from '../screens/VerifyProfessionalScreen';
 import AddressInputScreen           from '../screens/AddressInputScreen';
 import PaystackWebView              from '../screens/PaystackWebView';
 import EmailVerifiedScreen          from '../screens/EmailVerifiedScreen';
+import ConversationsScreen          from '../screens/ConversationsScreen';
+import ChatScreen                   from '../screens/ChatScreen';
 
 const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://vet-market-place-jsj5.onrender.com';
 
@@ -97,6 +99,7 @@ export type RootStackParamList = {
     amount:            number;
     callbackKey:       string;
   };
+  Chat: { otherUserId: string; otherUserName: string };
 };
 
 export type TabParamList = {
@@ -108,6 +111,7 @@ export type TabParamList = {
   Subscription:    undefined;
   Network:         undefined;
   VetVerification: undefined;
+  Messages:        undefined;
 };
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -228,6 +232,7 @@ function UserTabs() {
       <Tab.Screen name="Professionals" component={ProfessionalsScreen} options={{ title: 'Find Vets', tabBarLabel: 'Vets', tabBarIcon: TabIcon('medkit'),  headerShown: false }} />
       <Tab.Screen name="Kennels"       component={KennelsScreen}       options={{ tabBarIcon: TabIcon('paw'),      headerShown: false }} />
       <Tab.Screen name="Shops"         component={ShopsScreen}         options={{ title: 'Pet Shops', tabBarLabel: 'Shops', tabBarIcon: TabIcon('basket'), headerShown: false }} />
+      <Tab.Screen name="Messages"      component={ConversationsScreen} options={{ title: 'Messages', tabBarIcon: TabIcon('chatbubbles-outline'), headerShown: false }} />
       <Tab.Screen name="Subscription"  component={SubscriptionScreen}  options={{ title: 'Subscription', tabBarLabel: 'Plans', tabBarIcon: TabIcon('star'), headerShown: false }} />
       <Tab.Screen name="Profile"       component={ProfileScreen}       options={{ tabBarIcon: TabIcon('person'),   headerShown: false }} />
     </Tab.Navigator>
@@ -241,6 +246,7 @@ function ProfessionalTabs() {
       <Tab.Screen name="Network"         component={ProfessionalsScreen}  options={{ tabBarIcon: TabIcon('people'),            headerShown: false }} />
       <Tab.Screen name="Shops"           component={ShopsScreen}          options={{ title: 'Pet Shops', tabBarLabel: 'Shops', tabBarIcon: TabIcon('basket'), headerShown: false }} />
       <Tab.Screen name="Subscription"    component={SubscriptionScreen}   options={{ title: 'Subscription', tabBarIcon: TabIcon('star'),            headerShown: false }} />
+      <Tab.Screen name="Messages"        component={ConversationsScreen}  options={{ title: 'Messages', tabBarIcon: TabIcon('chatbubbles-outline'), headerShown: false }} />
       <Tab.Screen name="VetVerification" component={VetVerificationScreen} options={{ title: 'Get Verified', tabBarLabel: 'Verify', tabBarIcon: TabIcon('checkmark-circle'), headerShown: false }} />
       <Tab.Screen name="Profile"         component={ProfileScreen}        options={{ tabBarIcon: TabIcon('person'),            headerShown: false }} />
     </Tab.Navigator>
@@ -252,6 +258,7 @@ function KennelOwnerTabs() {
     <Tab.Navigator screenOptions={tabScreenOptions}>
       <Tab.Screen name="Home"         component={HomeScreen}         options={{ tabBarIcon: TabIcon('home'),  headerShown: false }} />
       <Tab.Screen name="Kennels"      component={KennelsScreen}      options={{ tabBarIcon: TabIcon('paw'),   headerShown: false }} />
+      <Tab.Screen name="Messages"     component={ConversationsScreen} options={{ title: 'Messages', tabBarIcon: TabIcon('chatbubbles-outline'), headerShown: false }} />
       <Tab.Screen name="Subscription" component={SubscriptionScreen} options={{ title: 'Subscription', tabBarIcon: TabIcon('star'),   headerShown: false }} />
       <Tab.Screen name="Profile"      component={ProfileScreen}      options={{ tabBarIcon: TabIcon('person'), headerShown: false }} />
     </Tab.Navigator>
@@ -263,6 +270,7 @@ function ShopOwnerTabs() {
     <Tab.Navigator screenOptions={tabScreenOptions}>
       <Tab.Screen name="Home"         component={HomeScreen}         options={{ tabBarIcon: TabIcon('home'),   headerShown: false }} />
       <Tab.Screen name="Shops"        component={ShopsScreen}        options={{ title: 'My Shops', tabBarIcon: TabIcon('basket'), headerShown: false }} />
+      <Tab.Screen name="Messages"     component={ConversationsScreen} options={{ title: 'Messages', tabBarIcon: TabIcon('chatbubbles-outline'), headerShown: false }} />
       <Tab.Screen name="Subscription" component={SubscriptionScreen} options={{ title: 'Subscription', tabBarIcon: TabIcon('star'),    headerShown: false }} />
       <Tab.Screen name="Profile"      component={ProfileScreen}      options={{ tabBarIcon: TabIcon('person'), headerShown: false }} />
     </Tab.Navigator>
@@ -431,6 +439,17 @@ export default function AppNavigator() {
                   name="PaystackWebView"
                   component={PaystackWebView}
                   options={{ headerShown: false }}
+                />
+                <RootStack.Screen
+                  name="Chat"
+                  component={ChatScreen}
+                  options={({ route }) => ({
+                    headerShown: true,
+                    title: route.params.otherUserName,
+                    headerStyle:      { backgroundColor: '#E8610A' },
+                    headerTintColor:  '#fff',
+                    headerTitleStyle: { fontWeight: 'bold' },
+                  })}
                 />
               </>
             )}

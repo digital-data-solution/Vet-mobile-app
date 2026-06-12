@@ -1,14 +1,16 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
   Linking,
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { apiFetch } from '../api/client';
 
 interface Kennel {
   _id?: string;
@@ -24,27 +26,115 @@ interface Kennel {
   isVerified?: boolean;
   rating?: number;
   reviewCount?: number;
+  userId?: {
+    supabaseId?: string;   // ← populated by backend after patch
+    name?: string;
+    phone?: string;
+    email?: string;
+  };
 }
 
-export default function KennelProfileScreen({ route }: any) {
-  const kennel: Kennel = route.params?.kennel ?? {};
+export default function KennelProfileScreen({ route, navigation }: any) {
+  const kennelId: string | undefined      = route?.params?.kennelId;
+  const passedKennel: Kennel | undefined  = route?.params?.kennel;
 
-  const displayName = kennel.businessName ?? kennel.name ?? 'Kennel';
-  const services = kennel.specialization?.split(',').map(s => s.trim()).filter(Boolean) ?? [];
+  const [kennel, setKennel]   = useState<Kennel | null>(passedKennel ?? null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState<string | null>(null);
+
+  const fetchKennel = useCallback(async () => {
+    if (!kennelId) {
+      // No ID — use the stub as-is (Message button will be hidden)
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`/api/v1/kennels/${kennelId}`, { method: 'GET' });
+      if (res.ok && res.body?.success && res.body?.data) {
+        setKennel(res.body.data);
+      } else {
+        // Fall back to stub — don't blank the screen
+        if (!kennel) setError(res.body?.message || 'Could not load kennel profile.');
+      }
+    } catch {
+      if (!kennel) setError('Network error. Please check your connection.');
+    } finally {
+      setLoading(false);
+    }
+  }, [kennelId]);
+
+  useEffect(() => {
+    // Always re-fetch — the stub from KennelsScreen comes from an aggregate
+    // query that doesn't populate userId, so supabaseId won't be there.
+    fetchKennel();
+  }, [fetchKennel]);
+
+  const displayName = kennel?.businessName ?? kennel?.name ?? kennel?.userId?.name ?? 'Kennel';
+  const phone       = kennel?.phone || kennel?.userId?.phone;
+  const email       = kennel?.email || kennel?.userId?.email;
+  const services    = kennel?.specialization?.split(',').map(s => s.trim()).filter(Boolean) ?? [];
+  const canMessage  = !!kennel?.userId?.supabaseId;
 
   const call = () => {
-    if (!kennel.phone) return;
-    Linking.openURL(`tel:${kennel.phone}`).catch(() =>
-      Alert.alert('Error', 'Unable to open phone app')
+    if (!phone) return;
+    Linking.openURL(`tel:${phone}`).catch(() =>
+      Alert.alert('Error', 'Unable to open phone app'),
     );
   };
 
-  const email = () => {
-    if (!kennel.email) return;
-    Linking.openURL(`mailto:${kennel.email}`).catch(() =>
-      Alert.alert('Error', 'Unable to open mail app')
+  const emailKennel = () => {
+    if (!email) return;
+    Linking.openURL(`mailto:${email}`).catch(() =>
+      Alert.alert('Error', 'Unable to open mail app'),
     );
   };
+
+  const whatsApp = () => {
+    if (!phone) return;
+    const digits = phone.replace(/\D/g, '').replace(/^0/, '234');
+    Linking.openURL(`https://wa.me/${digits}`).catch(() =>
+      Alert.alert('WhatsApp', 'Could not open WhatsApp. Make sure it is installed.'),
+    );
+  };
+
+  const openChat = () => {
+    const supabaseId = kennel?.userId?.supabaseId;
+    if (!supabaseId) {
+      Alert.alert('Unavailable', 'This kennel cannot be messaged yet.');
+      return;
+    }
+    navigation.navigate('Chat', {
+      otherUserId:   supabaseId,
+      otherUserName: displayName,
+    });
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#7C3AED" />
+        <Text style={styles.loadingText}>Loading kennel...</Text>
+      </View>
+    );
+  }
+
+  if (error || !kennel) {
+    return (
+      <View style={styles.centered}>
+        <Ionicons name="warning-outline" size={52} color="#F59E0B" />
+        <Text style={styles.errorTitle}>Kennel Unavailable</Text>
+        <Text style={styles.errorText}>{error ?? 'Could not load this kennel.'}</Text>
+        <TouchableOpacity style={styles.retryBtn} onPress={fetchKennel}>
+          <Text style={styles.retryText}>Try Again</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Text style={styles.backText}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <ScrollView
@@ -52,7 +142,7 @@ export default function KennelProfileScreen({ route }: any) {
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}
     >
-      {/* Hero */}
+      {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <View style={styles.hero}>
         <View style={styles.avatarWrapper}>
           <View style={styles.avatar}>
@@ -104,7 +194,7 @@ export default function KennelProfileScreen({ route }: any) {
         )}
       </View>
 
-      {/* Services chips */}
+      {/* ── Services chips ────────────────────────────────────────────────── */}
       {services.length > 0 && (
         <View style={styles.servicesCard}>
           <Text style={styles.cardTitle}>Services Offered</Text>
@@ -118,10 +208,10 @@ export default function KennelProfileScreen({ route }: any) {
         </View>
       )}
 
-      {/* Contact actions */}
-      {(kennel.phone || kennel.email) && (
+      {/* ── Contact actions ───────────────────────────────────────────────── */}
+      {(phone || email || canMessage) && (
         <View style={styles.contactRow}>
-          {kennel.phone && (
+          {phone && (
             <TouchableOpacity
               style={[styles.contactBtn, styles.contactBtnCall]}
               onPress={call}
@@ -131,38 +221,59 @@ export default function KennelProfileScreen({ route }: any) {
               <Text style={styles.contactBtnText}>Call</Text>
             </TouchableOpacity>
           )}
-          {kennel.email && (
+
+          {phone && (
             <TouchableOpacity
-              style={[styles.contactBtn, styles.contactBtnEmail]}
-              onPress={email}
+              style={[styles.contactBtn, { backgroundColor: '#25D366' }]}
+              onPress={whatsApp}
               activeOpacity={0.8}
             >
-              <Ionicons name="mail-outline" size={18} color="#0F172A" />
-              <Text style={[styles.contactBtnText, { color: '#0F172A' }]}>Email</Text>
+              <Ionicons name="logo-whatsapp" size={18} color="#fff" />
+              <Text style={styles.contactBtnText}>WhatsApp</Text>
             </TouchableOpacity>
           )}
+
+          {canMessage ? (
+            <TouchableOpacity
+              style={[styles.contactBtn, styles.contactBtnOutline]}
+              onPress={openChat}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="chatbubble-outline" size={18} color="#7C3AED" />
+              <Text style={[styles.contactBtnText, { color: '#7C3AED' }]}>Message</Text>
+            </TouchableOpacity>
+          ) : email ? (
+            <TouchableOpacity
+              style={[styles.contactBtn, styles.contactBtnOutline]}
+              onPress={emailKennel}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="mail-outline" size={18} color="#7C3AED" />
+              <Text style={[styles.contactBtnText, { color: '#7C3AED' }]}>Email</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       )}
 
-      {/* Details card */}
+      {/* ── Details card ─────────────────────────────────────────────────── */}
       <View style={styles.detailsCard}>
         <Text style={styles.cardTitle}>Details</Text>
 
         {kennel.address && (
           <DetailRow icon="location-outline" label="Location" value={kennel.address} />
         )}
-        {kennel.phone && (
-          <DetailRow icon="call-outline" label="Phone" value={kennel.phone} />
+        {phone && (
+          <DetailRow icon="call-outline" label="Phone" value={phone} />
         )}
-        {kennel.email && (
-          <DetailRow icon="mail-outline" label="Email" value={kennel.email} />
+        {email && (
+          <DetailRow icon="mail-outline" label="Email" value={email} />
         )}
-        {!kennel.address && !kennel.phone && !kennel.email && (
+        {!kennel.address && !phone && !email && (
           <Text style={styles.noDetails}>No contact details available.</Text>
         )}
       </View>
 
-      {/* About / description */}
+      {/* ── About ────────────────────────────────────────────────────────── */}
       {kennel.description && (
         <View style={styles.bioCard}>
           <Text style={styles.cardTitle}>About</Text>
@@ -170,7 +281,7 @@ export default function KennelProfileScreen({ route }: any) {
         </View>
       )}
 
-      {/* Safety note */}
+      {/* ── Safety note ──────────────────────────────────────────────────── */}
       <View style={styles.safetyNote}>
         <Ionicons name="shield-checkmark-outline" size={18} color="#7C3AED" />
         <Text style={styles.safetyText}>
@@ -196,8 +307,23 @@ function DetailRow({ icon, label, value }: { icon: any; label: string; value: st
 }
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: '#F8FAFC' },
+  scroll:    { flex: 1, backgroundColor: '#F8FAFC' },
   container: { paddingBottom: 40 },
+
+  centered: {
+    flex: 1, justifyContent: 'center', alignItems: 'center',
+    backgroundColor: '#F8FAFC', paddingHorizontal: 32,
+  },
+  loadingText: { marginTop: 12, fontSize: 15, color: '#64748B' },
+  errorTitle:  { fontSize: 20, fontWeight: '700', color: '#0F172A', marginTop: 16, marginBottom: 8 },
+  errorText:   { fontSize: 14, color: '#64748B', textAlign: 'center', lineHeight: 21, marginBottom: 20 },
+  retryBtn: {
+    backgroundColor: '#7C3AED', paddingHorizontal: 28, paddingVertical: 12,
+    borderRadius: 10, marginBottom: 10,
+  },
+  retryText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  backBtn:   { paddingVertical: 10 },
+  backText:  { color: '#64748B', fontSize: 14 },
 
   hero: {
     backgroundColor: '#fff',
@@ -233,135 +359,81 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 12,
   },
-  name: { fontSize: 24, fontWeight: '800', color: '#0F172A', marginBottom: 4, textAlign: 'center' },
+  name:       { fontSize: 24, fontWeight: '800', color: '#0F172A', marginBottom: 4, textAlign: 'center' },
   ownerLabel: { fontSize: 14, color: '#64748B', marginBottom: 12 },
-  badgeRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  badgeRow:   { flexDirection: 'row', gap: 8, marginBottom: 12 },
   badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-    gap: 4,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, gap: 4,
   },
   badgeGreen: { backgroundColor: '#D1FAE5' },
-  badgeBlue: { backgroundColor: '#EFF6FF' },
-  badgeText: { fontSize: 12, fontWeight: '700' },
-  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  badgeBlue:  { backgroundColor: '#EFF6FF' },
+  badgeText:  { fontSize: 12, fontWeight: '700' },
+  ratingRow:  { flexDirection: 'row', alignItems: 'center', gap: 3 },
   ratingText: { fontSize: 13, color: '#64748B', marginLeft: 4 },
 
   servicesCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: '#fff', marginHorizontal: 16, borderRadius: 16,
+    padding: 16, marginBottom: 14,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
   },
   cardTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#94A3B8',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 12,
+    fontSize: 12, fontWeight: '700', color: '#94A3B8',
+    textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12,
   },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
-    backgroundColor: '#F5F3FF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#DDD6FE',
+    backgroundColor: '#F5F3FF', paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 20, borderWidth: 1, borderColor: '#DDD6FE',
   },
   chipText: { fontSize: 13, color: '#7C3AED', fontWeight: '600' },
 
   contactRow: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    gap: 10,
-    marginBottom: 14,
+    flexDirection: 'row', marginHorizontal: 16, gap: 10, marginBottom: 14,
   },
   contactBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 15,
-    borderRadius: 14,
-    gap: 8,
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 15, borderRadius: 14, gap: 8,
   },
-  contactBtnCall: { backgroundColor: '#7C3AED' },
-  contactBtnEmail: {
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-  },
-  contactBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  contactBtnCall:    { backgroundColor: '#7C3AED' },
+  contactBtnOutline: { backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#7C3AED' },
+  contactBtnText:    { fontSize: 15, fontWeight: '700', color: '#fff' },
 
   detailsCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: '#fff', marginHorizontal: 16, borderRadius: 16,
+    padding: 16, marginBottom: 14,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
   },
   detailRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: 11,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    flexDirection: 'row', alignItems: 'flex-start',
+    paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
   },
   detailIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: '#F5F3FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    marginTop: 1,
+    width: 32, height: 32, borderRadius: 10, backgroundColor: '#F5F3FF',
+    justifyContent: 'center', alignItems: 'center', marginRight: 12, marginTop: 1,
   },
   detailContent: { flex: 1 },
-  detailLabel: { fontSize: 11, color: '#94A3B8', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  detailLabel: {
+    fontSize: 11, color: '#94A3B8', fontWeight: '700',
+    textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2,
+  },
   detailValue: { fontSize: 14, color: '#0F172A', fontWeight: '500', lineHeight: 20 },
-  noDetails: { fontSize: 14, color: '#94A3B8', textAlign: 'center', paddingVertical: 8 },
+  noDetails:   { fontSize: 14, color: '#94A3B8', textAlign: 'center', paddingVertical: 8 },
 
   bioCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: '#fff', marginHorizontal: 16, borderRadius: 16,
+    padding: 16, marginBottom: 14,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
   },
   bioText: { fontSize: 15, color: '#334155', lineHeight: 24 },
 
   safetyNote: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginHorizontal: 16,
-    backgroundColor: '#FAF5FF',
-    borderRadius: 14,
-    padding: 14,
-    gap: 10,
-    borderWidth: 1,
-    borderColor: '#E9D5FF',
+    flexDirection: 'row', alignItems: 'flex-start',
+    marginHorizontal: 16, backgroundColor: '#FAF5FF', borderRadius: 14,
+    padding: 14, gap: 10, borderWidth: 1, borderColor: '#E9D5FF',
   },
   safetyText: { flex: 1, fontSize: 13, color: '#6D28D9', lineHeight: 18 },
 });

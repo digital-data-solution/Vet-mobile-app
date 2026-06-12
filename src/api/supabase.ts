@@ -127,7 +127,6 @@ export const sendMessage = async (fromUserId: string, toUserId: string, messageT
       from_user_id: fromUserId,
       to_user_id: toUserId,
       message_text: messageText,
-      timestamp: new Date().toISOString(),
       read_status: false,
     })
     .select()
@@ -166,7 +165,7 @@ export const getMessages = async (userId: string, otherUserId: string) => {
       `and(from_user_id.eq.${userId},to_user_id.eq.${otherUserId}),` +
       `and(from_user_id.eq.${otherUserId},to_user_id.eq.${userId})`
     )
-    .order('timestamp', { ascending: true });
+    .order('created_at', { ascending: true });
   return { data, error };
 };
 
