@@ -15,7 +15,13 @@ import {
 import * as Location from 'expo-location';
 import { apiFetch } from '../api/client';
 import { Ionicons } from '@expo/vector-icons';
-import SubscriptionPrompt from '../components/SubscriptionPrompt';
+function goToSubscription(navigation: any) {
+  try {
+    const parent = navigation.getParent();
+    if (parent) parent.navigate('SubscriptionScreen');
+    else navigation.navigate('SubscriptionScreen');
+  } catch { navigation.navigate('SubscriptionScreen'); }
+}
 
 interface Kennel {
   _id: string;
@@ -180,25 +186,6 @@ export default function KennelsScreen({ navigation }: any) {
     </TouchableOpacity>
   );
 
-  if (!subscriptionChecked) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#E8610A" />
-      </View>
-    );
-  }
-
-  if (!isSubscribed) {
-    return (
-      <SubscriptionPrompt
-        navigation={navigation}
-        feature="kennels"
-        customMessage="Subscribe to browse kennels, view contact details, and find boarding near you."
-        requiredPlan="Premium"
-      />
-    );
-  }
-
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
@@ -248,7 +235,23 @@ export default function KennelsScreen({ navigation }: any) {
               </>
             )}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.searchNearbyBtn} onPress={searchNearby}>
+          <TouchableOpacity
+            style={styles.searchNearbyBtn}
+            onPress={() => {
+              if (!isSubscribed) {
+                Alert.alert(
+                  'Premium Feature',
+                  'GPS nearby search requires a Premium subscription.',
+                  [
+                    { text: 'Subscribe', onPress: () => goToSubscription(navigation) },
+                    { text: 'Cancel', style: 'cancel' },
+                  ],
+                );
+                return;
+              }
+              searchNearby();
+            }}
+          >
             <Ionicons name="search-outline" size={15} color="#fff" />
             <Text style={styles.searchNearbyText}>Search Nearby</Text>
           </TouchableOpacity>
@@ -256,6 +259,17 @@ export default function KennelsScreen({ navigation }: any) {
             <Text style={styles.allBtnText}>Show All</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Teaser banner */}
+        {subscriptionChecked && !isSubscribed && (
+          <View style={styles.teaserBanner}>
+            <Ionicons name="lock-closed-outline" size={14} color="#7C3AED" style={{ marginRight: 6 }} />
+            <Text style={styles.teaserText}>Subscribe to view contact details and use GPS search.</Text>
+            <TouchableOpacity style={styles.teaserBtn} onPress={() => goToSubscription(navigation)}>
+              <Text style={styles.teaserBtnText}>Subscribe</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Results */}
         {loading ? (
@@ -406,4 +420,19 @@ const styles = StyleSheet.create({
   emptyEmoji: { fontSize: 52, marginBottom: 16 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: '#0F172A', marginBottom: 8 },
   emptyText: { fontSize: 14, color: '#64748B', textAlign: 'center' },
+  teaserBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F3FF',
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  teaserText:    { flex: 1, fontSize: 12, color: '#5B21B6', lineHeight: 16 },
+  teaserBtn:     { backgroundColor: '#7C3AED', borderRadius: 7, paddingHorizontal: 10, paddingVertical: 6, marginLeft: 8 },
+  teaserBtnText: { fontSize: 12, color: '#fff', fontWeight: '700' },
 });

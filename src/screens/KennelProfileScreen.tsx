@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Linking,
   Alert,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../api/client';
@@ -39,10 +40,11 @@ export default function KennelProfileScreen({ route, navigation }: any) {
   const kennelId: string | undefined      = route?.params?.kennelId;
   const passedKennel: Kennel | undefined  = route?.params?.kennel;
 
-  const [kennel, setKennel]               = useState<Kennel | null>(passedKennel ?? null);
-  const [loading, setLoading]             = useState(true);
-  const [error, setError]                 = useState<string | null>(null);
-  const [isSubscriptionError, setIsSubscriptionError] = useState(false);
+  const [kennel, setKennel]         = useState<Kennel | null>(passedKennel ?? null);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState<string | null>(null);
+  const [isPreview, setIsPreview]       = useState(false);
+  const [showSubModal, setShowSubModal] = useState(false);
 
   const fetchKennel = useCallback(async () => {
     if (!kennelId) {
@@ -52,13 +54,11 @@ export default function KennelProfileScreen({ route, navigation }: any) {
     }
     setLoading(true);
     setError(null);
-    setIsSubscriptionError(false);
     try {
       const res = await apiFetch(`/api/v1/kennels/${kennelId}`, { method: 'GET' });
       if (res.ok && res.body?.success && res.body?.data) {
         setKennel(res.body.data);
-      } else if (res.status === 402) {
-        setIsSubscriptionError(true);
+        setIsPreview(res.body.data.isPreview === true);
       } else {
         // Fall back to stub — don't blank the screen
         if (!kennel) setError(res.body?.message || 'Could not load kennel profile.');
@@ -122,17 +122,6 @@ export default function KennelProfileScreen({ route, navigation }: any) {
         <ActivityIndicator size="large" color="#7C3AED" />
         <Text style={styles.loadingText}>Loading kennel...</Text>
       </View>
-    );
-  }
-
-  if (isSubscriptionError) {
-    return (
-      <SubscriptionPrompt
-        navigation={navigation}
-        feature="full kennel profiles"
-        customMessage="Subscribe to view full kennel profiles, contact details, and boarding information."
-        requiredPlan="Premium"
-      />
     );
   }
 
@@ -225,51 +214,50 @@ export default function KennelProfileScreen({ route, navigation }: any) {
       )}
 
       {/* ── Contact actions ───────────────────────────────────────────────── */}
-      {(phone || email || canMessage) && (
+      {isPreview ? (
+        <View style={styles.contactRow}>
+          {(['Call', 'WhatsApp', 'Message'] as const).map((label) => (
+            <TouchableOpacity
+              key={label}
+              style={[styles.contactBtn, styles.contactBtnLocked]}
+              onPress={() => setShowSubModal(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={label === 'Call' ? 'call-outline' : label === 'WhatsApp' ? 'logo-whatsapp' : 'chatbubble-outline'}
+                size={18} color="#9CA3AF"
+              />
+              <Text style={[styles.contactBtnText, { color: '#9CA3AF' }]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : (phone || email || canMessage) ? (
         <View style={styles.contactRow}>
           {phone && (
-            <TouchableOpacity
-              style={[styles.contactBtn, styles.contactBtnCall]}
-              onPress={call}
-              activeOpacity={0.8}
-            >
+            <TouchableOpacity style={[styles.contactBtn, styles.contactBtnCall]} onPress={call} activeOpacity={0.8}>
               <Ionicons name="call-outline" size={18} color="#fff" />
               <Text style={styles.contactBtnText}>Call</Text>
             </TouchableOpacity>
           )}
-
           {phone && (
-            <TouchableOpacity
-              style={[styles.contactBtn, { backgroundColor: '#25D366' }]}
-              onPress={whatsApp}
-              activeOpacity={0.8}
-            >
+            <TouchableOpacity style={[styles.contactBtn, { backgroundColor: '#25D366' }]} onPress={whatsApp} activeOpacity={0.8}>
               <Ionicons name="logo-whatsapp" size={18} color="#fff" />
               <Text style={styles.contactBtnText}>WhatsApp</Text>
             </TouchableOpacity>
           )}
-
           {canMessage ? (
-            <TouchableOpacity
-              style={[styles.contactBtn, styles.contactBtnOutline]}
-              onPress={openChat}
-              activeOpacity={0.8}
-            >
+            <TouchableOpacity style={[styles.contactBtn, styles.contactBtnOutline]} onPress={openChat} activeOpacity={0.8}>
               <Ionicons name="chatbubble-outline" size={18} color="#7C3AED" />
               <Text style={[styles.contactBtnText, { color: '#7C3AED' }]}>Message</Text>
             </TouchableOpacity>
           ) : email ? (
-            <TouchableOpacity
-              style={[styles.contactBtn, styles.contactBtnOutline]}
-              onPress={emailKennel}
-              activeOpacity={0.8}
-            >
+            <TouchableOpacity style={[styles.contactBtn, styles.contactBtnOutline]} onPress={emailKennel} activeOpacity={0.8}>
               <Ionicons name="mail-outline" size={18} color="#7C3AED" />
               <Text style={[styles.contactBtnText, { color: '#7C3AED' }]}>Email</Text>
             </TouchableOpacity>
           ) : null}
         </View>
-      )}
+      ) : null}
 
       {/* ── Details card ─────────────────────────────────────────────────── */}
       <View style={styles.detailsCard}>
@@ -277,6 +265,12 @@ export default function KennelProfileScreen({ route, navigation }: any) {
 
         {kennel.address && (
           <DetailRow icon="location-outline" label="Location" value={kennel.address} />
+        )}
+        {isPreview && (
+          <TouchableOpacity style={styles.addressLockRow} onPress={() => setShowSubModal(true)}>
+            <Ionicons name="lock-closed-outline" size={12} color="#7C3AED" />
+            <Text style={styles.addressLockText}> Subscribe to see exact address</Text>
+          </TouchableOpacity>
         )}
         {phone && (
           <DetailRow icon="call-outline" label="Phone" value={phone} />
@@ -304,6 +298,29 @@ export default function KennelProfileScreen({ route, navigation }: any) {
           Always verify credentials before leaving your pet with any service provider.
         </Text>
       </View>
+
+      {/* ── Subscription gate modal ───────────────────────────────────────── */}
+      <Modal visible={showSubModal} transparent animationType="slide" onRequestClose={() => setShowSubModal(false)}>
+        <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowSubModal(false)} activeOpacity={1}>
+          <View style={styles.modalSheet} onStartShouldSetResponder={() => true}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Premium Feature</Text>
+            <Text style={styles.modalMsg}>
+              Subscribe to contact this kennel directly — call, WhatsApp, email, or message.
+            </Text>
+            <TouchableOpacity
+              style={styles.modalSubscribeBtn}
+              onPress={() => { setShowSubModal(false); navigation.navigate('SubscriptionScreen'); }}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.modalSubscribeBtnText}>Subscribe — from ₦1,500/month</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowSubModal(false)}>
+              <Text style={styles.modalCancelText}>Not now</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </ScrollView>
   );
 }
@@ -452,4 +469,28 @@ const styles = StyleSheet.create({
     padding: 14, gap: 10, borderWidth: 1, borderColor: '#E9D5FF',
   },
   safetyText: { flex: 1, fontSize: 13, color: '#6D28D9', lineHeight: 18 },
+
+  contactBtnLocked: { backgroundColor: '#F1F5F9', borderWidth: 1.5, borderColor: '#E2E8F0' },
+  addressLockRow:   { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 2 },
+  addressLockText:  { fontSize: 12, color: '#7C3AED', fontWeight: '600' },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  modalSheet: {
+    backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 24, paddingBottom: 40,
+  },
+  modalHandle: {
+    width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0',
+    alignSelf: 'center', marginBottom: 20,
+  },
+  modalTitle:          { fontSize: 18, fontWeight: '800', color: '#0F172A', marginBottom: 10, textAlign: 'center' },
+  modalMsg:            { fontSize: 14, color: '#64748B', lineHeight: 21, textAlign: 'center', marginBottom: 24 },
+  modalSubscribeBtn: {
+    backgroundColor: '#7C3AED', paddingVertical: 15, borderRadius: 12, alignItems: 'center',
+    marginBottom: 12, shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 8, elevation: 5,
+  },
+  modalSubscribeBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  modalCancelBtn:        { alignItems: 'center', paddingVertical: 8 },
+  modalCancelText:       { fontSize: 14, color: '#94A3B8', fontWeight: '600' },
 });

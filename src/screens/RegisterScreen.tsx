@@ -52,6 +52,10 @@ export default function RegisterScreen({ navigation }: Props) {
   };
 
   const handleRegister = useCallback(async () => {
+    if (password !== confirmPassword) {
+      Alert.alert('Password Mismatch', 'Your passwords do not match. Please re-enter.');
+      return;
+    }
     const validationError = validate();
     if (validationError) {
       Alert.alert('Validation Error', validationError);

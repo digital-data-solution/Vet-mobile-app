@@ -140,7 +140,10 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
 
   const register = async () => {
     const isValid = role === 'vet' ? validateVet() : validateKennel();
-    if (!isValid) return;
+    if (!isValid) {
+      Alert.alert('Check Your Details', 'Please fill in all required fields correctly before submitting.');
+      return;
+    }
 
     setLoading(true);
     try {

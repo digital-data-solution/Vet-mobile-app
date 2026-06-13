@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Linking,
   Alert,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../api/client';
@@ -44,10 +45,11 @@ export default function ShopProfileScreen({ route, navigation }: any) {
   const shopId: string | undefined    = route?.params?.shopId;
   const passedShop: Shop | undefined  = route?.params?.shop;
 
-  const [shop, setShop]                   = useState<Shop | null>(passedShop ?? null);
-  const [loading, setLoading]             = useState(!passedShop);
-  const [error, setError]                 = useState<string | null>(null);
-  const [isSubscriptionError, setIsSubscriptionError] = useState(false);
+  const [shop, setShop]         = useState<Shop | null>(passedShop ?? null);
+  const [loading, setLoading]   = useState(!passedShop);
+  const [error, setError]       = useState<string | null>(null);
+  const [isPreview, setIsPreview]       = useState(false);
+  const [showSubModal, setShowSubModal] = useState(false);
 
   const fetchShop = useCallback(async () => {
     if (!shopId) {
@@ -57,13 +59,11 @@ export default function ShopProfileScreen({ route, navigation }: any) {
     }
     setLoading(true);
     setError(null);
-    setIsSubscriptionError(false);
     try {
       const res = await apiFetch(`/api/v1/shops/${shopId}`, { method: 'GET' });
       if (res.ok && res.body?.success && res.body?.data) {
         setShop(res.body.data);
-      } else if (res.status === 402) {
-        setIsSubscriptionError(true);
+        setIsPreview(res.body.data.isPreview === true);
       } else {
         setError(res.body?.message || 'Could not load shop profile.');
       }
@@ -135,17 +135,6 @@ export default function ShopProfileScreen({ route, navigation }: any) {
         <ActivityIndicator size="large" color="#EA580C" />
         <Text style={styles.loadingText}>Loading shop...</Text>
       </View>
-    );
-  }
-
-  if (isSubscriptionError) {
-    return (
-      <SubscriptionPrompt
-        navigation={navigation}
-        feature="full shop profiles"
-        customMessage="Subscribe to view full pet shop profiles, contact details, and services near you."
-        requiredPlan="Premium"
-      />
     );
   }
 
@@ -228,45 +217,44 @@ export default function ShopProfileScreen({ route, navigation }: any) {
       ) : null}
 
       {/* ── Contact actions ───────────────────────────────────────────────── */}
-      {(phone || email || canMessage) ? (
+      {isPreview ? (
+        <View style={styles.contactRow}>
+          {(['Call', 'WhatsApp', 'Message'] as const).map((label) => (
+            <TouchableOpacity
+              key={label}
+              style={[styles.contactBtn, styles.contactBtnLocked]}
+              onPress={() => setShowSubModal(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={label === 'Call' ? 'call-outline' : label === 'WhatsApp' ? 'logo-whatsapp' : 'chatbubble-outline'}
+                size={18} color="#9CA3AF"
+              />
+              <Text style={[styles.contactBtnText, { color: '#9CA3AF' }]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : (phone || email || canMessage) ? (
         <View style={styles.contactRow}>
           {phone ? (
-            <TouchableOpacity
-              style={[styles.contactBtn, { backgroundColor: '#EA580C' }]}
-              onPress={call}
-              activeOpacity={0.8}
-            >
+            <TouchableOpacity style={[styles.contactBtn, { backgroundColor: '#EA580C' }]} onPress={call} activeOpacity={0.8}>
               <Ionicons name="call-outline" size={18} color="#fff" />
               <Text style={styles.contactBtnText}>Call</Text>
             </TouchableOpacity>
           ) : null}
-
           {phone ? (
-            <TouchableOpacity
-              style={[styles.contactBtn, { backgroundColor: '#25D366' }]}
-              onPress={whatsApp}
-              activeOpacity={0.8}
-            >
+            <TouchableOpacity style={[styles.contactBtn, { backgroundColor: '#25D366' }]} onPress={whatsApp} activeOpacity={0.8}>
               <Ionicons name="logo-whatsapp" size={18} color="#fff" />
               <Text style={styles.contactBtnText}>WhatsApp</Text>
             </TouchableOpacity>
           ) : null}
-
           {canMessage ? (
-            <TouchableOpacity
-              style={[styles.contactBtn, styles.contactBtnOutline]}
-              onPress={openChat}
-              activeOpacity={0.8}
-            >
+            <TouchableOpacity style={[styles.contactBtn, styles.contactBtnOutline]} onPress={openChat} activeOpacity={0.8}>
               <Ionicons name="chatbubble-outline" size={18} color="#EA580C" />
               <Text style={[styles.contactBtnText, { color: '#EA580C' }]}>Message</Text>
             </TouchableOpacity>
           ) : email ? (
-            <TouchableOpacity
-              style={[styles.contactBtn, styles.contactBtnOutline]}
-              onPress={emailShop}
-              activeOpacity={0.8}
-            >
+            <TouchableOpacity style={[styles.contactBtn, styles.contactBtnOutline]} onPress={emailShop} activeOpacity={0.8}>
               <Ionicons name="mail-outline" size={18} color="#EA580C" />
               <Text style={[styles.contactBtnText, { color: '#EA580C' }]}>Email</Text>
             </TouchableOpacity>
@@ -281,6 +269,12 @@ export default function ShopProfileScreen({ route, navigation }: any) {
         {address ? (
           <InfoRow icon="location-outline" label="Address" value={address} />
         ) : null}
+        {isPreview && (
+          <TouchableOpacity style={styles.addressLockRow} onPress={() => setShowSubModal(true)}>
+            <Ionicons name="lock-closed-outline" size={12} color="#EA580C" />
+            <Text style={styles.addressLockText}> Subscribe to see exact address</Text>
+          </TouchableOpacity>
+        )}
 
         {phone ? (
           <InfoRow icon="call-outline" label="Phone" value={phone} />
@@ -316,6 +310,28 @@ export default function ShopProfileScreen({ route, navigation }: any) {
           </View>
         </View>
       ) : null}
+      {/* ── Subscription gate modal ───────────────────────────────────────── */}
+      <Modal visible={showSubModal} transparent animationType="slide" onRequestClose={() => setShowSubModal(false)}>
+        <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowSubModal(false)} activeOpacity={1}>
+          <View style={styles.modalSheet} onStartShouldSetResponder={() => true}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Premium Feature</Text>
+            <Text style={styles.modalMsg}>
+              Subscribe to contact this shop directly — call, WhatsApp, email, or message.
+            </Text>
+            <TouchableOpacity
+              style={styles.modalSubscribeBtn}
+              onPress={() => { setShowSubModal(false); navigation.navigate('SubscriptionScreen'); }}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.modalSubscribeBtnText}>Subscribe — from ₦1,500/month</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowSubModal(false)}>
+              <Text style={styles.modalCancelText}>Not now</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </ScrollView>
   );
 }
@@ -451,4 +467,28 @@ const styles = StyleSheet.create({
     borderRadius: 20, borderWidth: 1, borderColor: '#FED7AA',
   },
   serviceChipText: { fontSize: 13, color: '#EA580C', fontWeight: '600' },
+
+  contactBtnLocked: { backgroundColor: '#F1F5F9', borderWidth: 1.5, borderColor: '#E2E8F0' },
+  addressLockRow:   { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 2 },
+  addressLockText:  { fontSize: 12, color: '#EA580C', fontWeight: '600' },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  modalSheet: {
+    backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 24, paddingBottom: 40,
+  },
+  modalHandle: {
+    width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0',
+    alignSelf: 'center', marginBottom: 20,
+  },
+  modalTitle:            { fontSize: 18, fontWeight: '800', color: '#0F172A', marginBottom: 10, textAlign: 'center' },
+  modalMsg:              { fontSize: 14, color: '#64748B', lineHeight: 21, textAlign: 'center', marginBottom: 24 },
+  modalSubscribeBtn: {
+    backgroundColor: '#EA580C', paddingVertical: 15, borderRadius: 12, alignItems: 'center',
+    marginBottom: 12, shadowColor: '#EA580C', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 8, elevation: 5,
+  },
+  modalSubscribeBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  modalCancelBtn:        { alignItems: 'center', paddingVertical: 8 },
+  modalCancelText:       { fontSize: 14, color: '#94A3B8', fontWeight: '600' },
 });
