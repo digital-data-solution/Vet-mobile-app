@@ -19,11 +19,11 @@ import { useAuth } from '../navigation';
 import type { RootStackParamList } from '../navigation';
 import {
   getMessages,
-  sendMessage,
   listenMessages,
   markMessageAsRead,
   unsubscribeFromChannel,
 } from '../api/supabase';
+import { apiFetch } from '../api/client';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Chat'>;
 
@@ -113,15 +113,24 @@ export default function ChatScreen({ route }: Props) {
     setSending(true);
     setText('');
 
-    const { data, error } = await sendMessage(currentUserId, otherUserId, trimmed);
-    if (!error && data) {
-      const msg = data as Message;
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev;
-        return [msg, ...prev];
+    try {
+      const res = await apiFetch('/api/messages/send', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ toUserId: otherUserId, text: trimmed }),
       });
+      if (res.ok && res.body?.data) {
+        const msg = res.body.data as Message;
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === msg.id)) return prev;
+          return [msg, ...prev];
+        });
+      }
+    } catch {
+      // Realtime will still deliver the message if it was persisted
+    } finally {
+      setSending(false);
     }
-    setSending(false);
   };
 
   if (loading) {

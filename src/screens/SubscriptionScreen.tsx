@@ -337,8 +337,6 @@ export default function SubscriptionScreen({ navigation }: any) {
 
   const plans = userType === 'professional' ? PROFESSIONAL_PLANS : PET_OWNER_PLANS;
 
-  // ─────────────────────────────────────────────────────────────────────────────
-
   if (checkingRole) {
     return (
       <View style={styles.loadingContainer}>
@@ -517,6 +515,7 @@ function PlanCard({
     </View>
   );
 }
+
 
 function ActiveSubscriptionCard({ sub }: { sub: SubscriptionInfo }) {
   const planLabel = (sub.plan ?? 'Free')

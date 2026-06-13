@@ -78,7 +78,7 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
             setSpecialization(p.specialization ?? '');
             setPhone(p.phone            ?? '');
             setEmail(p.email            ?? '');
-            setGalleryImages(p.images   ?? []);
+            setGalleryImages(p.mediaImages ?? []);
           }
         } catch {
           // 404 = no profile yet — normal for first-time users
