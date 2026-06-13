@@ -15,6 +15,7 @@ import {
 import * as Location from 'expo-location';
 import { apiFetch } from '../api/client';
 import { Ionicons } from '@expo/vector-icons';
+import SubscriptionPrompt from '../components/SubscriptionPrompt';
 
 interface Kennel {
   _id: string;
@@ -28,68 +29,31 @@ interface Kennel {
   isVerified?: boolean;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// HELPER
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Always escape the tab navigator and push SubscriptionScreen on the root
-// stack. navigation.replace() is a stack method — calling it on a tab
-// screen's navigation object does nothing or crashes. getParent() bubbles
-// up to the root Stack.Navigator where SubscriptionScreen is registered.
-function goToSubscription(navigation: any) {
-  try {
-    const parent = navigation.getParent();
-    if (parent) {
-      parent.navigate('SubscriptionScreen');
-    } else {
-      navigation.navigate('SubscriptionScreen');
-    }
-  } catch {
-    navigation.navigate('SubscriptionScreen');
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// COMPONENT
-// ─────────────────────────────────────────────────────────────────────────────
-
 export default function KennelsScreen({ navigation }: any) {
   const [kennels, setKennels] = useState<Kennel[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [locationLoading, setLocationLoading] = useState(false);
   const [coords, setCoords] = useState({ lat: '6.5244', lng: '3.3792' });
+  const [isSubscribed,        setIsSubscribed]        = useState(false);
+  const [subscriptionChecked, setSubscriptionChecked] = useState(false);
 
   // ─── Subscription gate ──────────────────────────────────────────────────────
 
   useFocusEffect(
     React.useCallback(() => {
-      let isActive = true;
-      const checkSub = async () => {
-        try {
-          const res = await apiFetch('/api/subscriptions/me', { method: 'GET' });
-          if (!isActive) return;
-          if (!res.ok || !res.body?.data?.isActive) {
-            Alert.alert(
-              'Subscription Required',
-              'You need an active subscription to access kennels.',
-              [
-                { text: 'Not Now', style: 'cancel' },
-                // FIX: was navigation.replace('SubscriptionScreen') —
-                // replace() is a stack method, not valid on a tab screen.
-                // goToSubscription() uses getParent() to reach the root stack.
-                { text: 'Subscribe', onPress: () => goToSubscription(navigation) },
-              ],
-            );
-          }
-        } catch {
-          if (!isActive) return;
-          Alert.alert('Error', 'Could not verify subscription. Please try again.');
-        }
-      };
-      checkSub();
-      return () => { isActive = false; };
-    }, [navigation]),
+      let active = true;
+
+      apiFetch('/api/subscriptions/me', { method: 'GET' })
+        .then((res) => {
+          if (!active) return;
+          setIsSubscribed(res.ok && res.body?.data?.isActive === true);
+        })
+        .catch(() => { if (active) setIsSubscribed(false); })
+        .finally(() => { if (active) setSubscriptionChecked(true); });
+
+      return () => { active = false; };
+    }, []),
   );
 
   useEffect(() => {
@@ -215,6 +179,25 @@ export default function KennelsScreen({ navigation }: any) {
       <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
     </TouchableOpacity>
   );
+
+  if (!subscriptionChecked) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#E8610A" />
+      </View>
+    );
+  }
+
+  if (!isSubscribed) {
+    return (
+      <SubscriptionPrompt
+        navigation={navigation}
+        feature="kennels"
+        customMessage="Subscribe to browse kennels, view contact details, and find boarding near you."
+        requiredPlan="Premium"
+      />
+    );
+  }
 
   return (
     <KeyboardAvoidingView

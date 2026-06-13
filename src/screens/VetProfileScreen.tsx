@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../api/client';
+import SubscriptionPrompt from '../components/SubscriptionPrompt';
 
 interface Professional {
   _id: string;
@@ -42,9 +43,10 @@ interface Professional {
 export default function VetProfileScreen({ route, navigation }: any) {
   const vetId: string | undefined = route?.params?.vetId;
 
-  const [vet, setVet]           = useState<Professional | null>(null);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState<string | null>(null);
+  const [vet, setVet]                     = useState<Professional | null>(null);
+  const [loading, setLoading]             = useState(true);
+  const [error, setError]                 = useState<string | null>(null);
+  const [isSubscriptionError, setIsSubscriptionError] = useState(false);
 
   const fetchVet = useCallback(async () => {
     if (!vetId) {
@@ -54,10 +56,13 @@ export default function VetProfileScreen({ route, navigation }: any) {
     }
     setLoading(true);
     setError(null);
+    setIsSubscriptionError(false);
     try {
       const res = await apiFetch(`/api/v1/professionals/${vetId}`, { method: 'GET' });
       if (res.ok && res.body?.success && res.body?.data) {
         setVet(res.body.data);
+      } else if (res.status === 402) {
+        setIsSubscriptionError(true);
       } else {
         setError(res.body?.message || 'Could not load professional profile.');
       }
@@ -116,6 +121,17 @@ export default function VetProfileScreen({ route, navigation }: any) {
         <ActivityIndicator size="large" color="#2563EB" />
         <Text style={styles.loadingText}>Loading profile...</Text>
       </View>
+    );
+  }
+
+  if (isSubscriptionError) {
+    return (
+      <SubscriptionPrompt
+        navigation={navigation}
+        feature="full vet profiles"
+        customMessage="Subscribe to view full vet profiles, contact details, and book appointments."
+        requiredPlan="Premium"
+      />
     );
   }
 

@@ -4,34 +4,30 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 interface SubscriptionPromptProps {
   navigation?: NativeStackNavigationProp<any>;
-  /**
-   * Short description of the gated action, e.g. "messaging vets"
-   * Shown inline: "Subscribe to unlock messaging vets and get…"
-   */
   feature?: string;
-  /**
-   * Pass true when rendering inside a professional's context so the
-   * copy, price, and features shown are appropriate for their plan.
-   */
   isProfessional?: boolean;
+  customMessage?: string;
+  requiredPlan?: string;
 }
 
-/**
- * Drop-in gate component. Render this whenever a 402 comes back from
- * enforceSubscription — e.g. in ChatScreen, SearchResultsScreen, etc.
- */
 export default function SubscriptionPrompt({
   navigation,
   feature = 'this feature',
   isProfessional = false,
+  customMessage,
+  requiredPlan,
 }: SubscriptionPromptProps) {
   const handleSubscribe = () => {
     navigation?.navigate('SubscriptionScreen');
   };
 
-  // Professional entry plan is ₦1,500 (basic), up to ₦5,000 (pro).
-  // Pet owner premium is ₦1,500/month.
-  const price = isProfessional ? 'from ₦1,500' : '₦1,500';
+  const price       = isProfessional ? 'from ₦1,500' : '₦1,500';
+  const planLabel   = requiredPlan ?? (isProfessional ? 'Professional' : 'Premium');
+  const ctaText     = `Subscribe to ${planLabel} — ${price}/month`;
+
+  const defaultMessage = `Subscribe to unlock ${feature} and get full access to ${
+    isProfessional ? 'business listing features' : 'all Xpress Vet services'
+  }.`;
 
   const features = isProfessional
     ? [
@@ -56,8 +52,7 @@ export default function SubscriptionPrompt({
       <Text style={styles.title}>Subscription Required</Text>
 
       <Text style={styles.message}>
-        Subscribe to unlock {feature} and get full access to{' '}
-        {isProfessional ? 'business listing features' : 'all PetCare services'}.
+        {customMessage ?? defaultMessage}
       </Text>
 
       <View style={styles.featuresBox}>
@@ -72,9 +67,7 @@ export default function SubscriptionPrompt({
         onPress={handleSubscribe}
         activeOpacity={0.85}
       >
-        <Text style={styles.subscribeButtonText}>
-          Subscribe — {price}/month
-        </Text>
+        <Text style={styles.subscribeButtonText}>{ctaText}</Text>
       </TouchableOpacity>
 
       <Text style={styles.disclaimer}>

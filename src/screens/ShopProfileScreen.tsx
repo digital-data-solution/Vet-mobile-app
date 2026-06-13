@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../api/client';
+import SubscriptionPrompt from '../components/SubscriptionPrompt';
 
 interface Shop {
   _id: string;
@@ -43,9 +44,10 @@ export default function ShopProfileScreen({ route, navigation }: any) {
   const shopId: string | undefined    = route?.params?.shopId;
   const passedShop: Shop | undefined  = route?.params?.shop;
 
-  const [shop, setShop]         = useState<Shop | null>(passedShop ?? null);
-  const [loading, setLoading]   = useState(!passedShop);
-  const [error, setError]       = useState<string | null>(null);
+  const [shop, setShop]                   = useState<Shop | null>(passedShop ?? null);
+  const [loading, setLoading]             = useState(!passedShop);
+  const [error, setError]                 = useState<string | null>(null);
+  const [isSubscriptionError, setIsSubscriptionError] = useState(false);
 
   const fetchShop = useCallback(async () => {
     if (!shopId) {
@@ -55,10 +57,13 @@ export default function ShopProfileScreen({ route, navigation }: any) {
     }
     setLoading(true);
     setError(null);
+    setIsSubscriptionError(false);
     try {
       const res = await apiFetch(`/api/v1/shops/${shopId}`, { method: 'GET' });
       if (res.ok && res.body?.success && res.body?.data) {
         setShop(res.body.data);
+      } else if (res.status === 402) {
+        setIsSubscriptionError(true);
       } else {
         setError(res.body?.message || 'Could not load shop profile.');
       }
@@ -130,6 +135,17 @@ export default function ShopProfileScreen({ route, navigation }: any) {
         <ActivityIndicator size="large" color="#EA580C" />
         <Text style={styles.loadingText}>Loading shop...</Text>
       </View>
+    );
+  }
+
+  if (isSubscriptionError) {
+    return (
+      <SubscriptionPrompt
+        navigation={navigation}
+        feature="full shop profiles"
+        customMessage="Subscribe to view full pet shop profiles, contact details, and services near you."
+        requiredPlan="Premium"
+      />
     );
   }
 

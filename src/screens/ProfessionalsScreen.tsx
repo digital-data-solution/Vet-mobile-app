@@ -14,6 +14,7 @@ import {
 import * as Location from 'expo-location';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiFetch } from '../api/client';
+import SubscriptionPrompt from '../components/SubscriptionPrompt';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -76,6 +77,8 @@ export default function ProfessionalsScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [isSubscribed,       setIsSubscribed]       = useState(false);
+  const [subscriptionChecked, setSubscriptionChecked] = useState(false);
 
   // ─── Subscription gate ──────────────────────────────────────────────────────
 
@@ -83,37 +86,16 @@ export default function ProfessionalsScreen({ navigation }: Props) {
     useCallback(() => {
       let active = true;
 
-      const checkSubscription = async () => {
-        try {
-          const res = await apiFetch('/api/subscriptions/me', { method: 'GET' });
+      apiFetch('/api/subscriptions/me', { method: 'GET' })
+        .then((res) => {
           if (!active) return;
+          setIsSubscribed(res.ok && res.body?.data?.isActive === true);
+        })
+        .catch(() => { if (active) setIsSubscribed(false); })
+        .finally(() => { if (active) setSubscriptionChecked(true); });
 
-          if (!res.ok || !res.body?.data?.isActive) {
-            Alert.alert(
-              'Subscription Required',
-              'You need an active subscription to search for professionals.',
-              [
-                { text: 'Not Now', style: 'cancel' },
-                // FIX: was goToSubscription(navigation) which tried the tab
-                // name 'Subscription' — only exists for professional roles.
-                // Now always targets root stack's SubscriptionScreen.
-                { text: 'Subscribe', onPress: () => goToSubscription(navigation) },
-              ],
-            );
-          }
-        } catch {
-          if (!active) return;
-          Alert.alert(
-            'Connection Error',
-            'Could not verify your subscription. Please check your internet connection.',
-            [{ text: 'OK' }],
-          );
-        }
-      };
-
-      checkSubscription();
       return () => { active = false; };
-    }, [navigation]),
+    }, []),
   );
 
   // ─── Initial fetch ───────────────────────────────────────────────────────────
@@ -280,6 +262,25 @@ export default function ProfessionalsScreen({ navigation }: Props) {
   );
 
   // ─── Render ──────────────────────────────────────────────────────────────────
+
+  if (!subscriptionChecked) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#E8610A" />
+      </View>
+    );
+  }
+
+  if (!isSubscribed) {
+    return (
+      <SubscriptionPrompt
+        navigation={navigation}
+        feature="vets and kennels"
+        customMessage="Subscribe to search and contact vets, kennels, and pet professionals near you."
+        requiredPlan="Premium"
+      />
+    );
+  }
 
   return (
     <KeyboardAvoidingView

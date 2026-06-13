@@ -15,6 +15,7 @@ import {
 import * as Location from 'expo-location';
 import { apiFetch } from '../api/client';
 import { Ionicons } from '@expo/vector-icons';
+import SubscriptionPrompt from '../components/SubscriptionPrompt';
 
 interface Shop {
   _id: string;
@@ -34,18 +35,6 @@ interface Props {
   navigation: any;
 }
 
-function goToSubscription(navigation: any) {
-  try {
-    const parent = navigation.getParent();
-    if (parent) {
-      parent.navigate('SubscriptionScreen');
-    } else {
-      navigation.navigate('SubscriptionScreen');
-    }
-  } catch {
-    navigation.navigate('SubscriptionScreen');
-  }
-}
 
 export default function ShopsScreen({ navigation }: Props) {
   const [shops,           setShops]           = useState<Shop[]>([]);
@@ -53,49 +42,31 @@ export default function ShopsScreen({ navigation }: Props) {
   const [searchTerm,      setSearchTerm]      = useState('');
   const [locationLoading, setLocationLoading] = useState(false);
   const [coords,          setCoords]          = useState({ lat: '6.5244', lng: '3.3792' });
-  const [distance,        setDistance]        = useState('10');
-  const [hasSearched,     setHasSearched]     = useState(false);
-  const [isSubscribed,    setIsSubscribed]    = useState(false);
+  const [distance,           setDistance]           = useState('10');
+  const [hasSearched,        setHasSearched]        = useState(false);
+  const [isSubscribed,       setIsSubscribed]       = useState(false);
+  const [subscriptionChecked, setSubscriptionChecked] = useState(false);
 
   // ── On every focus: check subscription then load shops ──────────────────
-  // FIX: Previously the subscription check could block or show stale data
-  // after the user subscribed and navigated back. Now we re-check on every
-  // focus and re-fetch shops, so returning from SubscriptionScreen always
-  // shows the latest state.
   useFocusEffect(
     useCallback(() => {
-      let isActive = true;
+      let active = true;
 
-      const init = async () => {
-        try {
-          const res = await apiFetch('/api/subscriptions/me', { method: 'GET' });
-          if (!isActive) return;
+      apiFetch('/api/subscriptions/me', { method: 'GET' })
+        .then((res) => {
+          if (!active) return;
+          const subscribed = res.ok && res.body?.data?.isActive === true;
+          setIsSubscribed(subscribed);
+          if (subscribed) fetchAllShops();
+          else { setLoading(false); setHasSearched(true); setShops([]); }
+        })
+        .catch(() => {
+          // Network error — try loading anyway; backend will gate if needed
+          if (active) fetchAllShops();
+        })
+        .finally(() => { if (active) setSubscriptionChecked(true); });
 
-          if (res.ok && res.body?.data?.isActive) {
-            setIsSubscribed(true);
-            fetchAllShops();
-          } else {
-            setIsSubscribed(false);
-            setLoading(false);
-            setHasSearched(true);
-            setShops([]);
-            Alert.alert(
-              'Subscription Required',
-              'You need an active subscription to access pet shops.',
-              [
-                { text: 'Not Now', style: 'cancel' },
-                { text: 'Subscribe', onPress: () => goToSubscription(navigation) },
-              ],
-            );
-          }
-        } catch {
-          // Network error — still try to load shops, backend will gate if needed
-          if (isActive) fetchAllShops();
-        }
-      };
-
-      init();
-      return () => { isActive = false; };
+      return () => { active = false; };
     }, [navigation]),
   );
 
@@ -236,22 +207,22 @@ export default function ShopsScreen({ navigation }: Props) {
     </TouchableOpacity>
   );
 
-  // ── Unsubscribed empty state ──────────────────────────────────────────────
-  if (!loading && !isSubscribed && hasSearched) {
+  if (!subscriptionChecked) {
     return (
-      <View style={styles.gateContainer}>
-        <Text style={styles.gateEmoji}>🛒</Text>
-        <Text style={styles.gateTitle}>Subscription Required</Text>
-        <Text style={styles.gateText}>
-          Subscribe to browse and contact pet shops near you.
-        </Text>
-        <TouchableOpacity
-          style={styles.gateBtn}
-          onPress={() => goToSubscription(navigation)}
-        >
-          <Text style={styles.gateBtnText}>View Subscription Plans</Text>
-        </TouchableOpacity>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#E8610A" />
       </View>
+    );
+  }
+
+  if (!isSubscribed) {
+    return (
+      <SubscriptionPrompt
+        navigation={navigation}
+        feature="pet shops"
+        customMessage="Subscribe to browse pet shops, view contact details, and find stores near you."
+        requiredPlan="Premium"
+      />
     );
   }
 

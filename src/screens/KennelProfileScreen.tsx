@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../api/client';
+import SubscriptionPrompt from '../components/SubscriptionPrompt';
 
 interface Kennel {
   _id?: string;
@@ -38,9 +39,10 @@ export default function KennelProfileScreen({ route, navigation }: any) {
   const kennelId: string | undefined      = route?.params?.kennelId;
   const passedKennel: Kennel | undefined  = route?.params?.kennel;
 
-  const [kennel, setKennel]   = useState<Kennel | null>(passedKennel ?? null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState<string | null>(null);
+  const [kennel, setKennel]               = useState<Kennel | null>(passedKennel ?? null);
+  const [loading, setLoading]             = useState(true);
+  const [error, setError]                 = useState<string | null>(null);
+  const [isSubscriptionError, setIsSubscriptionError] = useState(false);
 
   const fetchKennel = useCallback(async () => {
     if (!kennelId) {
@@ -50,10 +52,13 @@ export default function KennelProfileScreen({ route, navigation }: any) {
     }
     setLoading(true);
     setError(null);
+    setIsSubscriptionError(false);
     try {
       const res = await apiFetch(`/api/v1/kennels/${kennelId}`, { method: 'GET' });
       if (res.ok && res.body?.success && res.body?.data) {
         setKennel(res.body.data);
+      } else if (res.status === 402) {
+        setIsSubscriptionError(true);
       } else {
         // Fall back to stub — don't blank the screen
         if (!kennel) setError(res.body?.message || 'Could not load kennel profile.');
@@ -117,6 +122,17 @@ export default function KennelProfileScreen({ route, navigation }: any) {
         <ActivityIndicator size="large" color="#7C3AED" />
         <Text style={styles.loadingText}>Loading kennel...</Text>
       </View>
+    );
+  }
+
+  if (isSubscriptionError) {
+    return (
+      <SubscriptionPrompt
+        navigation={navigation}
+        feature="full kennel profiles"
+        customMessage="Subscribe to view full kennel profiles, contact details, and boarding information."
+        requiredPlan="Premium"
+      />
     );
   }
 
