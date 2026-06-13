@@ -306,7 +306,7 @@ export default function ProfileScreen({ navigation }: Props) {
                 {(subscription.plan ?? 'Free').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
               </Text>
               <Text style={styles.subscriptionAmount}>
-                ₦{subscription.amount.toLocaleString()}/month
+                ₦{(subscription.amount ?? 0).toLocaleString()}/month
               </Text>
             </View>
             <View style={[
@@ -317,7 +317,7 @@ export default function ProfileScreen({ navigation }: Props) {
                 styles.statusText,
                 subscription.isActive ? styles.statusTextActive : styles.statusTextInactive,
               ]}>
-                {subscription.status.toUpperCase()}
+                {(subscription.status ?? 'inactive').toUpperCase()}
               </Text>
             </View>
           </View>
@@ -331,15 +331,19 @@ export default function ProfileScreen({ navigation }: Props) {
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Renewal date:</Text>
                 <Text style={styles.detailValue}>
-                  {new Date(subscription.expiresAt).toLocaleDateString('en-NG', {
-                    day: 'numeric', month: 'long', year: 'numeric',
-                  })}
+                  {subscription.expiresAt
+                    ? new Date(subscription.expiresAt).toLocaleDateString('en-NG', {
+                        day: 'numeric', month: 'long', year: 'numeric',
+                      })
+                    : 'N/A'}
                 </Text>
               </View>
             </View>
           ) : (
             <Text style={styles.expiredText}>
-              Expired on {new Date(subscription.expiresAt).toLocaleDateString('en-NG')}
+              {subscription.expiresAt
+                ? `Expired on ${new Date(subscription.expiresAt).toLocaleDateString('en-NG')}`
+                : 'No active subscription'}
             </Text>
           )}
 
