@@ -100,8 +100,18 @@ export default function ShopProfileScreen({ route, navigation }: any) {
   const email    = shop?.email || shop?.owner?.email;
   const address  = getAddress();
 
+  const trackTap = (method: 'phone' | 'whatsapp' | 'email') => {
+    if (shop?._id) {
+      apiFetch('/api/v1/track/contact-tap', {
+        method: 'POST',
+        body: JSON.stringify({ targetId: shop._id, targetType: 'shop', method }),
+      }).catch(() => {});
+    }
+  };
+
   const call = () => {
     if (!phone) return;
+    trackTap('phone');
     Linking.openURL(`tel:${phone}`).catch(() =>
       Alert.alert('Error', 'Unable to open phone app.'),
     );
@@ -109,6 +119,7 @@ export default function ShopProfileScreen({ route, navigation }: any) {
 
   const whatsApp = () => {
     if (!phone) return;
+    trackTap('whatsapp');
     const digits = phone.replace(/\D/g, '').replace(/^0/, '234');
     Linking.openURL(`https://wa.me/${digits}`).catch(() =>
       Alert.alert('WhatsApp', 'Could not open WhatsApp. Make sure it is installed.'),
@@ -117,6 +128,7 @@ export default function ShopProfileScreen({ route, navigation }: any) {
 
   const emailShop = () => {
     if (!email) return;
+    trackTap('email');
     Linking.openURL(`mailto:${email}`).catch(() =>
       Alert.alert('Error', 'Unable to open mail app.'),
     );

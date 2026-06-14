@@ -11,6 +11,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from 'react-native';
 import * as Location from 'expo-location';
 import { apiFetch } from '../api/client';
@@ -43,6 +44,19 @@ export default function KennelsScreen({ navigation }: any) {
   const [coords, setCoords] = useState({ lat: '6.5244', lng: '3.3792' });
   const [isSubscribed,        setIsSubscribed]        = useState(false);
   const [subscriptionChecked, setSubscriptionChecked] = useState(false);
+  const [showUpsell, setShowUpsell] = useState(false);
+
+  const handleDismissUpsell = () => {
+    setShowUpsell(false);
+    apiFetch('/api/v1/upsell/dismiss', { method: 'POST' }).catch(() => {});
+  };
+
+  const checkUpsellAfterSearch = () => {
+    if (isSubscribed) return;
+    apiFetch('/api/v1/upsell/check?trigger=search', { method: 'GET' })
+      .then((r) => { if (r.body?.show) setShowUpsell(true); })
+      .catch(() => {});
+  };
 
   // ─── Subscription gate ──────────────────────────────────────────────────────
 
@@ -72,6 +86,7 @@ export default function KennelsScreen({ navigation }: any) {
       const res = await apiFetch('/api/v1/kennels/list?limit=50', { method: 'GET' });
       if (res.ok && res.body?.success) {
         setKennels(res.body.data || []);
+        checkUpsellAfterSearch();
       } else if (res.status === 402) {
         setKennels([]);
       } else {
@@ -98,6 +113,7 @@ export default function KennelsScreen({ navigation }: any) {
       const res = await apiFetch(`/api/v1/kennels/nearby?${params}`, { method: 'GET' });
       if (res.ok && res.body?.success) {
         setKennels(res.body.data || []);
+        checkUpsellAfterSearch();
         if ((res.body.data || []).length === 0) {
           Alert.alert('No Results', 'No kennels found nearby. Try a wider search area.');
         }
@@ -300,6 +316,29 @@ export default function KennelsScreen({ navigation }: any) {
             }
           />
         )}
+
+        {/* Upsell modal */}
+        <Modal visible={showUpsell} transparent animationType="slide" onRequestClose={handleDismissUpsell}>
+          <TouchableOpacity style={styles.upsellOverlay} onPress={handleDismissUpsell} activeOpacity={1}>
+            <View style={styles.upsellSheet} onStartShouldSetResponder={() => true}>
+              <View style={styles.upsellHandle} />
+              <Text style={styles.upsellTitle}>Unlock Unlimited Search</Text>
+              <Text style={styles.upsellMsg}>
+                You've used your free searches this week. Subscribe to search without limits and contact kennels directly.
+              </Text>
+              <TouchableOpacity
+                style={styles.upsellBtn}
+                onPress={() => { handleDismissUpsell(); goToSubscription(navigation); }}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.upsellBtnText}>Subscribe — from ₦1,500/month</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.upsellNotNow} onPress={handleDismissUpsell}>
+                <Text style={styles.upsellNotNowText}>Not now</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
       </View>
     </KeyboardAvoidingView>
   );
@@ -435,4 +474,14 @@ const styles = StyleSheet.create({
   teaserText:    { flex: 1, fontSize: 12, color: '#5B21B6', lineHeight: 16 },
   teaserBtn:     { backgroundColor: '#7C3AED', borderRadius: 7, paddingHorizontal: 10, paddingVertical: 6, marginLeft: 8 },
   teaserBtnText: { fontSize: 12, color: '#fff', fontWeight: '700' },
+
+  upsellOverlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  upsellSheet:      { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
+  upsellHandle:     { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0', alignSelf: 'center', marginBottom: 20 },
+  upsellTitle:      { fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 10, textAlign: 'center' },
+  upsellMsg:        { fontSize: 14, color: '#6B7280', lineHeight: 21, textAlign: 'center', marginBottom: 24 },
+  upsellBtn:        { backgroundColor: '#7C3AED', paddingVertical: 15, borderRadius: 12, alignItems: 'center', marginBottom: 12, shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
+  upsellBtnText:    { color: '#fff', fontSize: 16, fontWeight: '700' },
+  upsellNotNow:     { alignItems: 'center', paddingVertical: 8 },
+  upsellNotNowText: { fontSize: 14, color: '#94A3B8', fontWeight: '600' },
 });

@@ -82,9 +82,19 @@ export default function VetProfileScreen({ route, navigation }: any) {
     fetchVet();
   }, [fetchVet]);
 
+  const trackTap = (method: 'phone' | 'whatsapp' | 'email') => {
+    if (vet?._id) {
+      apiFetch('/api/v1/track/contact-tap', {
+        method: 'POST',
+        body: JSON.stringify({ targetId: vet._id, targetType: 'professional', method }),
+      }).catch(() => {});
+    }
+  };
+
   const call = () => {
     const phone = vet?.phone || vet?.userId?.phone;
     if (!phone) return;
+    trackTap('phone');
     Linking.openURL(`tel:${phone}`).catch(() =>
       Alert.alert('Error', 'Unable to open phone app.'),
     );
@@ -93,6 +103,7 @@ export default function VetProfileScreen({ route, navigation }: any) {
   const emailVet = () => {
     const emailAddr = vet?.email || vet?.userId?.email;
     if (!emailAddr) return;
+    trackTap('email');
     Linking.openURL(`mailto:${emailAddr}`).catch(() =>
       Alert.alert('Error', 'Unable to open mail app.'),
     );
@@ -101,6 +112,7 @@ export default function VetProfileScreen({ route, navigation }: any) {
   const whatsApp = () => {
     const rawPhone = vet?.phone || vet?.userId?.phone;
     if (!rawPhone) return;
+    trackTap('whatsapp');
     const digits = rawPhone.replace(/\D/g, '').replace(/^0/, '234');
     Linking.openURL(`https://wa.me/${digits}`).catch(() =>
       Alert.alert('WhatsApp', 'Could not open WhatsApp. Make sure it is installed.'),

@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, TextInput, Pressable, StyleSheet,
+  View, Text, TextInput, Pressable, StyleSheet, Image,
   Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform,
 } from 'react-native';
+
+const LOGO = require('../../assets/icon.png');
 import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage             from '@react-native-async-storage/async-storage';
 import { supabase }             from '../api/supabase';
@@ -22,7 +24,12 @@ const STORAGE_KEYS = {
 // Creates the MongoDB User document if it doesn't exist yet (upsert),
 // or returns the existing one. Silent — never blocks navigation.
 // ─────────────────────────────────────────────────────────────────────────────
-async function syncWithBackend(accessToken: string): Promise<void> {
+async function syncWithBackend(
+  accessToken:  string,
+  utmSource?:   string | null,
+  utmCampaign?: string | null,
+  utmMedium?:   string | null,
+): Promise<void> {
   try {
     const res = await apiFetch('/api/auth/sync', {
       method:  'POST',
@@ -30,6 +37,11 @@ async function syncWithBackend(accessToken: string): Promise<void> {
         'Content-Type':  'application/json',
         'Authorization': `Bearer ${accessToken}`,
       },
+      body: JSON.stringify({
+        ...(utmSource   && { utmSource }),
+        ...(utmCampaign && { utmCampaign }),
+        ...(utmMedium   && { utmMedium }),
+      }),
     });
 
     if (!res.ok) {
@@ -45,7 +57,10 @@ async function syncWithBackend(accessToken: string): Promise<void> {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function AuthScreen({ navigation }: { navigation: any }) {
+export default function AuthScreen({ navigation, route }: { navigation: any; route?: any }) {
+  const utmSource   = route?.params?.utmSource   ?? null;
+  const utmCampaign = route?.params?.utmCampaign ?? null;
+  const utmMedium   = route?.params?.utmMedium   ?? null;
   const [email,              setEmail]              = useState('');
   const [password,           setPassword]           = useState('');
   const [step,               setStep]               = useState<Step>('login');
@@ -80,7 +95,7 @@ export default function AuthScreen({ navigation }: { navigation: any }) {
 
       // 2. Ensure MongoDB document exists — fire-and-forget but awaited
       //    so the document is ready before any gated route is hit.
-      await syncWithBackend(accessToken);
+      await syncWithBackend(accessToken, utmSource, utmCampaign, utmMedium);
 
       // 3. Navigation handled by onAuthStateChange — no navigate() call needed.
     },
@@ -204,7 +219,7 @@ export default function AuthScreen({ navigation }: { navigation: any }) {
       >
         {/* Logo */}
         <View style={styles.logoSection}>
-          <Text style={styles.logoEmoji}>🐾</Text>
+          <Image source={LOGO} style={styles.logoImage} resizeMode="contain" />
           <Text style={styles.appName}>Xpress Vet</Text>
           <Text style={styles.appTagline}>Your trusted veterinary marketplace</Text>
         </View>
@@ -373,7 +388,7 @@ const styles = StyleSheet.create({
   scroll:             { flex: 1, backgroundColor: '#F3F4F6' },
   container:          { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 40 },
   logoSection:        { alignItems: 'center', marginBottom: 28 },
-  logoEmoji:          { fontSize: 56, marginBottom: 10 },
+  logoImage:          { width: 80, height: 80, marginBottom: 10, borderRadius: 18 },
   appName:            { fontSize: 30, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
   appTagline:         { fontSize: 14, color: '#6B7280', marginTop: 4 },
   card:               { backgroundColor: '#fff', borderRadius: 20, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 4 },

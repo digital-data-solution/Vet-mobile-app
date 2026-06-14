@@ -10,7 +10,10 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
+
+const LOGO = require('../../assets/icon.png');
 import { supabase } from '../api/supabase';
 import { apiFetch } from '../api/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -32,7 +35,10 @@ const EMAIL_VERIFY_REDIRECT = Platform.OS === 'web'
   ? 'https://xpressvetmarketplace.com/auth/callback'
   : 'xpressvet://auth/callback';
 
-export default function RegisterScreen({ navigation }: Props) {
+export default function RegisterScreen({ navigation, route }: Props & { route?: any }) {
+  const utmSource   = route?.params?.utmSource   ?? null;
+  const utmCampaign = route?.params?.utmCampaign ?? null;
+  const utmMedium   = route?.params?.utmMedium   ?? null;
   const [email,           setEmail]           = useState('');
   const [password,        setPassword]        = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -105,6 +111,9 @@ export default function RegisterScreen({ navigation }: Props) {
             password,
             role:         'pet_owner',
             ...(referralCode.trim() && { referralCode: referralCode.trim().toUpperCase() }),
+            ...(utmSource   && { utmSource }),
+            ...(utmCampaign && { utmCampaign }),
+            ...(utmMedium   && { utmMedium }),
           }),
         });
       } catch {
@@ -166,7 +175,7 @@ export default function RegisterScreen({ navigation }: Props) {
       >
         {/* Logo */}
         <View style={styles.logoSection}>
-          <Text style={styles.logoEmoji}>🐾</Text>
+          <Image source={LOGO} style={styles.logoImage} resizeMode="contain" />
           <Text style={styles.appName}>Xpress Vet</Text>
           <Text style={styles.appTagline}>Create your free account</Text>
         </View>
@@ -355,7 +364,7 @@ const styles = StyleSheet.create({
   scroll:              { flex: 1, backgroundColor: '#F3F4F6' },
   container:           { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 40 },
   logoSection:         { alignItems: 'center', marginBottom: 28 },
-  logoEmoji:           { fontSize: 56, marginBottom: 10 },
+  logoImage:           { width: 80, height: 80, marginBottom: 10, borderRadius: 18 },
   appName:             { fontSize: 30, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
   appTagline:          { fontSize: 14, color: '#6B7280', marginTop: 4 },
   card:                { backgroundColor: '#fff', borderRadius: 20, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 4 },

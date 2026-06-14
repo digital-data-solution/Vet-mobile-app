@@ -87,8 +87,18 @@ export default function KennelProfileScreen({ route, navigation }: any) {
   const services    = kennel?.specialization?.split(',').map(s => s.trim()).filter(Boolean) ?? [];
   const canMessage  = !!kennel?.userId?.supabaseId;
 
+  const trackTap = (method: 'phone' | 'whatsapp' | 'email') => {
+    if (kennel?._id) {
+      apiFetch('/api/v1/track/contact-tap', {
+        method: 'POST',
+        body: JSON.stringify({ targetId: kennel._id, targetType: 'kennel', method }),
+      }).catch(() => {});
+    }
+  };
+
   const call = () => {
     if (!phone) return;
+    trackTap('phone');
     Linking.openURL(`tel:${phone}`).catch(() =>
       Alert.alert('Error', 'Unable to open phone app'),
     );
@@ -96,6 +106,7 @@ export default function KennelProfileScreen({ route, navigation }: any) {
 
   const emailKennel = () => {
     if (!email) return;
+    trackTap('email');
     Linking.openURL(`mailto:${email}`).catch(() =>
       Alert.alert('Error', 'Unable to open mail app'),
     );
@@ -103,6 +114,7 @@ export default function KennelProfileScreen({ route, navigation }: any) {
 
   const whatsApp = () => {
     if (!phone) return;
+    trackTap('whatsapp');
     const digits = phone.replace(/\D/g, '').replace(/^0/, '234');
     Linking.openURL(`https://wa.me/${digits}`).catch(() =>
       Alert.alert('WhatsApp', 'Could not open WhatsApp. Make sure it is installed.'),
