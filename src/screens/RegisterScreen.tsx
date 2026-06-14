@@ -36,6 +36,7 @@ export default function RegisterScreen({ navigation }: Props) {
   const [email,           setEmail]           = useState('');
   const [password,        setPassword]        = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [referralCode,    setReferralCode]    = useState('');
   const [step,            setStep]            = useState<Step>('register');
   const [loading,         setLoading]         = useState(false);
   const [showPassword,    setShowPassword]    = useState(false);
@@ -97,10 +98,11 @@ export default function RegisterScreen({ navigation }: Props) {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify({
-            name:  email.trim().split('@')[0],
-            email: email.trim().toLowerCase(),
+            name:         email.trim().split('@')[0],
+            email:        email.trim().toLowerCase(),
             password,
-            role:  'pet_owner',
+            role:         'pet_owner',
+            ...(referralCode.trim() && { referralCode: referralCode.trim().toUpperCase() }),
           }),
         });
       } catch {
@@ -204,6 +206,14 @@ export default function RegisterScreen({ navigation }: Props) {
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 secureTextEntry={!showPassword}
+              />
+
+              <FormInput
+                icon="🎁"
+                placeholder="Referral Code (optional)"
+                value={referralCode}
+                onChangeText={setReferralCode}
+                autoCapitalize="characters"
               />
 
               <PrimaryButton

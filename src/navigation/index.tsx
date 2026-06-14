@@ -15,10 +15,11 @@ import {
   StyleSheet,
   Pressable,
 } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, NavigatorScreenParams, type LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { supabase } from '../api/supabase';
 import type { Session } from '@supabase/supabase-js';
@@ -45,6 +46,9 @@ import PaystackWebView              from '../screens/PaystackWebView';
 import EmailVerifiedScreen          from '../screens/EmailVerifiedScreen';
 import ConversationsScreen          from '../screens/ConversationsScreen';
 import ChatScreen                   from '../screens/ChatScreen';
+import PrivacyPolicyScreen          from '../screens/PrivacyPolicyScreen';
+import TermsScreen                  from '../screens/TermsScreen';
+import SupportScreen                from '../screens/SupportScreen';
 
 const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://vet-market-place-jsj5.onrender.com';
 
@@ -80,7 +84,7 @@ export const useAuth = () => useContext(AuthContext);
 export type RootStackParamList = {
   Auth:             undefined;
   Register:         undefined;
-  MainTabs:         undefined;
+  MainTabs:         NavigatorScreenParams<TabParamList> | undefined;
   EmailVerified:    undefined;
   // Shared overlay screens
   VetProfile:             { vetId?: string } | undefined;
@@ -100,6 +104,9 @@ export type RootStackParamList = {
     callbackKey:       string;
   };
   Chat: { otherUserId: string; otherUserName: string };
+  PrivacyPolicy: undefined;
+  Terms:         undefined;
+  Support:       undefined;
 };
 
 export type TabParamList = {
@@ -123,7 +130,7 @@ const Tab       = createBottomTabNavigator<TabParamList>();
 // Web:    https://xpressvetmarketplace.com/auth/callback  → EmailVerified
 // Native: xpressvet://verify-email                        → EmailVerified
 // ─────────────────────────────────────────────────────────────────────────────
-const linking = {
+const linking: LinkingOptions<RootStackParamList> = {
   prefixes: [
     'https://xpressvetmarketplace.com',
     'http://xpressvetmarketplace.com',
@@ -134,6 +141,9 @@ const linking = {
       EmailVerified: 'auth/callback',
       Auth:          'auth/login',
       Register:      'auth/register',
+      PrivacyPolicy: 'privacy-policy',
+      Terms:         'terms-and-conditions',
+      Support:       'support',
       MainTabs:      {
         screens: {
           Home:          'home',
@@ -373,6 +383,21 @@ export default function AppNavigator() {
             <RootStack.Screen
               name="EmailVerified"
               component={EmailVerifiedScreen}
+              options={{ headerShown: false }}
+            />
+            <RootStack.Screen
+              name="PrivacyPolicy"
+              component={PrivacyPolicyScreen}
+              options={{ headerShown: false }}
+            />
+            <RootStack.Screen
+              name="Terms"
+              component={TermsScreen}
+              options={{ headerShown: false }}
+            />
+            <RootStack.Screen
+              name="Support"
+              component={SupportScreen}
               options={{ headerShown: false }}
             />
 

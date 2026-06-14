@@ -14,6 +14,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../api/client';
 import SubscriptionPrompt from '../components/SubscriptionPrompt';
+import ReviewsSection    from '../components/ReviewsSection';
+import WriteReviewModal  from '../components/WriteReviewModal';
 
 interface Professional {
   _id: string;
@@ -33,10 +35,11 @@ interface Professional {
   licenseExpiry?: string;
   images?: { url: string; publicId: string }[];
   userId?: {
-    supabaseId?: string;   // ← added: populated by backend
-    name?: string;
-    phone?: string;
-    email?: string;
+    _id?:        string;
+    supabaseId?: string;
+    name?:       string;
+    phone?:      string;
+    email?:      string;
     profileImage?: string;
   };
 }
@@ -47,8 +50,10 @@ export default function VetProfileScreen({ route, navigation }: any) {
   const [vet, setVet]           = useState<Professional | null>(null);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
-  const [isPreview, setIsPreview]       = useState(false);
-  const [showSubModal, setShowSubModal] = useState(false);
+  const [isPreview, setIsPreview]           = useState(false);
+  const [showSubModal, setShowSubModal]     = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewRefreshKey, setReviewRefreshKey] = useState(0);
 
   const fetchVet = useCallback(async () => {
     if (!vetId) {
@@ -324,6 +329,40 @@ export default function VetProfileScreen({ route, navigation }: any) {
         </View>
       )}
 
+      {/* ── Reviews ─────────────────────────────────────────────────────────── */}
+      {vet._id ? (
+        <>
+          <TouchableOpacity
+            style={[styles.writeReviewBtn, { borderColor: accentColor }]}
+            onPress={() => setShowReviewModal(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="star-outline" size={16} color={accentColor} />
+            <Text style={[styles.writeReviewBtnText, { color: accentColor }]}>Write a Review</Text>
+          </TouchableOpacity>
+
+          <ReviewsSection
+            targetType="professional"
+            targetId={vet._id}
+            avgRating={vet.rating}
+            reviewCount={vet.reviewCount}
+            accentColor={accentColor}
+            refreshKey={reviewRefreshKey}
+            ownerMongoId={vet.userId?._id}
+          />
+
+          <WriteReviewModal
+            visible={showReviewModal}
+            onClose={() => setShowReviewModal(false)}
+            onSuccess={() => setReviewRefreshKey(k => k + 1)}
+            targetType="professional"
+            targetId={vet._id}
+            targetName={displayName}
+            accentColor={accentColor}
+          />
+        </>
+      ) : null}
+
       {/* ── Subscription gate modal ───────────────────────────────────────── */}
       <Modal visible={showSubModal} transparent animationType="slide" onRequestClose={() => setShowSubModal(false)}>
         <TouchableOpacity
@@ -521,4 +560,17 @@ const styles = StyleSheet.create({
     width: 100, height: 100, borderRadius: 12,
     backgroundColor: '#F1F5F9',
   },
+  writeReviewBtn: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'center',
+    gap:               6,
+    marginHorizontal:  16,
+    marginBottom:      12,
+    paddingVertical:   12,
+    borderRadius:      10,
+    borderWidth:       1.5,
+    backgroundColor:   '#fff',
+  },
+  writeReviewBtnText: { fontSize: 14, fontWeight: '700' },
 });

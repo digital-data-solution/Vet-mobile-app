@@ -13,6 +13,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../api/client';
 import SubscriptionPrompt from '../components/SubscriptionPrompt';
+import ReviewsSection    from '../components/ReviewsSection';
+import WriteReviewModal  from '../components/WriteReviewModal';
 
 interface Kennel {
   _id?: string;
@@ -29,10 +31,11 @@ interface Kennel {
   rating?: number;
   reviewCount?: number;
   userId?: {
-    supabaseId?: string;   // ← populated by backend after patch
-    name?: string;
-    phone?: string;
-    email?: string;
+    _id?:        string;
+    supabaseId?: string;
+    name?:       string;
+    phone?:      string;
+    email?:      string;
   };
 }
 
@@ -44,7 +47,9 @@ export default function KennelProfileScreen({ route, navigation }: any) {
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState<string | null>(null);
   const [isPreview, setIsPreview]       = useState(false);
-  const [showSubModal, setShowSubModal] = useState(false);
+  const [showSubModal, setShowSubModal]         = useState(false);
+  const [showReviewModal, setShowReviewModal]   = useState(false);
+  const [reviewRefreshKey, setReviewRefreshKey] = useState(0);
 
   const fetchKennel = useCallback(async () => {
     if (!kennelId) {
@@ -299,6 +304,40 @@ export default function KennelProfileScreen({ route, navigation }: any) {
         </Text>
       </View>
 
+      {/* ── Reviews ─────────────────────────────────────────────────────────── */}
+      {kennel._id ? (
+        <>
+          <TouchableOpacity
+            style={[styles.writeReviewBtn, { borderColor: '#7C3AED' }]}
+            onPress={() => setShowReviewModal(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="star-outline" size={16} color="#7C3AED" />
+            <Text style={[styles.writeReviewBtnText, { color: '#7C3AED' }]}>Write a Review</Text>
+          </TouchableOpacity>
+
+          <ReviewsSection
+            targetType="professional"
+            targetId={kennel._id}
+            avgRating={kennel.rating}
+            reviewCount={kennel.reviewCount}
+            accentColor="#7C3AED"
+            refreshKey={reviewRefreshKey}
+            ownerMongoId={kennel.userId?._id}
+          />
+
+          <WriteReviewModal
+            visible={showReviewModal}
+            onClose={() => setShowReviewModal(false)}
+            onSuccess={() => setReviewRefreshKey(k => k + 1)}
+            targetType="professional"
+            targetId={kennel._id}
+            targetName={displayName}
+            accentColor="#7C3AED"
+          />
+        </>
+      ) : null}
+
       {/* ── Subscription gate modal ───────────────────────────────────────── */}
       <Modal visible={showSubModal} transparent animationType="slide" onRequestClose={() => setShowSubModal(false)}>
         <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowSubModal(false)} activeOpacity={1}>
@@ -493,4 +532,10 @@ const styles = StyleSheet.create({
   modalSubscribeBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   modalCancelBtn:        { alignItems: 'center', paddingVertical: 8 },
   modalCancelText:       { fontSize: 14, color: '#94A3B8', fontWeight: '600' },
+  writeReviewBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    marginHorizontal: 16, marginBottom: 12, paddingVertical: 12,
+    borderRadius: 10, borderWidth: 1.5, backgroundColor: '#fff',
+  },
+  writeReviewBtnText: { fontSize: 14, fontWeight: '700' },
 });

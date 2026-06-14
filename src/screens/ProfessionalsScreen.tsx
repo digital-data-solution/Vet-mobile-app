@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -77,6 +77,7 @@ export default function ProfessionalsScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isSubscribed,       setIsSubscribed]       = useState(false);
   const [subscriptionChecked, setSubscriptionChecked] = useState(false);
 
@@ -98,19 +99,22 @@ export default function ProfessionalsScreen({ navigation }: Props) {
     }, []),
   );
 
-  // ─── Initial fetch ───────────────────────────────────────────────────────────
+  // ─── Initial fetch + role filter change ─────────────────────────────────────
 
   useEffect(() => {
-    fetchAllProfessionals();
+    fetchAllProfessionals(searchTerm);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roleFilter]);
 
   // ─── Fetch all ───────────────────────────────────────────────────────────────
 
-  const fetchAllProfessionals = async () => {
+  const fetchAllProfessionals = async (term?: string) => {
     setLoading(true);
+    const q = term !== undefined ? term : searchTerm;
     try {
       const params = new URLSearchParams({
         ...(roleFilter !== 'all' && { role: roleFilter }),
+        ...(q.trim() && { search: q.trim() }),
         limit: '50',
       });
 
@@ -276,12 +280,16 @@ export default function ProfessionalsScreen({ navigation }: Props) {
           <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
             value={searchTerm}
-            onChangeText={setSearchTerm}
+            onChangeText={(v) => {
+              setSearchTerm(v);
+              if (searchDebounce.current) clearTimeout(searchDebounce.current);
+              searchDebounce.current = setTimeout(() => fetchAllProfessionals(v), 350);
+            }}
             style={styles.searchInput}
             placeholder="Search by name, specialization..."
             placeholderTextColor="#9CA3AF"
             returnKeyType="search"
-            onSubmitEditing={searchNearby}
+            onSubmitEditing={() => fetchAllProfessionals(searchTerm)}
           />
         </View>
 

@@ -306,7 +306,7 @@ export default function ProfileScreen({ navigation }: Props) {
                 {(subscription.plan ?? 'Free').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
               </Text>
               <Text style={styles.subscriptionAmount}>
-                ₦{subscription.amount.toLocaleString()}/month
+                ₦{(subscription.amount ?? 0).toLocaleString()}/month
               </Text>
             </View>
             <View style={[
@@ -460,6 +460,29 @@ export default function ProfileScreen({ navigation }: Props) {
           label="Register Your Pet Shop"
           onPress={() => navigation.navigate('ShopOnboarding')}
           tint="#F97316"
+        />
+      </View>
+
+      {/* ── Legal & Support ─────────────────────────────────────────────── */}
+      <View style={styles.actionsCard}>
+        <Text style={styles.cardTitle}>Legal &amp; Support</Text>
+        <MenuButton
+          emoji="🔒"
+          label="Privacy Policy"
+          onPress={() => navigation.navigate('PrivacyPolicy')}
+          tint="#6B7280"
+        />
+        <MenuButton
+          emoji="📋"
+          label="Terms &amp; Conditions"
+          onPress={() => navigation.navigate('Terms')}
+          tint="#6B7280"
+        />
+        <MenuButton
+          emoji="❓"
+          label="Support / Help"
+          onPress={() => navigation.navigate('Support')}
+          tint="#2563EB"
         />
       </View>
 
