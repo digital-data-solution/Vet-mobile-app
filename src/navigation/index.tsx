@@ -40,6 +40,8 @@ import ExploreOptionsScreen         from '../screens/ExploreOptionsScreen';
 import VetProfileScreen             from '../screens/VetProfileScreen';
 import ShopProfileScreen            from '../screens/ShopProfileScreen';
 import KennelProfileScreen          from '../screens/KennelProfileScreen';
+import ServiceProfileScreen         from '../screens/ServiceProfileScreen';
+import ServiceScreen                from '../screens/ServiceScreen';
 import VerifyProfessionalScreen     from '../screens/VerifyProfessionalScreen';
 import AddressInputScreen           from '../screens/AddressInputScreen';
 import PaystackWebView              from '../screens/PaystackWebView';
@@ -55,7 +57,12 @@ const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://vet-market-plac
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
 // ─────────────────────────────────────────────────────────────────────────────
-type UserRole = 'vet' | 'kennel_owner' | 'shop_owner' | 'pet_owner' | null;
+type UserRole =
+  | 'vet' | 'kennel_owner' | 'shop_owner' | 'pet_owner'
+  | 'groomer' | 'trainer' | 'pet_sitter'
+  | 'pet_transport' | 'cremation_service' | 'agro_vet_supplier' | 'insurance_provider'
+  | 'pet_pharmacy' | 'rescue_center' | 'pet_hotel'
+  | null;
 
 type AuthContextType = {
   session:         Session | null;
@@ -90,6 +97,7 @@ export type RootStackParamList = {
   VetProfile:             { vetId?: string } | undefined;
   ShopProfile:            { shopId?: string } | undefined;
   KennelProfile:          { kennelId?: string } | undefined;
+  ServiceProfile:         { professionalId: string };
   ExploreOptions:         undefined;
   VerifyProfessional:     undefined;
   AddressInput:           { mode?: 'professional' } | undefined;
@@ -114,6 +122,7 @@ export type TabParamList = {
   Professionals:   undefined;
   Kennels:         undefined;
   Shops:           undefined;
+  Services:        undefined;
   Profile:         undefined;
   Subscription:    undefined;
   Network:         undefined;
@@ -238,13 +247,14 @@ function TabIcon(name: keyof typeof Ionicons.glyphMap) {
 function UserTabs() {
   return (
     <Tab.Navigator screenOptions={tabScreenOptions}>
-      <Tab.Screen name="Home"          component={HomeScreen}          options={{ tabBarIcon: TabIcon('home'),     headerShown: false }} />
-      <Tab.Screen name="Professionals" component={ProfessionalsScreen} options={{ title: 'Find Vets', tabBarLabel: 'Vets', tabBarIcon: TabIcon('medkit'),  headerShown: false }} />
-      <Tab.Screen name="Kennels"       component={KennelsScreen}       options={{ tabBarIcon: TabIcon('paw'),      headerShown: false }} />
-      <Tab.Screen name="Shops"         component={ShopsScreen}         options={{ title: 'Pet Shops', tabBarLabel: 'Shops', tabBarIcon: TabIcon('basket'), headerShown: false }} />
-      <Tab.Screen name="Messages"      component={ConversationsScreen} options={{ title: 'Messages', tabBarIcon: TabIcon('chatbubbles-outline'), headerShown: false }} />
-      <Tab.Screen name="Subscription"  component={SubscriptionScreen}  options={{ title: 'Subscription', tabBarLabel: 'Plans', tabBarIcon: TabIcon('star'), headerShown: false }} />
-      <Tab.Screen name="Profile"       component={ProfileScreen}       options={{ tabBarIcon: TabIcon('person'),   headerShown: false }} />
+      <Tab.Screen name="Home"          component={HomeScreen}          options={{ tabBarIcon: TabIcon('home'),               headerShown: false }} />
+      <Tab.Screen name="Professionals" component={ProfessionalsScreen} options={{ title: 'Find Vets', tabBarLabel: 'Vets',   tabBarIcon: TabIcon('medkit'),            headerShown: false }} />
+      <Tab.Screen name="Kennels"       component={KennelsScreen}       options={{ tabBarIcon: TabIcon('paw'),                headerShown: false }} />
+      <Tab.Screen name="Shops"         component={ShopsScreen}         options={{ title: 'Pet Shops', tabBarLabel: 'Shops', tabBarIcon: TabIcon('basket'),            headerShown: false }} />
+      <Tab.Screen name="Services"      component={ServiceScreen}       options={{ title: 'Pet Services', tabBarLabel: 'Services', tabBarIcon: TabIcon('grid-outline'), headerShown: false }} />
+      <Tab.Screen name="Messages"      component={ConversationsScreen} options={{ title: 'Messages',     tabBarIcon: TabIcon('chatbubbles-outline'),                   headerShown: false }} />
+      <Tab.Screen name="Subscription"  component={SubscriptionScreen}  options={{ title: 'Subscription', tabBarLabel: 'Plans', tabBarIcon: TabIcon('star'),           headerShown: false }} />
+      <Tab.Screen name="Profile"       component={ProfileScreen}       options={{ tabBarIcon: TabIcon('person'),              headerShown: false }} />
     </Tab.Navigator>
   );
 }
@@ -252,13 +262,14 @@ function UserTabs() {
 function ProfessionalTabs() {
   return (
     <Tab.Navigator screenOptions={tabScreenOptions}>
-      <Tab.Screen name="Home"            component={HomeScreen}           options={{ tabBarIcon: TabIcon('home'),             headerShown: false }} />
-      <Tab.Screen name="Network"         component={ProfessionalsScreen}  options={{ tabBarIcon: TabIcon('people'),            headerShown: false }} />
-      <Tab.Screen name="Shops"           component={ShopsScreen}          options={{ title: 'Pet Shops', tabBarLabel: 'Shops', tabBarIcon: TabIcon('basket'), headerShown: false }} />
-      <Tab.Screen name="Subscription"    component={SubscriptionScreen}   options={{ title: 'Subscription', tabBarIcon: TabIcon('star'),            headerShown: false }} />
-      <Tab.Screen name="Messages"        component={ConversationsScreen}  options={{ title: 'Messages', tabBarIcon: TabIcon('chatbubbles-outline'), headerShown: false }} />
+      <Tab.Screen name="Home"            component={HomeScreen}            options={{ tabBarIcon: TabIcon('home'),                headerShown: false }} />
+      <Tab.Screen name="Network"         component={ProfessionalsScreen}   options={{ tabBarIcon: TabIcon('people'),              headerShown: false }} />
+      <Tab.Screen name="Services"        component={ServiceScreen}         options={{ title: 'Pet Services', tabBarLabel: 'Services', tabBarIcon: TabIcon('grid-outline'), headerShown: false }} />
+      <Tab.Screen name="Shops"           component={ShopsScreen}           options={{ title: 'Pet Shops', tabBarLabel: 'Shops',   tabBarIcon: TabIcon('basket'),          headerShown: false }} />
+      <Tab.Screen name="Subscription"    component={SubscriptionScreen}    options={{ title: 'Subscription', tabBarIcon: TabIcon('star'),                                  headerShown: false }} />
+      <Tab.Screen name="Messages"        component={ConversationsScreen}   options={{ title: 'Messages',     tabBarIcon: TabIcon('chatbubbles-outline'),                   headerShown: false }} />
       <Tab.Screen name="VetVerification" component={VetVerificationScreen} options={{ title: 'Get Verified', tabBarLabel: 'Verify', tabBarIcon: TabIcon('checkmark-circle'), headerShown: false }} />
-      <Tab.Screen name="Profile"         component={ProfileScreen}        options={{ tabBarIcon: TabIcon('person'),            headerShown: false }} />
+      <Tab.Screen name="Profile"         component={ProfileScreen}         options={{ tabBarIcon: TabIcon('person'),              headerShown: false }} />
     </Tab.Navigator>
   );
 }
@@ -287,10 +298,16 @@ function ShopOwnerTabs() {
   );
 }
 
+const SERVICE_PROFESSIONAL_ROLES = new Set([
+  'vet', 'groomer', 'trainer', 'pet_sitter',
+  'pet_transport', 'cremation_service', 'agro_vet_supplier', 'insurance_provider',
+  'pet_pharmacy', 'rescue_center', 'pet_hotel',
+]);
+
 function MainTabs() {
   const { userRole } = useAuth();
+  if (userRole && SERVICE_PROFESSIONAL_ROLES.has(userRole)) return <ProfessionalTabs />;
   switch (userRole) {
-    case 'vet':          return <ProfessionalTabs />;
     case 'kennel_owner': return <KennelOwnerTabs />;
     case 'shop_owner':   return <ShopOwnerTabs />;
     default:             return <UserTabs />;
@@ -424,6 +441,11 @@ export default function AppNavigator() {
                   name="KennelProfile"
                   component={KennelProfileScreen}
                   options={{ headerShown: true, title: 'Kennel Profile' }}
+                />
+                <RootStack.Screen
+                  name="ServiceProfile"
+                  component={ServiceProfileScreen}
+                  options={{ headerShown: true, title: 'Profile' }}
                 />
                 <RootStack.Screen
                   name="ExploreOptions"

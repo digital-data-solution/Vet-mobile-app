@@ -21,11 +21,18 @@ type Props = {
 };
 
 const ROLE_LABELS: Record<string, string> = {
-  vet:          'Veterinarian',
-  kennel_owner: 'Kennel Owner',
-  shop_owner:   'Shop Owner',
-  pet_owner:    'Pet Owner',
-  user:         'Pet Owner',
+  vet:                'Veterinarian',
+  kennel_owner:       'Kennel Owner',
+  shop_owner:         'Shop Owner',
+  pet_owner:          'Pet Owner',
+  user:               'Pet Owner',
+  groomer:            'Groomer',
+  trainer:            'Pet Trainer',
+  pet_sitter:         'Pet Sitter',
+  pet_transport:      'Pet Transport',
+  cremation_service:  'Cremation Service',
+  agro_vet_supplier:  'Agro-Vet Supplier',
+  insurance_provider: 'Insurance Provider',
 };
 
 interface SubscriptionInfo {
@@ -251,7 +258,14 @@ export default function ProfileScreen({ navigation }: Props) {
   const getUserPhone = () => user?.phone ?? user?.user_metadata?.phone ?? 'Not provided';
   const getUserEmail = () => user?.email ?? user?.user_metadata?.email ?? 'Not provided';
 
-  const isProfessional = user?.role === 'vet' || user?.role === 'kennel_owner';
+  // Roles with a Professional document (edit via ProfessionalOnboarding)
+  const PROF_ROLES = new Set([
+    'vet', 'kennel_owner',
+    'groomer', 'trainer', 'pet_sitter',
+    'pet_transport', 'cremation_service', 'agro_vet_supplier', 'insurance_provider',
+  ]);
+  const isProfessional = PROF_ROLES.has(user?.role ?? '');
+  const isShopOwner    = user?.role === 'shop_owner';
   const isVet          = user?.role === 'vet';
   const roleLabel      = ROLE_LABELS[user?.role] ?? 'User';
 
@@ -444,6 +458,24 @@ export default function ProfileScreen({ navigation }: Props) {
         </View>
       )}
 
+      {/* ── Shop tools ──────────────────────────────────────────────────── */}
+      {isShopOwner && (
+        <View style={styles.actionsCard}>
+          <Text style={styles.cardTitle}>Shop Tools</Text>
+          <MenuButton
+            emoji="✏️"
+            label="Edit Shop Info"
+            onPress={() => navigation.navigate('ShopOnboarding')}
+          />
+          <MenuButton
+            emoji="⭐"
+            label="Manage Subscription"
+            onPress={() => goToSubscription(navigation)}
+            tint="#F59E0B"
+          />
+        </View>
+      )}
+
       {/* ── Register a business ─────────────────────────────────────────── */}
       <View style={styles.actionsCard}>
         <Text style={styles.cardTitle}>Register a Business</Text>
@@ -464,6 +496,48 @@ export default function ProfileScreen({ navigation }: Props) {
           label="Register Your Pet Shop"
           onPress={() => navigation.navigate('ShopOnboarding')}
           tint="#F97316"
+        />
+        <MenuButton
+          emoji="✂️"
+          label="Register as Groomer"
+          onPress={() => navigation.navigate('ProfessionalOnboarding', { role: 'groomer' })}
+          tint="#DB2777"
+        />
+        <MenuButton
+          emoji="🎓"
+          label="Register as Pet Trainer"
+          onPress={() => navigation.navigate('ProfessionalOnboarding', { role: 'trainer' })}
+          tint="#059669"
+        />
+        <MenuButton
+          emoji="🏠"
+          label="Register as Pet Sitter"
+          onPress={() => navigation.navigate('ProfessionalOnboarding', { role: 'pet_sitter' })}
+          tint="#D97706"
+        />
+        <MenuButton
+          emoji="🚐"
+          label="Register Pet Transport"
+          onPress={() => navigation.navigate('ProfessionalOnboarding', { role: 'pet_transport' })}
+          tint="#0891B2"
+        />
+        <MenuButton
+          emoji="🕊️"
+          label="Register Cremation Service"
+          onPress={() => navigation.navigate('ProfessionalOnboarding', { role: 'cremation_service' })}
+          tint="#64748B"
+        />
+        <MenuButton
+          emoji="🌾"
+          label="Register Agro-Vet Store"
+          onPress={() => navigation.navigate('ProfessionalOnboarding', { role: 'agro_vet_supplier' })}
+          tint="#65A30D"
+        />
+        <MenuButton
+          emoji="🛡️"
+          label="Register Insurance Provider"
+          onPress={() => navigation.navigate('ProfessionalOnboarding', { role: 'insurance_provider' })}
+          tint="#7C3AED"
         />
       </View>
 

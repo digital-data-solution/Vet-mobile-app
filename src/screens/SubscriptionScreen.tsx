@@ -42,29 +42,30 @@ const PET_OWNER_PLANS = [
     color:    '#64748B',
     bgColor:  '#F8FAFC',
     features: [
-      { text: 'Browse vet & kennel listings',     included: true  },
-      { text: 'See names and specializations',    included: true  },
-      { text: 'General location (city only)',     included: true  },
-      { text: 'Full contact details (phone/email)', included: false },
-      { text: 'GPS nearby search',                included: false },
-      { text: 'Unlimited search results',         included: false },
+      { text: 'Browse all 13 pet service categories',    included: true  },
+      { text: 'See names, roles & specializations',      included: true  },
+      { text: 'General location (city only)',            included: true  },
+      { text: 'Full contact details (phone/email)',      included: false },
+      { text: 'WhatsApp & in-app messaging',             included: false },
+      { text: 'GPS nearby search',                       included: false },
+      { text: 'Unlimited search results',                included: false },
     ],
   },
   {
     id:       'user_premium',
     name:     'Premium',
     price:    1500,
-    tagline:  'Full access to all professionals',
+    tagline:  'Full access to all pet professionals',
     color:    '#2563EB',
     bgColor:  '#EFF6FF',
     badge:    'Most Popular',
     features: [
-      { text: 'Browse vet & kennel listings',       included: true },
-      { text: 'Full contact details (phone/email)', included: true },
-      { text: 'Exact address for every listing',    included: true },
-      { text: 'GPS nearby search',                  included: true },
-      { text: 'Unlimited search results',           included: true },
-      { text: 'Cancel anytime',                     included: true },
+      { text: 'All 13 categories: vets, groomers, trainers, sitters, pet hotels, pharmacies, kennels, transport, rescue centers, agro-vet, insurance & shops', included: true },
+      { text: 'Full contact details (phone/email)',      included: true },
+      { text: 'WhatsApp & in-app messaging',             included: true },
+      { text: 'Exact address for every listing',         included: true },
+      { text: 'GPS nearby search',                       included: true },
+      { text: 'Unlimited search results',                included: true },
     ],
   },
 ] as const;
@@ -163,8 +164,8 @@ export default function SubscriptionScreen({ navigation }: any) {
       const res = await apiFetch('/api/auth/me', { method: 'GET' });
       if (res.ok && res.body?.user?.role) {
         const role = res.body.user.role;
-        const isPro = ['vet', 'kennel_owner', 'shop_owner'].includes(role);
-        setUserType(isPro ? 'professional' : 'pet_owner');
+        const petOwnerRoles = new Set(['pet_owner', 'user', 'admin', null, undefined]);
+        setUserType(petOwnerRoles.has(role) ? 'pet_owner' : 'professional');
       }
     } catch {
       // keep default pet_owner

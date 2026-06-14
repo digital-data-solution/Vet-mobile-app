@@ -5,6 +5,7 @@ import {
   TextInput,
   StyleSheet,
   FlatList,
+  ScrollView,
   Alert,
   ActivityIndicator,
   TouchableOpacity,
@@ -20,12 +21,41 @@ import { apiFetch } from '../api/client';
 // TYPES
 // ─────────────────────────────────────────────────────────────────────────────
 
+type ProfRole =
+  | 'vet' | 'kennel' | 'groomer' | 'trainer' | 'pet_sitter'
+  | 'pet_transport' | 'cremation_service' | 'agro_vet_supplier' | 'insurance_provider';
+
+const ROLE_META: Record<ProfRole, { label: string; emoji: string; color: string; avatarBg: string }> = {
+  vet:               { label: 'Veterinarian',       emoji: '👨‍⚕️', color: '#2563EB', avatarBg: '#EFF6FF' },
+  kennel:            { label: 'Kennel',              emoji: '🐕',   color: '#7C3AED', avatarBg: '#F5F3FF' },
+  groomer:           { label: 'Groomer',             emoji: '✂️',   color: '#DB2777', avatarBg: '#FDF2F8' },
+  trainer:           { label: 'Trainer',             emoji: '🎓',   color: '#059669', avatarBg: '#ECFDF5' },
+  pet_sitter:        { label: 'Pet Sitter',          emoji: '🏠',   color: '#D97706', avatarBg: '#FFFBEB' },
+  pet_transport:     { label: 'Pet Transport',       emoji: '🚐',   color: '#0891B2', avatarBg: '#ECFEFF' },
+  cremation_service: { label: 'Cremation Service',   emoji: '🕊️',  color: '#64748B', avatarBg: '#F8FAFC' },
+  agro_vet_supplier: { label: 'Agro-Vet Supplier',  emoji: '🌾',   color: '#65A30D', avatarBg: '#F7FEE7' },
+  insurance_provider:{ label: 'Insurance Provider', emoji: '🛡️',  color: '#7C3AED', avatarBg: '#F5F3FF' },
+};
+
+const FILTER_CHIPS: { key: ProfRole | 'all'; label: string; emoji: string }[] = [
+  { key: 'all',               label: 'All',               emoji: '🔍' },
+  { key: 'vet',               label: 'Vets',              emoji: '👨‍⚕️' },
+  { key: 'kennel',            label: 'Kennels',           emoji: '🐕' },
+  { key: 'groomer',           label: 'Groomers',          emoji: '✂️' },
+  { key: 'trainer',           label: 'Trainers',          emoji: '🎓' },
+  { key: 'pet_sitter',        label: 'Sitters',           emoji: '🏠' },
+  { key: 'pet_transport',     label: 'Transport',         emoji: '🚐' },
+  { key: 'cremation_service', label: 'Cremation',         emoji: '🕊️' },
+  { key: 'agro_vet_supplier', label: 'Agro-Vet',         emoji: '🌾' },
+  { key: 'insurance_provider',label: 'Insurance',        emoji: '🛡️' },
+];
+
 interface Professional {
   _id: string;
   userId?: { name?: string; phone?: string; email?: string };
   name: string;
   businessName?: string;
-  role: 'vet' | 'kennel';
+  role: ProfRole;
   vcnNumber?: string;
   specialization?: string;
   address: string;
@@ -72,7 +102,7 @@ export default function ProfessionalsScreen({ navigation }: Props) {
   const [distance, setDistance] = useState('10');
   const [searchTerm, setSearchTerm] = useState('');
   const [addressInput, setAddressInput] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'vet' | 'kennel'>('vet');
+  const [roleFilter, setRoleFilter] = useState<ProfRole | 'all'>('vet');
   const [results, setResults] = useState<Professional[]>([]);
   const [loading, setLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
@@ -210,32 +240,46 @@ export default function ProfessionalsScreen({ navigation }: Props) {
 
   // ─── Render card ─────────────────────────────────────────────────────────────
 
+  const navigateToProfile = (item: Professional) => {
+    if (item.role === 'vet') {
+      navigation.navigate('VetProfile', { vetId: item._id });
+    } else if (item.role === 'kennel') {
+      navigation.navigate('KennelProfile', { kennelId: item._id });
+    } else {
+      navigation.navigate('ServiceProfile', { professionalId: item._id });
+    }
+  };
+
   const renderProfessional = ({ item }: { item: Professional }) => {
-    const isVet = item.role === 'vet';
+    const meta = ROLE_META[item.role] ?? ROLE_META.vet;
     const displayName = item.businessName || item.name || item.userId?.name || 'Unknown';
+    const showOwnerLine = item.businessName && item.name && item.name !== item.businessName;
 
     return (
       <TouchableOpacity
         style={styles.card}
-        onPress={() => navigation.navigate('VetProfile', { vetId: item._id })}
+        onPress={() => navigateToProfile(item)}
         activeOpacity={0.8}
       >
         <View style={styles.cardHeader}>
-          <View style={[styles.avatarCircle, !isVet && styles.avatarCircleKennel]}>
-            <Text style={styles.avatarEmoji}>{isVet ? '👨‍⚕️' : '🐕'}</Text>
+          <View style={[styles.avatarCircle, { backgroundColor: meta.avatarBg }]}>
+            <Text style={styles.avatarEmoji}>{meta.emoji}</Text>
           </View>
           <View style={styles.cardMeta}>
             <Text style={styles.vetName}>{displayName}</Text>
+            <Text style={[styles.roleLabel, { color: meta.color }]}>{meta.label}</Text>
             {item.specialization ? (
-              <Text style={styles.specialization}>{item.specialization}</Text>
+              <Text style={styles.specialization} numberOfLines={1}>{item.specialization}</Text>
             ) : null}
-            {!isVet && item.name !== displayName ? (
+            {showOwnerLine ? (
               <Text style={styles.ownerName}>Owner: {item.name}</Text>
             ) : null}
           </View>
           {item.isVerified && (
-            <View style={styles.verifiedBadge}>
-              <Text style={styles.verifiedText}>✓ {isVet ? 'VCN' : 'Verified'}</Text>
+            <View style={[styles.verifiedBadge, { backgroundColor: `${meta.color}18` }]}>
+              <Text style={[styles.verifiedText, { color: meta.color }]}>
+                ✓ {item.role === 'vet' ? 'VCN' : 'Verified'}
+              </Text>
             </View>
           )}
         </View>
@@ -294,20 +338,24 @@ export default function ProfessionalsScreen({ navigation }: Props) {
         </View>
 
         {/* Role filter */}
-        <View style={styles.filterRow}>
-          <Text style={styles.filterLabel}>Show:</Text>
-          {(['vet', 'kennel', 'all'] as const).map((r) => (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.filterScroll}
+          contentContainerStyle={styles.filterRow}
+        >
+          {FILTER_CHIPS.map(({ key, label, emoji }) => (
             <TouchableOpacity
-              key={r}
-              style={[styles.filterChip, roleFilter === r && styles.filterChipActive]}
-              onPress={() => setRoleFilter(r)}
+              key={key}
+              style={[styles.filterChip, roleFilter === key && styles.filterChipActive]}
+              onPress={() => setRoleFilter(key)}
             >
-              <Text style={[styles.filterChipText, roleFilter === r && styles.filterChipTextActive]}>
-                {r === 'vet' ? '👨‍⚕️ Vets' : r === 'kennel' ? '🐕 Kennels' : '🔍 All'}
+              <Text style={[styles.filterChipText, roleFilter === key && styles.filterChipTextActive]}>
+                {emoji} {label}
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
 
         {/* Location card */}
         <View style={styles.locationCard}>
@@ -484,14 +532,14 @@ const styles = StyleSheet.create({
   searchIcon: { fontSize: 16, marginRight: 8 },
   searchInput: { flex: 1, paddingVertical: 14, fontSize: 15, color: '#111827' },
 
+  filterScroll: { marginTop: 12 },
   filterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 16,
-    marginTop: 12,
+    paddingHorizontal: 16,
     gap: 8,
+    paddingBottom: 2,
   },
-  filterLabel: { fontSize: 13, color: '#6B7280', fontWeight: '600', marginRight: 4 },
   filterChip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -580,12 +628,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-  avatarCircleKennel: { backgroundColor: '#FEF3C7' },
   avatarEmoji: { fontSize: 22 },
   cardMeta: { flex: 1 },
-  vetName: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 3 },
-  specialization: { fontSize: 13, color: '#2563EB', fontWeight: '500' },
-  ownerName: { fontSize: 12, color: '#6B7280', marginTop: 2 },
+  vetName: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 1 },
+  roleLabel: { fontSize: 11, fontWeight: '600', marginBottom: 2 },
+  specialization: { fontSize: 13, color: '#6B7280', fontWeight: '500' },
+  ownerName: { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
   verifiedBadge: {
     backgroundColor: '#D1FAE5',
     paddingHorizontal: 8,

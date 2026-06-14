@@ -1,259 +1,323 @@
-import React from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
-  ScrollView,
   StyleSheet,
-  Pressable,
-  Linking,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  SafeAreaView,
+  StatusBar,
+  RefreshControl,
 } from 'react-native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { supabase } from '../api/supabase';
 
-type Props = { navigation: NativeStackNavigationProp<any> };
+const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://vet-market-place-jsj5.onrender.com';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Content
-// ─────────────────────────────────────────────────────────────────────────────
-
-const CONTENT = `
-## Frequently Asked Questions
-
-### How do I create an account?
-
-Download the app or visit xpressvetmarketplace.com, tap "Sign Up," and enter your email and password. You'll receive a confirmation email — click the link to verify your account.
-
-### I didn't receive my verification email. What do I do?
-
-Check your spam/promotions folder. If you still don't see it, contact us at support@xpressvetmarketplace.com with the email address you signed up with.
-
-### How do I list my veterinary practice?
-
-Go to **Profile → Register as Veterinarian**, fill in your details including your VCN registration number, and submit. Our team will review and verify your listing within 2–3 business days.
-
-### I don't have a clinic — can I still list myself?
-
-Yes! You can list yourself as an ambulatory/mobile veterinarian using your service address.
-
-### How do subscriptions work?
-
-Some features (full contact details, exact addresses, GPS "nearby" search, and messaging) require an active subscription. You can subscribe from **Profile → Subscription**. Payments are processed securely via Paystack.
-
-### How do I cancel my subscription?
-
-Go to **Profile → Subscription** and tap "Cancel Subscription." You'll keep access until the end of your current billing period.
-
-### My payment didn't go through or my subscription is stuck on "pending."
-
-Bank transfers can take a few minutes to confirm. If it's been longer than 30 minutes, go to **Subscription** and tap "Cancel & Start Over" to try again. If money was deducted but your subscription still isn't active, contact support with your payment reference.
-
-### How does the referral program work?
-
-Find your unique referral code under **Profile → Refer & Earn**. Share it with friends — when they subscribe for the first time, they get a discount, and you earn a free month added to your subscription.
-
-### How do I delete my account?
-
-Contact us at support@xpressvetmarketplace.com and we'll process your deletion request in line with our Privacy Policy.
-
-### I found incorrect or suspicious information on a listing.
-
-Please report it to support@xpressvetmarketplace.com with details, and we'll investigate.
-`;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Markdown renderer
-// ─────────────────────────────────────────────────────────────────────────────
-
-function inlineParse(text: string): React.ReactNode {
-  const parts: React.ReactNode[] = [];
-  const re = /\*\*(.*?)\*\*/g;
-  let last = 0, m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
-    if (m.index > last) parts.push(text.slice(last, m.index));
-    parts.push(<Text key={m.index} style={{ fontWeight: '700' }}>{m[1]}</Text>);
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) parts.push(text.slice(last));
-  return parts.length > 1 ? <>{parts}</> : text;
+interface Message {
+  _id: string;
+  text: string;
+  senderRole: 'user' | 'admin';
+  createdAt: string;
 }
 
-function renderMd(content: string): React.ReactNode[] {
-  const out: React.ReactNode[] = [];
-  let key = 0;
-  for (const raw of content.split('\n')) {
-    const line = raw.trim();
-    if (!line) continue;
+interface Thread {
+  _id: string;
+  status: 'open' | 'resolved';
+  messages: Message[];
+}
 
-    if (line === '---') {
-      out.push(<View key={key++} style={md.hr} />);
-    } else if (line.startsWith('### ')) {
-      out.push(<Text key={key++} style={md.h3}>{inlineParse(line.slice(4))}</Text>);
-    } else if (line.startsWith('## ')) {
-      out.push(<Text key={key++} style={md.h2}>{inlineParse(line.slice(3))}</Text>);
-    } else if (line.startsWith('# ')) {
-      out.push(<Text key={key++} style={md.h1}>{inlineParse(line.slice(2))}</Text>);
-    } else if (line.startsWith('- ') || line.startsWith('* ')) {
-      out.push(
-        <View key={key++} style={md.li}>
-          <Text style={md.bullet}>•</Text>
-          <Text style={md.liText}>{inlineParse(line.slice(2))}</Text>
-        </View>,
-      );
-    } else {
-      out.push(<Text key={key++} style={md.p}>{inlineParse(line)}</Text>);
+async function getToken(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token ?? null;
+}
+
+export default function SupportScreen({ navigation }: { navigation: any }) {
+  const [thread, setThread]         = useState<Thread | null>(null);
+  const [text, setText]             = useState('');
+  const [loading, setLoading]       = useState(true);
+  const [sending, setSending]       = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError]           = useState('');
+  const flatRef = useRef<FlatList>(null);
+
+  const fetchThread = useCallback(async () => {
+    try {
+      const token = await getToken();
+      if (!token) {
+        setError('Please log in to contact support.');
+        setLoading(false);
+        return;
+      }
+      const res  = await fetch(`${BASE_URL}/api/support`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (json.success) {
+        setThread(json.data);
+        setError('');
+      } else {
+        setError(json.message || 'Failed to load conversation.');
+      }
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-  }
-  return out;
-}
+  }, []);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Screen
-// ─────────────────────────────────────────────────────────────────────────────
+  useEffect(() => { fetchThread(); }, [fetchThread]);
 
-export default function SupportScreen({ navigation }: Props) {
-  const openEmail = () =>
-    Linking.openURL('mailto:support@xpressvetmarketplace.com?subject=Xpress%20Vet%20Support');
+  // Auto-refresh every 20 s so the user sees admin replies without manual pull
+  useEffect(() => {
+    const timer = setInterval(fetchThread, 20000);
+    return () => clearInterval(timer);
+  }, [fetchThread]);
+
+  const scrollToBottom = useCallback(() => {
+    setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 120);
+  }, []);
+
+  useEffect(() => {
+    if ((thread?.messages?.length ?? 0) > 0) scrollToBottom();
+  }, [thread?.messages?.length, scrollToBottom]);
+
+  const handleSend = async () => {
+    const trimmed = text.trim();
+    if (!trimmed || sending) return;
+
+    setSending(true);
+    setText('');
+    try {
+      const token = await getToken();
+      if (!token) {
+        setError('Session expired. Please log in again.');
+        setSending(false);
+        return;
+      }
+      const res  = await fetch(`${BASE_URL}/api/support`, {
+        method:  'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ text: trimmed }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setThread(json.data);
+        setError('');
+      } else {
+        setError(json.message || 'Failed to send message.');
+        setText(trimmed);
+      }
+    } catch {
+      setError('Network error. Message not sent.');
+      setText(trimmed);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const messages = thread?.messages ?? [];
+
+  const renderMessage = ({ item }: { item: Message }) => {
+    const isAdmin = item.senderRole === 'admin';
+    const time = new Date(item.createdAt).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' });
+    const date = new Date(item.createdAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' });
+
+    return (
+      <View style={[styles.bubble, isAdmin ? styles.bubbleAdmin : styles.bubbleUser]}>
+        {isAdmin && <Text style={styles.senderLabel}>Support Team</Text>}
+        <Text style={[styles.bubbleText, isAdmin ? styles.bubbleTextAdmin : styles.bubbleTextUser]}>
+          {item.text}
+        </Text>
+        <Text style={[styles.bubbleTime, isAdmin ? styles.bubbleTimeAdmin : styles.bubbleTimeUser]}>
+          {date}  {time}
+        </Text>
+      </View>
+    );
+  };
 
   return (
-    <View style={styles.root}>
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+
       {/* Header */}
       <View style={styles.header}>
-        <Pressable
-          style={({ pressed }) => [styles.backBtn, { opacity: pressed ? 0.6 : 1 }]}
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Text style={styles.backText}>‹ Back</Text>
-        </Pressable>
-        <Text style={styles.headerTitle}>Support / Help</Text>
-        <View style={styles.backBtn} />
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.7}>
+          <Text style={styles.backArrow}>{'<'}</Text>
+        </TouchableOpacity>
+        <View style={styles.headerCenter}>
+          <View style={styles.avatarCircle}>
+            <Text style={styles.avatarEmoji}>🐾</Text>
+          </View>
+          <View>
+            <Text style={styles.headerTitle}>Xpress Vet Support</Text>
+            <Text style={styles.headerSub}>
+              {thread?.status === 'resolved'
+                ? 'Conversation resolved'
+                : 'Typically replies within a few hours'}
+            </Text>
+          </View>
+        </View>
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={0}
       >
-        {/* Contact card */}
-        <View style={styles.contactCard}>
-          <Text style={styles.contactEmoji}>📧</Text>
-          <Text style={styles.contactTitle}>Contact Us</Text>
-          <Text style={styles.contactBody}>
-            We aim to respond within 1–2 business days.
-          </Text>
-          <Pressable
-            style={({ pressed }) => [styles.emailBtn, { opacity: pressed ? 0.8 : 1 }]}
-            onPress={openEmail}
-          >
-            <Text style={styles.emailBtnText}>support@xpressvetmarketplace.com</Text>
-          </Pressable>
-        </View>
+        {loading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color="#1A56DB" />
+          </View>
+        ) : (
+          <>
+            {messages.length === 0 && !error && (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyEmoji}>💬</Text>
+                <Text style={styles.emptyTitle}>How can we help?</Text>
+                <Text style={styles.emptySub}>
+                  Send us a message and our support team will reply as soon as possible.
+                  We typically respond within a few hours.
+                </Text>
+              </View>
+            )}
 
-        {/* FAQ */}
-        <View style={styles.faqCard}>
-          {renderMd(CONTENT)}
-        </View>
+            {messages.length > 0 && (
+              <FlatList
+                ref={flatRef}
+                data={messages}
+                keyExtractor={(item, i) => item._id || String(i)}
+                renderItem={renderMessage}
+                contentContainerStyle={styles.messageList}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={() => { setRefreshing(true); fetchThread(); }}
+                  />
+                }
+                onContentSizeChange={scrollToBottom}
+              />
+            )}
 
-        {/* Legal links */}
-        <View style={styles.legalRow}>
-          <Pressable
-            onPress={() => navigation.navigate('PrivacyPolicy')}
-            style={({ pressed }) => [styles.legalLink, { opacity: pressed ? 0.7 : 1 }]}
-          >
-            <Text style={styles.legalLinkText}>Privacy Policy</Text>
-          </Pressable>
-          <Text style={styles.legalDot}>·</Text>
-          <Pressable
-            onPress={() => navigation.navigate('Terms')}
-            style={({ pressed }) => [styles.legalLink, { opacity: pressed ? 0.7 : 1 }]}
-          >
-            <Text style={styles.legalLinkText}>Terms & Conditions</Text>
-          </Pressable>
-        </View>
-      </ScrollView>
-    </View>
+            {!!error && (
+              <View style={styles.errorBanner}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+
+            {thread?.status === 'resolved' && (
+              <View style={styles.resolvedBanner}>
+                <Text style={styles.resolvedText}>
+                  This conversation has been marked resolved. Send a new message if you need further help.
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.inputRow}>
+              <TextInput
+                style={styles.input}
+                value={text}
+                onChangeText={setText}
+                placeholder="Type your message..."
+                placeholderTextColor="#9CA3AF"
+                multiline
+                maxLength={2000}
+              />
+              <TouchableOpacity
+                style={[styles.sendBtn, (!text.trim() || sending) && styles.sendBtnDisabled]}
+                onPress={handleSend}
+                disabled={!text.trim() || sending}
+                activeOpacity={0.8}
+              >
+                {sending
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={styles.sendBtnText}>Send</Text>}
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Markdown styles
-// ─────────────────────────────────────────────────────────────────────────────
-
-const md = StyleSheet.create({
-  h1:     { fontSize: 22, fontWeight: '800', color: '#111827', marginTop: 8, marginBottom: 6 },
-  h2:     { fontSize: 16, fontWeight: '700', color: '#6B7280', marginTop: 4, marginBottom: 14, textTransform: 'uppercase', letterSpacing: 0.4 },
-  h3:     { fontSize: 15, fontWeight: '700', color: '#111827', marginTop: 18, marginBottom: 4 },
-  p:      { fontSize: 14, color: '#374151', lineHeight: 22, marginBottom: 6 },
-  hr:     { height: 1, backgroundColor: '#E5E7EB', marginVertical: 16 },
-  li:     { flexDirection: 'row', marginBottom: 6, paddingLeft: 4 },
-  bullet: { fontSize: 14, color: '#6B7280', marginRight: 8, marginTop: 1 },
-  liText: { fontSize: 14, color: '#374151', lineHeight: 22, flex: 1 },
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Screen styles
-// ─────────────────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: '#F3F4F6' },
+  safe: { flex: 1, backgroundColor: '#fff' },
+
   header: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    justifyContent:    'space-between',
-    backgroundColor:   '#E8610A',
-    paddingTop:        52,
-    paddingBottom:     16,
+    flexDirection:    'row',
+    alignItems:       'center',
     paddingHorizontal: 16,
+    paddingVertical:  12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    backgroundColor:  '#fff',
   },
-  backBtn:     { width: 60 },
-  backText:    { color: '#fff', fontSize: 16, fontWeight: '600' },
-  headerTitle: { color: '#fff', fontSize: 17, fontWeight: '700', textAlign: 'center' },
+  backBtn:      { padding: 8, marginRight: 4 },
+  backArrow:    { fontSize: 22, color: '#1A56DB', fontWeight: '700' },
+  headerCenter: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10 },
+  avatarCircle: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center',
+  },
+  avatarEmoji:  { fontSize: 20 },
+  headerTitle:  { fontSize: 16, fontWeight: '700', color: '#111827' },
+  headerSub:    { fontSize: 12, color: '#6B7280', marginTop: 1 },
 
-  scroll:        { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 40 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
-  contactCard: {
-    backgroundColor: '#fff',
-    borderRadius:    14,
-    padding:         20,
-    alignItems:      'center',
-    marginBottom:    14,
-    shadowColor:     '#000',
-    shadowOffset:    { width: 0, height: 1 },
-    shadowOpacity:   0.06,
-    shadowRadius:    4,
-    elevation:       2,
-  },
-  contactEmoji: { fontSize: 40, marginBottom: 10 },
-  contactTitle: { fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 6 },
-  contactBody:  { fontSize: 14, color: '#6B7280', marginBottom: 14, textAlign: 'center' },
-  emailBtn: {
-    backgroundColor:   '#E8610A',
-    borderRadius:      10,
-    paddingVertical:   12,
-    paddingHorizontal: 20,
-  },
-  emailBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
+  emptyEmoji: { fontSize: 64, marginBottom: 16 },
+  emptyTitle: { fontSize: 20, fontWeight: '700', color: '#111827', marginBottom: 8, textAlign: 'center' },
+  emptySub:   { fontSize: 15, color: '#6B7280', textAlign: 'center', lineHeight: 22 },
 
-  faqCard: {
-    backgroundColor: '#fff',
-    borderRadius:    14,
-    padding:         20,
-    marginBottom:    14,
-    shadowColor:     '#000',
-    shadowOffset:    { width: 0, height: 1 },
-    shadowOpacity:   0.06,
-    shadowRadius:    4,
-    elevation:       2,
-  },
+  messageList: { padding: 16, paddingBottom: 8 },
 
-  legalRow: {
-    flexDirection:  'row',
-    justifyContent: 'center',
-    alignItems:     'center',
-    marginTop:      4,
-    marginBottom:   12,
+  bubble: { maxWidth: '80%', borderRadius: 16, padding: 12, marginBottom: 10 },
+  bubbleUser:  { alignSelf: 'flex-end',   backgroundColor: '#1A56DB', borderBottomRightRadius: 4 },
+  bubbleAdmin: { alignSelf: 'flex-start', backgroundColor: '#F1F5F9', borderBottomLeftRadius:  4 },
+
+  senderLabel: {
+    fontSize: 11, fontWeight: '700', color: '#64748B',
+    marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.3,
   },
-  legalLink:     { paddingHorizontal: 8, paddingVertical: 6 },
-  legalLinkText: { color: '#2563EB', fontSize: 13, fontWeight: '600' },
-  legalDot:      { color: '#9CA3AF', fontSize: 13 },
+  bubbleText:      { fontSize: 15, lineHeight: 22 },
+  bubbleTextUser:  { color: '#fff' },
+  bubbleTextAdmin: { color: '#111827' },
+  bubbleTime:      { fontSize: 11, marginTop: 4 },
+  bubbleTimeUser:  { color: 'rgba(255,255,255,0.65)', textAlign: 'right' },
+  bubbleTimeAdmin: { color: '#9CA3AF' },
+
+  errorBanner: {
+    backgroundColor: '#FEE2E2', borderRadius: 10, padding: 12,
+    marginHorizontal: 16, marginBottom: 8,
+  },
+  errorText: { color: '#DC2626', fontSize: 13, textAlign: 'center' },
+
+  resolvedBanner: {
+    backgroundColor: '#D1FAE5', borderRadius: 10, padding: 12,
+    marginHorizontal: 16, marginBottom: 8,
+  },
+  resolvedText: { color: '#065F46', fontSize: 13, textAlign: 'center', lineHeight: 19 },
+
+  inputRow: {
+    flexDirection: 'row', alignItems: 'flex-end',
+    paddingHorizontal: 12, paddingVertical: 10,
+    borderTopWidth: 1, borderTopColor: '#E5E7EB', backgroundColor: '#fff', gap: 8,
+  },
+  input: {
+    flex: 1, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 20,
+    paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, fontSize: 15,
+    color: '#111827', maxHeight: 120, backgroundColor: '#F9FAFB',
+  },
+  sendBtn: {
+    backgroundColor: '#1A56DB', borderRadius: 20, paddingHorizontal: 20,
+    paddingVertical: 12, justifyContent: 'center', alignItems: 'center', minWidth: 70,
+  },
+  sendBtnDisabled: { backgroundColor: '#93C5FD' },
+  sendBtnText:     { color: '#fff', fontWeight: '700', fontSize: 15 },
 });

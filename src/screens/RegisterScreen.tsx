@@ -40,6 +40,7 @@ export default function RegisterScreen({ navigation }: Props) {
   const [step,            setStep]            = useState<Step>('register');
   const [loading,         setLoading]         = useState(false);
   const [showPassword,    setShowPassword]    = useState(false);
+  const [agreedToTerms,   setAgreedToTerms]   = useState(false);
 
   const lastSubmitTime = useRef<number | null>(null);
 
@@ -49,6 +50,7 @@ export default function RegisterScreen({ navigation }: Props) {
     if (!password)                  return 'Please enter a password.';
     if (password.length < 6)        return 'Password must be at least 6 characters.';
     if (password !== confirmPassword) return 'Passwords do not match.';
+    if (!agreedToTerms)             return 'Please read and agree to our Terms of Service and Privacy Policy before continuing.';
     return null;
   };
 
@@ -216,18 +218,37 @@ export default function RegisterScreen({ navigation }: Props) {
                 autoCapitalize="characters"
               />
 
+              {/* Terms agreement checkbox */}
+              <Pressable
+                style={styles.termsRow}
+                onPress={() => setAgreedToTerms((v) => !v)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: agreedToTerms }}
+              >
+                <View style={[styles.checkbox, agreedToTerms && styles.checkboxChecked]}>
+                  {agreedToTerms && <Text style={styles.checkmark}>✓</Text>}
+                </View>
+                <Text style={styles.termsInline}>
+                  I have read and agree to the{' '}
+                  <Text
+                    style={styles.termsLink}
+                    onPress={(e) => { e.stopPropagation?.(); navigation.navigate('Terms'); }}
+                  >Terms of Service</Text>
+                  {' '}and{' '}
+                  <Text
+                    style={styles.termsLink}
+                    onPress={(e) => { e.stopPropagation?.(); navigation.navigate('PrivacyPolicy'); }}
+                  >Privacy Policy</Text>
+                  .
+                </Text>
+              </Pressable>
+
               <PrimaryButton
                 label="Create Account"
                 loadingLabel="Creating account..."
                 onPress={handleRegister}
                 loading={loading}
               />
-
-              <Text style={styles.terms}>
-                By registering you agree to our{' '}
-                <Text style={styles.termsLink}>Terms of Service</Text> and{' '}
-                <Text style={styles.termsLink}>Privacy Policy</Text>.
-              </Text>
             </>
           )}
 
@@ -353,8 +374,32 @@ const styles = StyleSheet.create({
   textLinkText:        { color: '#2563EB', fontSize: 14, fontWeight: '600' },
   successIcon:         { alignItems: 'center', marginBottom: 12 },
   successEmoji:        { fontSize: 52 },
-  terms:               { fontSize: 12, color: '#9CA3AF', textAlign: 'center', lineHeight: 18 },
-  termsLink:           { color: '#2563EB', fontWeight: '600' },
+  termsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 14,
+    marginTop: 4,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+    flexShrink: 0,
+  },
+  checkboxChecked: {
+    backgroundColor: '#2563EB',
+    borderColor: '#2563EB',
+  },
+  checkmark: { color: '#fff', fontSize: 13, fontWeight: '800', lineHeight: 16 },
+  termsInline: { fontSize: 13, color: '#6B7280', lineHeight: 20, flex: 1 },
+  termsLink:   { color: '#2563EB', fontWeight: '600' },
   footer:              { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
   footerText:          { fontSize: 14, color: '#6B7280' },
   footerLink:          { fontSize: 14, color: '#2563EB', fontWeight: '700' },

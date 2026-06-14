@@ -22,7 +22,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ProfessionalOnboarding'
 
 type Role =
   | 'vet' | 'kennel' | 'groomer' | 'trainer' | 'pet_sitter'
-  | 'pet_transport' | 'cremation_service' | 'agro_vet_supplier' | 'insurance_provider';
+  | 'pet_transport' | 'cremation_service' | 'agro_vet_supplier' | 'insurance_provider'
+  | 'pet_pharmacy' | 'rescue_center' | 'pet_hotel';
 
 interface MediaImage { url: string; publicId: string; }
 
@@ -88,21 +89,21 @@ const ROLE_CONFIG: Record<Role, RoleConfig> = {
     businessNameLabel: 'Company / Fleet Name *',
     specializationLabel: 'Routes / Services',
     specializationPlaceholder: 'e.g. Lagos–Abuja, Airport runs, Vet transfers',
-    requiresVCN: false, requiresBusinessName: true, requiresAdminReview: false,
+    requiresVCN: false, requiresBusinessName: true, requiresAdminReview: true,
   },
   cremation_service: {
     label: 'Cremation Service', emoji: '🕊️', color: '#64748B',
     businessNameLabel: 'Business Name *',
     specializationLabel: 'Services Offered',
     specializationPlaceholder: 'e.g. Private cremation, Communal, Memorial',
-    requiresVCN: false, requiresBusinessName: true, requiresAdminReview: false,
+    requiresVCN: false, requiresBusinessName: true, requiresAdminReview: true,
   },
   agro_vet_supplier: {
     label: 'Agro-Vet Supplier', emoji: '🌾', color: '#65A30D',
     businessNameLabel: 'Business / Store Name *',
     specializationLabel: 'Products / Categories',
     specializationPlaceholder: 'e.g. Feeds, Vaccines, Livestock equipment',
-    requiresVCN: false, requiresBusinessName: true, requiresAdminReview: false,
+    requiresVCN: false, requiresBusinessName: true, requiresAdminReview: true,
   },
   insurance_provider: {
     label: 'Insurance Provider', emoji: '🛡️', color: '#7C3AED',
@@ -111,12 +112,33 @@ const ROLE_CONFIG: Record<Role, RoleConfig> = {
     specializationPlaceholder: 'e.g. Health, Accident, Third-party liability',
     requiresVCN: false, requiresBusinessName: true, requiresAdminReview: true,
   },
+  pet_pharmacy: {
+    label: 'Pet Pharmacy', emoji: '💊', color: '#0891B2',
+    businessNameLabel: 'Pharmacy / Store Name *',
+    specializationLabel: 'Products & Services',
+    specializationPlaceholder: 'e.g. Vet prescriptions, Dewormers, Supplements',
+    requiresVCN: false, requiresBusinessName: true, requiresAdminReview: true,
+  },
+  rescue_center: {
+    label: 'Rescue / Adoption Center', emoji: '🐾', color: '#EA580C',
+    businessNameLabel: 'Organization Name *',
+    specializationLabel: 'Animals You Handle',
+    specializationPlaceholder: 'e.g. Dogs, Cats, Rabbits, Mixed breeds',
+    requiresVCN: false, requiresBusinessName: true, requiresAdminReview: true,
+  },
+  pet_hotel: {
+    label: 'Pet Hotel', emoji: '🏨', color: '#0D9488',
+    businessNameLabel: 'Hotel / Facility Name *',
+    specializationLabel: 'Services & Amenities',
+    specializationPlaceholder: 'e.g. Luxury suites, Pool, Grooming, 24h care',
+    requiresVCN: false, requiresBusinessName: true, requiresAdminReview: false,
+  },
 };
 
 const ROLE_GROUPS: { label: string; roles: Role[] }[] = [
-  { label: 'Medical', roles: ['vet'] },
-  { label: 'Care & Services', roles: ['kennel', 'groomer', 'trainer', 'pet_sitter'] },
-  { label: 'Business', roles: ['pet_transport', 'cremation_service', 'agro_vet_supplier', 'insurance_provider'] },
+  { label: 'Medical & Welfare',  roles: ['vet', 'pet_pharmacy', 'rescue_center'] },
+  { label: 'Care & Boarding',    roles: ['kennel', 'pet_hotel', 'groomer', 'trainer', 'pet_sitter'] },
+  { label: 'Business & Trade',   roles: ['pet_transport', 'cremation_service', 'agro_vet_supplier', 'insurance_provider'] },
 ];
 
 const VET_SPECIALIZATIONS = [
@@ -143,6 +165,12 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
   const [profileViews, setProfileViews] = useState<number>(0);
   const [errors, setErrors]           = useState<FormErrors>({});
   const [galleryImages, setGalleryImages] = useState<MediaImage[]>([]);
+
+  // Verification document fields
+  const [govIdType,    setGovIdType]    = useState('NIN');
+  const [govIdNumber,  setGovIdNumber]  = useState('');
+  const [cacNumber,    setCacNumber]    = useState('');
+  const [profCertNum,  setProfCertNum]  = useState('');
 
   useFocusEffect(
     React.useCallback(() => {
@@ -175,20 +203,8 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
           if (isActive) setProfileLoading(false);
         }
 
-        if (!hasExisting) {
-          try {
-            const res = await apiFetch('/api/subscriptions/me', { method: 'GET' });
-            if (isActive && (!res.ok || !res.body?.data?.isActive)) {
-              Alert.alert(
-                'Subscription Required',
-                'You need an active subscription to register as a professional.',
-                [{ text: 'Go to Subscription', onPress: () => navigation.navigate('SubscriptionScreen') }],
-              );
-            }
-          } catch {
-            // silent
-          }
-        }
+        // No subscription gate on registration — all roles can register free.
+        // Subscription only gates visibility features (contact details, GPS search, etc.).
       };
 
       init();
@@ -223,6 +239,18 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
     setLoading(true);
     try {
       const cfg = ROLE_CONFIG[role];
+
+      // Build verificationDocuments sub-object (non-vets only; vets use VCN flow)
+      const verificationDocuments: Record<string, string> = {};
+      if (!cfg.requiresVCN) {
+        if (govIdNumber.trim()) {
+          verificationDocuments.governmentIdType   = govIdType;
+          verificationDocuments.governmentIdNumber = govIdNumber.trim();
+        }
+        if (cacNumber.trim())   verificationDocuments.cacNumber = cacNumber.trim();
+        if (profCertNum.trim()) verificationDocuments.professionalCertNumber = profCertNum.trim();
+      }
+
       const payload: Record<string, unknown> = {
         name:           name.trim(),
         address:        address.trim(),
@@ -233,6 +261,7 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
         ...((cfg.requiresBusinessName || businessName.trim()) && {
           businessName: businessName.trim() || undefined,
         }),
+        ...(Object.keys(verificationDocuments).length > 0 && { verificationDocuments }),
       };
 
       let res;
@@ -494,6 +523,78 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
           />
         </View>
 
+        {/* Verification documents — non-vet roles */}
+        {!cfg.requiresVCN && (
+          <View style={styles.docSection}>
+            <View style={styles.docHeader}>
+              <Text style={styles.docHeaderEmoji}>🔒</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.docHeaderTitle}>Identity & Compliance Documents</Text>
+                <Text style={styles.docHeaderSubtitle}>
+                  Required to protect pet owners and keep the platform trustworthy.
+                  Details are only seen by our admin team — never shown publicly.
+                </Text>
+              </View>
+            </View>
+
+            {/* Government ID */}
+            <View style={styles.docField}>
+              <Text style={styles.docLabel}>Government ID Type *</Text>
+              <View style={styles.idTypeRow}>
+                {(['NIN', 'BVN', 'Passport', 'Driver\'s Licence'] as const).map((t) => (
+                  <Pressable
+                    key={t}
+                    style={[styles.idTypeChip, govIdType === t && styles.idTypeChipActive]}
+                    onPress={() => setGovIdType(t)}
+                  >
+                    <Text style={[styles.idTypeText, govIdType === t && styles.idTypeTextActive]}>{t}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <TextInput
+                style={styles.docInput}
+                value={govIdNumber}
+                onChangeText={setGovIdNumber}
+                placeholder={`Enter your ${govIdType} number`}
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="characters"
+              />
+            </View>
+
+            {/* CAC — business roles */}
+            {['kennel', 'pet_transport', 'cremation_service', 'agro_vet_supplier', 'insurance_provider'].includes(role) && (
+              <View style={styles.docField}>
+                <Text style={styles.docLabel}>CAC Registration Number</Text>
+                <TextInput
+                  style={styles.docInput}
+                  value={cacNumber}
+                  onChangeText={setCacNumber}
+                  placeholder="e.g. RC 1234567"
+                  placeholderTextColor="#9CA3AF"
+                  autoCapitalize="characters"
+                />
+                <Text style={styles.docHint}>Corporate Affairs Commission business registration number</Text>
+              </View>
+            )}
+
+            {/* Professional cert — groomer / trainer */}
+            {['groomer', 'trainer'].includes(role) && (
+              <View style={styles.docField}>
+                <Text style={styles.docLabel}>Professional Certificate Number (optional)</Text>
+                <TextInput
+                  style={styles.docInput}
+                  value={profCertNum}
+                  onChangeText={setProfCertNum}
+                  placeholder="e.g. NIGA-G-2024-00123"
+                  placeholderTextColor="#9CA3AF"
+                  autoCapitalize="characters"
+                />
+                <Text style={styles.docHint}>Certificate number from a recognised grooming/training body</Text>
+              </View>
+            )}
+          </View>
+        )}
+
         {/* Info box */}
         <View style={styles.infoBox}>
           <Text style={styles.infoIcon}>ℹ️</Text>
@@ -658,6 +759,55 @@ const styles = StyleSheet.create({
   specChipActive:     { backgroundColor: '#2563EB', borderColor: '#2563EB' },
   specChipText:       { fontSize: 12, fontWeight: '500', color: '#374151' },
   specChipTextActive: { color: '#fff' },
+  docSection: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    borderRadius: 14,
+    padding: 16,
+    marginTop: 16,
+    borderWidth: 1.5,
+    borderColor: '#FCD34D',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  docHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 16,
+  },
+  docHeaderEmoji:    { fontSize: 22 },
+  docHeaderTitle:    { fontSize: 15, fontWeight: '700', color: '#92400E', marginBottom: 4 },
+  docHeaderSubtitle: { fontSize: 12, color: '#78350F', lineHeight: 17 },
+  docField:     { marginBottom: 14 },
+  docLabel:     { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 },
+  docInput: {
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    fontSize: 14,
+    color: '#111827',
+    backgroundColor: '#F9FAFB',
+  },
+  docHint: { fontSize: 11, color: '#9CA3AF', marginTop: 4, lineHeight: 15 },
+  idTypeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
+  idTypeChip: {
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: '#F9FAFB',
+  },
+  idTypeChipActive: { backgroundColor: '#D97706', borderColor: '#D97706' },
+  idTypeText:       { fontSize: 12, fontWeight: '600', color: '#374151' },
+  idTypeTextActive: { color: '#fff' },
+
   infoBox: {
     flexDirection: 'row',
     backgroundColor: '#EFF6FF',

@@ -18,7 +18,7 @@ type Props = { navigation: NativeStackNavigationProp<any> };
 const CONTENT = `
 # Privacy Policy
 
-**Effective Date:** June 2026
+**Effective Date:** June 2026 | **Version:** 2.0
 
 Xpress Vet Marketplace ("Xpress Vet," "we," "us," or "our") is operated by Xpress Digital & Data Solutions Limited (RC: 9112280), Lagos, Nigeria. This Privacy Policy explains how we collect, use, store, and protect your information when you use our mobile app and website.
 
@@ -28,19 +28,31 @@ By using Xpress Vet, you agree to the practices described in this policy.
 
 ## 1. Information We Collect
 
-### 1.1 Information You Provide
+### 1.1 Information You Provide (All Users)
 
-- **Account information**: name, email address, phone number, password (managed securely via Supabase Authentication).
-- **Profile information**: profile photo, role (pet owner, veterinarian, kennel owner, shop owner).
-- **Professional listing information** (for vets, kennels, shops): business name, address, specialization, VCN registration number, contact details, gallery photos.
-- **Location information**: your address (for professional listings) and, where you grant permission, your device's GPS location (for "nearby" search features).
-- **Payment information**: when you subscribe, payments are processed by Paystack. We do not store your card details.
-- **Communications**: messages you send through our in-app chat feature, and any correspondence with our support team.
+- **Account information**: email address and password.
+- **Profile information**: name, phone number, profile photo, and your role on the platform (e.g. pet owner, service provider).
+- **Location information**: your address (for professional listings) and, where you grant permission, your device GPS coordinates (for "nearby" search features).
+- **Communications**: messages sent through our in-app chat feature, and any correspondence with our support team.
 
-### 1.2 Information Collected Automatically
+### 1.2 Additional Information for Service Providers
+
+When you register as a professional (veterinarian, groomer, trainer, pet sitter, pet transport operator, cremation service, agro-vet supplier, insurance provider, or kennel), we collect:
+
+- **Business information**: business or trading name, address, specialization, contact details, and gallery photos.
+- **Professional credentials**: VCN registration number (veterinarians only).
+- **Identity and compliance documents**: Government-issued identification number (e.g. National Identification Number — NIN), Bank Verification Number (BVN), international passport number, or driver's licence number; CAC (Corporate Affairs Commission) business registration number; and where applicable, a professional certification number.
+
+**Why we collect identity documents:** Nigerian law and platform safety require us to verify the identity of service providers before they are listed. This protects pet owners from fraudulent or unqualified practitioners. These details are stored securely and only accessed by our authorised admin team for verification purposes. They are never displayed publicly or shared with any third party other than as required by Nigerian law.
+
+### 1.3 Payment Information
+
+When you subscribe, payments are processed by our licensed payment processor. We do not store your card details — they are handled entirely by the payment processor in compliance with applicable security standards.
+
+### 1.4 Information Collected Automatically
 
 - Basic usage data (app interactions, search queries) to improve the Service.
-- Device and session information needed for authentication and security.
+- Device and session information required for authentication and security.
 
 ---
 
@@ -48,83 +60,102 @@ By using Xpress Vet, you agree to the practices described in this policy.
 
 We use your information to:
 
-- Create and manage your account.
-- Display professional listings (vets, kennels, shops) to pet owners.
-- Enable location-based search ("nearby" features).
+- Create and manage your account and verify your identity as a service provider.
+- Display professional listings to pet owners across Nigeria.
+- Enable location-based "nearby" search for pet services.
 - Process subscription payments and send related confirmations.
-- Enable in-app messaging between pet owners and professionals.
-- Send service-related emails (welcome, subscription confirmations, expiry reminders, verification updates).
-- Verify veterinarian credentials (VCN numbers) for trust and safety.
-- Respond to support requests and improve our Service.
-- Operate our referral program.
+- Enable in-app messaging between pet owners and service providers.
+- Send service-related notifications: welcome emails, document submission confirmations, verification outcomes, subscription reminders, and important updates.
+- Conduct identity verification of service providers in compliance with Nigerian regulations.
+- Respond to support requests and resolve disputes.
+- Operate and improve our referral program.
+- Comply with applicable Nigerian laws and regulations.
 
 ---
 
-## 3. Third-Party Services We Use
+## 3. Data Sharing & Third-Party Processors
 
-We work with the following providers, who may process your data on our behalf:
+We do not sell your personal data. We share only the minimum necessary information with carefully selected service providers who help us operate the platform — covering areas such as:
 
-- **Supabase** — User authentication and account management
-- **MongoDB** — Storing app data (profiles, listings, subscriptions)
-- **Cloudinary** — Hosting profile photos and gallery images
-- **Paystack** — Processing subscription payments
-- **Resend** — Sending transactional emails
-- **OpenStreetMap (Nominatim)** — Converting addresses to map coordinates
+- Secure user authentication and account management
+- Encrypted data storage
+- Profile photo and media hosting
+- Payment processing (licensed and regulated)
+- Transactional email delivery
+- Address-to-coordinates mapping for location features
 
-These providers are bound by their own privacy and security policies. We only share the minimum information necessary.
-
----
-
-## 4. How We Protect Your Information
-
-- Passwords are managed and encrypted by Supabase Authentication — we never store plain-text passwords.
-- Data is transmitted using HTTPS encryption.
-- Access to user data is restricted to authorized personnel only.
-- Payment card details are never stored on our servers — Paystack handles this in compliance with PCI-DSS standards.
+Each of these providers operates under strict data processing agreements and is bound by their own security and privacy standards. We do not disclose their identities publicly as part of our operational security practices. You may contact us at **support@xpressvetmarketplace.com** for more information about our sub-processors.
 
 ---
 
-## 5. Your Rights
+## 4. Identity Document Data — Special Notice
+
+For service provider accounts, we collect sensitive identity data (NIN, BVN, CAC numbers, etc.). By submitting this information, you confirm that:
+
+- The information is accurate and belongs to you.
+- You consent to Xpress Digital & Data Solutions Limited storing and using it solely for identity verification purposes.
+- You understand this data is visible only to our authorised admin team.
+- It will be retained for as long as your professional account is active, and deleted within 90 days of account closure unless we are required by law to retain it longer.
+
+Under the Nigeria Data Protection Act (NDPA) 2023, you have the right to access, correct, or request deletion of this data at any time by contacting us.
+
+---
+
+## 5. How We Protect Your Information
+
+- Passwords are never stored in plain text — they are managed by our authentication provider.
+- All data in transit is encrypted via HTTPS/TLS.
+- Sensitive identity documents are stored in a restricted-access database accessible only to authorised administrators.
+- Payment card details are never stored on our servers.
+- We conduct periodic security reviews of our data handling practices.
+
+---
+
+## 6. Your Rights Under the NDPA 2023
 
 Under the Nigeria Data Protection Act (NDPA) 2023, you have the right to:
 
 - **Access** the personal data we hold about you.
-- **Correct** inaccurate or incomplete information (via your Profile settings).
-- **Request deletion** of your account and associated data.
-- **Withdraw consent** for location-based features at any time (via your device settings).
+- **Correct** inaccurate or incomplete information (via your Profile settings or by contacting us).
+- **Request deletion** of your account and associated personal data.
+- **Withdraw consent** for location-based features at any time via your device settings.
 - **Object** to certain uses of your data.
+- **Data portability**: request a copy of your data in a structured format.
 
-To exercise any of these rights, contact us at **support@xpressvetmarketplace.com**.
-
----
-
-## 6. Data Retention
-
-We retain your information for as long as your account is active. If you delete your account, we will delete or anonymize your personal data within a reasonable period, except where required by law.
+To exercise any of these rights, contact us at **support@xpressvetmarketplace.com**. We will respond within 30 days.
 
 ---
 
-## 7. Children's Privacy
+## 7. Data Retention
 
-Xpress Vet is not intended for use by individuals under the age of 18. We do not knowingly collect personal information from children.
+- **Active accounts**: We retain your information for as long as your account remains active.
+- **Deleted accounts**: Personal data is deleted or anonymised within 90 days of account closure, except where retention is required by Nigerian law.
+- **Identity documents**: Retained for the duration of your professional account and for up to 6 months after closure for compliance and dispute-resolution purposes.
 
 ---
 
 ## 8. Location Data
 
-If you grant location permissions, we use your device's GPS coordinates only to power "nearby" search features. You can disable location access at any time through your device settings.
+If you grant location permissions, we use your device's GPS coordinates only to power "nearby" search features. We do not share or sell location data. You can disable location access at any time through your device settings.
 
 ---
 
-## 9. Changes to This Policy
+## 9. Children's Privacy
 
-We may update this Privacy Policy from time to time. We will notify users of significant changes via email or an in-app notice.
+Xpress Vet is not intended for use by individuals under the age of 18. We do not knowingly collect personal information from children.
 
 ---
 
-## 10. Contact Us
+## 10. Changes to This Policy
+
+We may update this Privacy Policy from time to time. Significant changes will be communicated via email or an in-app notice at least 7 days before taking effect. Continued use of the Service after the effective date constitutes acceptance.
+
+---
+
+## 11. Contact & Data Requests
 
 **Email:** support@xpressvetmarketplace.com
+**Data Protection enquiries:** support@xpressvetmarketplace.com (mark subject: "Data Request")
 **Company:** Xpress Digital & Data Solutions Limited (RC: 9112280)
 **Location:** Lagos, Nigeria
 `;
