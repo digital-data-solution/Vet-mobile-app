@@ -33,6 +33,9 @@ const ROLE_LABELS: Record<string, string> = {
   cremation_service:  'Cremation Service',
   agro_vet_supplier:  'Agro-Vet Supplier',
   insurance_provider: 'Insurance Provider',
+  pet_pharmacy:       'Pet Pharmacy',
+  rescue_center:      'Rescue Center',
+  pet_hotel:          'Pet Hotel',
 };
 
 interface SubscriptionInfo {
@@ -162,7 +165,6 @@ export default function ProfileScreen({ navigation }: Props) {
         Alert.alert('Your Code', referralCode);
       }
     } else {
-      // Native: open share sheet — Copy is the first action on iOS/Android
       try { await Share.share({ message: referralCode }); } catch {}
     }
   }, [referralCode]);
@@ -172,7 +174,6 @@ export default function ProfileScreen({ navigation }: Props) {
     try {
       await Share.share({ message: shareMessage });
     } catch {
-      // Share API unsupported (older web) — fall back to clipboard copy
       if (Platform.OS === 'web') {
         try {
           await (navigator as any).clipboard.writeText(shareMessage);
@@ -185,7 +186,6 @@ export default function ProfileScreen({ navigation }: Props) {
   }, [shareMessage]);
 
   // ─── Logout ────────────────────────────────────────────────────────────────
-  // Alert.alert multi-button is broken on web — use window.confirm there.
   const handleLogout = () => {
     const doLogout = async () => {
       setLoggingOut(true);
@@ -258,11 +258,11 @@ export default function ProfileScreen({ navigation }: Props) {
   const getUserPhone = () => user?.phone ?? user?.user_metadata?.phone ?? 'Not provided';
   const getUserEmail = () => user?.email ?? user?.user_metadata?.email ?? 'Not provided';
 
-  // Roles with a Professional document (edit via ProfessionalOnboarding)
   const PROF_ROLES = new Set([
     'vet', 'kennel_owner',
     'groomer', 'trainer', 'pet_sitter',
     'pet_transport', 'cremation_service', 'agro_vet_supplier', 'insurance_provider',
+    'pet_pharmacy', 'rescue_center', 'pet_hotel',
   ]);
   const isProfessional = PROF_ROLES.has(user?.role ?? '');
   const isShopOwner    = user?.role === 'shop_owner';
@@ -538,6 +538,24 @@ export default function ProfileScreen({ navigation }: Props) {
           label="Register Insurance Provider"
           onPress={() => navigation.navigate('ProfessionalOnboarding', { role: 'insurance_provider' })}
           tint="#7C3AED"
+        />
+        <MenuButton
+          emoji="💊"
+          label="Register Pet Pharmacy"
+          onPress={() => navigation.navigate('ProfessionalOnboarding', { role: 'pet_pharmacy' })}
+          tint="#0891B2"
+        />
+        <MenuButton
+          emoji="🐾"
+          label="Register Rescue Center"
+          onPress={() => navigation.navigate('ProfessionalOnboarding', { role: 'rescue_center' })}
+          tint="#EA580C"
+        />
+        <MenuButton
+          emoji="🏨"
+          label="Register Pet Hotel"
+          onPress={() => navigation.navigate('ProfessionalOnboarding', { role: 'pet_hotel' })}
+          tint="#0D9488"
         />
       </View>
 
