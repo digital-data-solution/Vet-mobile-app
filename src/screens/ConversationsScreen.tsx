@@ -59,6 +59,7 @@ export default function ConversationsScreen() {
 
   const [subscriptionChecked, setSubscriptionChecked] = useState(false);
   const [isSubscribed, setIsSubscribed]               = useState(false);
+  const [currentPlan, setCurrentPlan]                 = useState<string | null>(null);
   const [loading, setLoading]                         = useState(true);
   const [conversations, setConversations]             = useState<Conversation[]>([]);
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -66,7 +67,11 @@ export default function ConversationsScreen() {
   // Check subscription once on mount
   useEffect(() => {
     apiFetch('/api/subscriptions/me')
-      .then((res) => setIsSubscribed(res.ok && res.body?.data?.isActive === true))
+      .then((res) => {
+        const data = res.body?.data;
+        setIsSubscribed(res.ok && data?.isActive === true);
+        setCurrentPlan(data?.plan ?? null);
+      })
       .catch(() => setIsSubscribed(false))
       .finally(() => setSubscriptionChecked(true));
   }, []);
@@ -156,6 +161,7 @@ export default function ConversationsScreen() {
       <SubscriptionPrompt
         navigation={navigation as any}
         feature="messaging professionals"
+        currentPlan={currentPlan}
       />
     );
   }

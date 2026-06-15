@@ -8,7 +8,18 @@ interface SubscriptionPromptProps {
   isProfessional?: boolean;
   customMessage?: string;
   requiredPlan?: string;
+  // When the viewer already has a plan (even expired/lower tier), pass it here.
+  // The component switches to "Upgrade" mode instead of "Subscribe" mode.
+  currentPlan?: string | null;
 }
+
+const PLAN_LABELS: Record<string, string> = {
+  basic:        'Basic',
+  starter:      'Starter',
+  pro:          'Pro',
+  user_premium: 'Premium',
+  user_monthly: 'Monthly',
+};
 
 export default function SubscriptionPrompt({
   navigation,
@@ -16,14 +27,66 @@ export default function SubscriptionPrompt({
   isProfessional = false,
   customMessage,
   requiredPlan,
+  currentPlan,
 }: SubscriptionPromptProps) {
-  const handleSubscribe = () => {
-    navigation?.navigate('SubscriptionScreen');
-  };
+  const isUpgrade = !!currentPlan;
+  const planLabel = requiredPlan ?? (isProfessional ? 'Professional' : 'Premium');
+  const currentPlanLabel = currentPlan ? (PLAN_LABELS[currentPlan] ?? currentPlan) : null;
 
-  const price       = isProfessional ? 'from ₦1,500' : '₦1,500';
-  const planLabel   = requiredPlan ?? (isProfessional ? 'Professional' : 'Premium');
-  const ctaText     = `Subscribe to ${planLabel} — ${price}/month`;
+  const handleCTA = () => navigation?.navigate('SubscriptionScreen');
+
+  // ── Upgrade mode ──────────────────────────────────────────────────────────
+  if (isUpgrade) {
+    const upgradeFeatures = isProfessional
+      ? [
+          'Higher image upload limits for your gallery',
+          'Priority placement in search results',
+          'Access to advanced analytics',
+          'More client messages per month',
+          'Unlock all business listing features',
+        ]
+      : [
+          'GPS-based nearby search for vets and kennels',
+          'View contact details for more listings',
+          'Access premium pet shops and services',
+          'Higher search result limits',
+          'Priority support',
+        ];
+
+    return (
+      <View style={styles.container}>
+        <Text style={styles.emoji}>⬆️</Text>
+
+        <Text style={styles.title}>Upgrade Your Plan</Text>
+
+        <Text style={styles.message}>
+          {customMessage ??
+            `You're on the ${currentPlanLabel} plan. Upgrade to unlock ${feature} and get more ${
+              isProfessional ? 'business' : 'pet care'
+            } benefits.`}
+        </Text>
+
+        <View style={styles.featuresBox}>
+          <Text style={styles.featuresTitle}>Unlock with a higher plan:</Text>
+          {upgradeFeatures.map((f) => (
+            <FeatureItem key={f} text={f} />
+          ))}
+        </View>
+
+        <TouchableOpacity style={[styles.subscribeButton, styles.upgradeButton]} onPress={handleCTA} activeOpacity={0.85}>
+          <Text style={styles.subscribeButtonText}>View Upgrade Options</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.disclaimer}>
+          Cancel anytime · Upgrade instantly · Secure payment via Paystack
+        </Text>
+      </View>
+    );
+  }
+
+  // ── Subscribe mode (no plan at all) ───────────────────────────────────────
+  const price   = isProfessional ? 'from ₦1,500' : '₦1,500';
+  const ctaText = `Subscribe to ${planLabel} — ${price}/month`;
 
   const defaultMessage = `Subscribe to unlock ${feature} and get full access to ${
     isProfessional ? 'business listing features' : 'all Xpress Vet services'
@@ -62,11 +125,7 @@ export default function SubscriptionPrompt({
         ))}
       </View>
 
-      <TouchableOpacity
-        style={styles.subscribeButton}
-        onPress={handleSubscribe}
-        activeOpacity={0.85}
-      >
+      <TouchableOpacity style={styles.subscribeButton} onPress={handleCTA} activeOpacity={0.85}>
         <Text style={styles.subscribeButtonText}>{ctaText}</Text>
       </TouchableOpacity>
 
@@ -160,6 +219,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
+  },
+  upgradeButton: {
+    backgroundColor: '#7C3AED',
+    shadowColor: '#7C3AED',
   },
   subscribeButtonText: {
     color: '#fff',

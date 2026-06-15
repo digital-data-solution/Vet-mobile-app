@@ -44,6 +44,7 @@ export default function KennelsScreen({ navigation }: any) {
   const [coords, setCoords] = useState({ lat: '6.5244', lng: '3.3792' });
   const [isSubscribed,        setIsSubscribed]        = useState(false);
   const [subscriptionChecked, setSubscriptionChecked] = useState(false);
+  const [currentPlan,         setCurrentPlan]         = useState<string | null>(null);
   const [showUpsell, setShowUpsell] = useState(false);
 
   const handleDismissUpsell = () => {
@@ -67,7 +68,9 @@ export default function KennelsScreen({ navigation }: any) {
       apiFetch('/api/subscriptions/me', { method: 'GET' })
         .then((res) => {
           if (!active) return;
-          setIsSubscribed(res.ok && res.body?.data?.isActive === true);
+          const data = res.body?.data;
+          setIsSubscribed(res.ok && data?.isActive === true);
+          setCurrentPlan(data?.plan ?? null);
         })
         .catch(() => { if (active) setIsSubscribed(false); })
         .finally(() => { if (active) setSubscriptionChecked(true); });
@@ -280,9 +283,13 @@ export default function KennelsScreen({ navigation }: any) {
         {subscriptionChecked && !isSubscribed && (
           <View style={styles.teaserBanner}>
             <Ionicons name="lock-closed-outline" size={14} color="#7C3AED" style={{ marginRight: 6 }} />
-            <Text style={styles.teaserText}>Subscribe to view contact details and use GPS search.</Text>
+            <Text style={styles.teaserText}>
+              {currentPlan
+                ? 'Upgrade your plan to view contact details and use GPS search.'
+                : 'Subscribe to view contact details and use GPS search.'}
+            </Text>
             <TouchableOpacity style={styles.teaserBtn} onPress={() => goToSubscription(navigation)}>
-              <Text style={styles.teaserBtnText}>Subscribe</Text>
+              <Text style={styles.teaserBtnText}>{currentPlan ? 'Upgrade' : 'Subscribe'}</Text>
             </TouchableOpacity>
           </View>
         )}

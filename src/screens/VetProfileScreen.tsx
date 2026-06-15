@@ -53,6 +53,7 @@ export default function VetProfileScreen({ route, navigation }: any) {
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [isPreview, setIsPreview]           = useState(false);
+  const [viewerPlan, setViewerPlan]         = useState<string | null>(null);
   const [showSubModal, setShowSubModal]     = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewRefreshKey, setReviewRefreshKey] = useState(0);
@@ -70,6 +71,7 @@ export default function VetProfileScreen({ route, navigation }: any) {
       if (res.ok && res.body?.success && res.body?.data) {
         setVet(res.body.data);
         setIsPreview(res.body.data.isPreview === true);
+        setViewerPlan(res.body.data.viewerPlan ?? null);
       } else {
         setError(res.body?.message || 'Could not load professional profile.');
       }
@@ -393,16 +395,22 @@ export default function VetProfileScreen({ route, navigation }: any) {
         >
           <View style={styles.modalSheet} onStartShouldSetResponder={() => true}>
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Premium Feature</Text>
+            <Text style={styles.modalTitle}>
+              {viewerPlan ? 'Upgrade Required' : 'Premium Feature'}
+            </Text>
             <Text style={styles.modalMsg}>
-              Subscribe to contact this {isVet ? 'vet' : 'kennel'} directly — call, WhatsApp, email, or message.
+              {viewerPlan
+                ? `Your current plan doesn't include contact access. Upgrade to reach this ${isVet ? 'vet' : 'kennel'} directly.`
+                : `Subscribe to contact this ${isVet ? 'vet' : 'kennel'} directly — call, WhatsApp, email, or message.`}
             </Text>
             <TouchableOpacity
-              style={styles.modalSubscribeBtn}
+              style={[styles.modalSubscribeBtn, viewerPlan ? { backgroundColor: '#7C3AED' } : {}]}
               onPress={() => { setShowSubModal(false); navigation.navigate('SubscriptionScreen'); }}
               activeOpacity={0.85}
             >
-              <Text style={styles.modalSubscribeBtnText}>Subscribe — from ₦1,500/month</Text>
+              <Text style={styles.modalSubscribeBtnText}>
+                {viewerPlan ? 'View Upgrade Options' : 'Subscribe — from ₦1,500/month'}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowSubModal(false)}>
               <Text style={styles.modalCancelText}>Not now</Text>

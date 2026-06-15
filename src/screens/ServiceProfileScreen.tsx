@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Linking,
+  Modal,
 } from 'react-native';
 import { showAlert } from '../utils/alert';
 import { useFocusEffect } from '@react-navigation/native';
@@ -63,6 +64,7 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
   const [error, setError]       = useState<string | null>(null);
   const [showSubModal, setShowSubModal]   = useState(false);
   const [isSubscribed, setIsSubscribed]   = useState(false);
+  const [currentPlan, setCurrentPlan]     = useState<string | null>(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewRefreshKey, setReviewRefreshKey] = useState(0);
 
@@ -85,7 +87,9 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
         setError(profRes.body?.message || 'Professional not found.');
       }
 
-      setIsSubscribed(subRes.ok && subRes.body?.data?.isActive === true);
+      const subData = subRes.body?.data;
+      setIsSubscribed(subRes.ok && subData?.isActive === true);
+      setCurrentPlan(subData?.plan ?? null);
     } catch {
       setError('Network error. Please check your connection.');
     } finally {
@@ -202,7 +206,9 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
         ) : (
           <TouchableOpacity style={styles.lockRow} onPress={() => setShowSubModal(true)}>
             <Ionicons name="lock-closed-outline" size={16} color="#6B7280" />
-            <Text style={styles.lockText}>Subscribe to view contact details</Text>
+            <Text style={styles.lockText}>
+              {currentPlan ? 'Upgrade your plan to view contact details' : 'Subscribe to view contact details'}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -284,19 +290,36 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
         accentColor={meta.color}
       />
 
-      <SubscriptionPrompt
-        visible={showSubModal}
-        onClose={() => setShowSubModal(false)}
-        onSubscribe={() => {
-          setShowSubModal(false);
-          try {
-            navigation.getParent()?.navigate('SubscriptionScreen');
-          } catch {
-            navigation.navigate('SubscriptionScreen');
-          }
-        }}
-        message="Subscribe to view contact details and connect with this professional."
-      />
+      <Modal visible={showSubModal} transparent animationType="slide" onRequestClose={() => setShowSubModal(false)}>
+        <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowSubModal(false)} activeOpacity={1}>
+          <View style={styles.modalSheet} onStartShouldSetResponder={() => true}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>
+              {currentPlan ? 'Upgrade Required' : 'Premium Feature'}
+            </Text>
+            <Text style={styles.modalMsg}>
+              {currentPlan
+                ? `Your current plan doesn't include contact access. Upgrade to connect with this professional directly.`
+                : 'Subscribe to view contact details and connect with this professional directly.'}
+            </Text>
+            <TouchableOpacity
+              style={[styles.modalBtn, currentPlan ? { backgroundColor: '#7C3AED' } : {}]}
+              onPress={() => {
+                setShowSubModal(false);
+                try { navigation.getParent()?.navigate('SubscriptionScreen'); } catch { navigation.navigate('SubscriptionScreen'); }
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.modalBtnText}>
+                {currentPlan ? 'View Upgrade Options' : 'Subscribe — from ₦1,500/month'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalCancel} onPress={() => setShowSubModal(false)}>
+              <Text style={styles.modalCancelText}>Not now</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       <View style={{ height: 40 }} />
     </ScrollView>
@@ -428,4 +451,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   writeReviewBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalSheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 36 },
+  modalHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#E5E7EB', alignSelf: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 8 },
+  modalMsg: { fontSize: 14, color: '#6B7280', lineHeight: 20, marginBottom: 24 },
+  modalBtn: { backgroundColor: '#2563EB', borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginBottom: 12 },
+  modalBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  modalCancel: { alignItems: 'center', paddingVertical: 8 },
+  modalCancelText: { fontSize: 14, color: '#6B7280' },
 });

@@ -15,7 +15,7 @@ import {
   StyleSheet,
   Pressable,
 } from 'react-native';
-import { NavigationContainer, NavigatorScreenParams, type LinkingOptions, useNavigationContainerRef } from '@react-navigation/native';
+import { NavigationContainer, NavigatorScreenParams, type LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -417,7 +417,9 @@ export default function AppNavigator() {
   const [userRole, setUserRole] = useState<UserRole>(null);
   const [loading,  setLoading]  = useState(true);
 
-  const navigationRef = useNavigationContainerRef<RootStackParamList>();
+  // Derive isAuthenticated immediately so effects below can reference it safely
+  // (avoids temporal dead zone if placed after the effects).
+  const isAuthenticated = !!session;
 
   const fetchRoleFromBackend = useCallback(async (currentSession: Session | null) => {
     if (!currentSession) {
@@ -460,6 +462,15 @@ export default function AppNavigator() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, newSession) => {
         if (!mounted) return;
+        // When session expires, reset the URL to root so the navigator
+        // doesn't try to render an authenticated route with no registered screens.
+        if (!newSession && typeof window !== 'undefined' && window.history) {
+          const { pathname } = window.location;
+          const isPublic =
+            pathname === '/' ||
+            PUBLIC_WEB_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
+          if (!isPublic) window.history.replaceState({}, '', '/');
+        }
         setSession(newSession);
         await fetchRoleFromBackend(newSession);
       },
@@ -484,9 +495,8 @@ export default function AppNavigator() {
     } catch {}
   }, [isAuthenticated, loading]);
 
-  // When the Supabase session expires (or user signs out from another tab),
-  // reset the URL to root and navigate to the sign-in screen so the user
-  // never sees "Anonymous User" or a broken authenticated screen.
+  // Belt-and-suspenders URL reset: if React re-renders before onAuthStateChange fires
+  // the URL reset above, this effect also clears any protected pathname.
   useEffect(() => {
     if (loading || isAuthenticated) return;
     if (typeof window !== 'undefined' && window.history) {
@@ -494,12 +504,7 @@ export default function AppNavigator() {
       const isPublic =
         pathname === '/' ||
         PUBLIC_WEB_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
-      if (!isPublic) {
-        window.history.replaceState({}, '', '/');
-      }
-    }
-    if (navigationRef.isReady()) {
-      navigationRef.reset({ index: 0, routes: [{ name: 'Auth' }] });
+      if (!isPublic) window.history.replaceState({}, '', '/');
     }
   }, [isAuthenticated, loading]);
 
@@ -514,18 +519,26 @@ export default function AppNavigator() {
     await supabase.auth.signOut();
   }, []);
 
-  const isAuthenticated = !!session;
-
   if (loading) return <LoadingScreen />;
 
   return (
     <AuthContext.Provider value={{ session, userRole, isAuthenticated, signOut, refreshRole }}>
       <NavigationErrorBoundary>
-        <NavigationContainer linking={linking} ref={navigationRef}>
+        <NavigationContainer linking={linking}>
           <RootStack.Navigator
             screenOptions={{ headerShown: false }}
             initialRouteName={isAuthenticated ? 'MainTabs' : 'Auth'}
           >
+
+            {/*
+             * Auth + Register are first so that when the navigation state becomes
+             * empty (e.g. after session expiry removes MainTabs), React Navigation
+             * falls back to Auth — not EmailVerified.
+             * They're also ALWAYS registered so deep links like /auth/register?ref=CODE
+             * work even when the user is already signed in.
+             */}
+            <RootStack.Screen name="Auth"     component={AuthScreen} />
+            <RootStack.Screen name="Register" component={RegisterScreen} />
 
             {/*
              * EmailVerified is ALWAYS registered regardless of auth state.
@@ -552,14 +565,6 @@ export default function AppNavigator() {
               component={SupportScreen}
               options={{ headerShown: false }}
             />
-
-            {/*
-             * Auth + Register are ALWAYS registered so that deep links like
-             * /auth/register?ref=CODE work even when the user is already signed
-             * in — the screens themselves redirect to MainTabs in that case.
-             */}
-            <RootStack.Screen name="Auth"     component={AuthScreen} />
-            <RootStack.Screen name="Register" component={RegisterScreen} />
 
             {isAuthenticated && (
               <>
