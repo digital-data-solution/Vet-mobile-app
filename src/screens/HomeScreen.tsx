@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -355,19 +355,32 @@ const ROLE_CONFIG: Record<string, RoleConfig> = {
 
 export default function HomeScreen({ navigation }: Props) {
   const { userRole, isAuthenticated } = useAuth();
+  const [showDashboard, setShowDashboard] = useState(false);
 
   const isProfessional = PROFESSIONAL_ROLES.has(userRole ?? '');
   const cfg: RoleConfig | undefined = userRole ? ROLE_CONFIG[userRole] : undefined;
 
-  if (isAuthenticated && isProfessional && cfg) {
-    return <ProfessionalHome navigation={navigation} cfg={cfg} />;
+  if (!isAuthenticated) {
+    return <GuestHome navigation={navigation} />;
   }
 
-  if (isAuthenticated && !isProfessional) {
-    return <PetOwnerHome navigation={navigation} />;
+  if (isProfessional && cfg && showDashboard) {
+    return (
+      <ProfessionalHome
+        navigation={navigation}
+        cfg={cfg}
+        onBack={() => setShowDashboard(false)}
+      />
+    );
   }
 
-  return <GuestHome navigation={navigation} />;
+  return (
+    <PetOwnerHome
+      navigation={navigation}
+      dashboardCfg={isProfessional && cfg ? cfg : null}
+      onOpenDashboard={() => setShowDashboard(true)}
+    />
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -466,7 +479,15 @@ function GuestHome({ navigation }: { navigation: any }) {
 // Pet owner home
 // ─────────────────────────────────────────────────────────────────────────────
 
-function PetOwnerHome({ navigation }: { navigation: any }) {
+function PetOwnerHome({
+  navigation,
+  dashboardCfg,
+  onOpenDashboard,
+}: {
+  navigation: any;
+  dashboardCfg: RoleConfig | null;
+  onOpenDashboard: () => void;
+}) {
   return (
     <ScrollView
       style={styles.scroll}
@@ -479,6 +500,23 @@ function PetOwnerHome({ navigation }: { navigation: any }) {
         <Text style={styles.ownerHeaderTitle}>🐾 Xpress Vet</Text>
         <Text style={styles.ownerHeaderSub}>Find trusted pet care near you</Text>
       </View>
+
+      {dashboardCfg && (
+        <TouchableOpacity
+          style={[styles.dashboardCard, { backgroundColor: dashboardCfg.bgColor, borderColor: dashboardCfg.color + '44' }]}
+          onPress={onOpenDashboard}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.dashboardCardEmoji}>{dashboardCfg.emoji}</Text>
+          <View style={styles.dashboardCardText}>
+            <Text style={[styles.dashboardCardTitle, { color: dashboardCfg.color }]}>
+              {dashboardCfg.title}
+            </Text>
+            <Text style={styles.dashboardCardSub}>Manage your listing, subscriptions and more</Text>
+          </View>
+          <Text style={[styles.dashboardCardArrow, { color: dashboardCfg.color }]}>›</Text>
+        </TouchableOpacity>
+      )}
 
       <View style={styles.sectionPad}>
         <Text style={styles.sectionHeading}>Browse Services</Text>
@@ -555,9 +593,11 @@ function PetOwnerHome({ navigation }: { navigation: any }) {
 function ProfessionalHome({
   navigation,
   cfg,
+  onBack,
 }: {
   navigation: any;
   cfg: RoleConfig;
+  onBack?: () => void;
 }) {
   return (
     <ScrollView
@@ -568,6 +608,11 @@ function ProfessionalHome({
       <StatusBar barStyle="dark-content" backgroundColor={cfg.bgColor} />
 
       <View style={[styles.proHero, { backgroundColor: cfg.bgColor }]}>
+        {onBack && (
+          <TouchableOpacity style={styles.backBtn} onPress={onBack} activeOpacity={0.7}>
+            <Text style={[styles.backBtnText, { color: cfg.color }]}>← Browse Services</Text>
+          </TouchableOpacity>
+        )}
         <Text style={styles.proHeroEmoji}>{cfg.emoji}</Text>
         <Text style={[styles.proHeroTitle, { color: cfg.color }]}>{cfg.title}</Text>
         <Text style={styles.proHeroSub}>{cfg.subtitle}</Text>
@@ -705,6 +750,22 @@ const styles = StyleSheet.create({
   },
   ownerHeaderTitle: { fontSize: 28, fontWeight: '800', color: '#111827', letterSpacing: -0.3 },
   ownerHeaderSub:   { fontSize: 15, color: '#6B7280', marginTop: 4 },
+
+  // Dashboard entry card (shown on PetOwnerHome for professional roles)
+  dashboardCard: {
+    flexDirection: 'row', alignItems: 'center', borderWidth: 1.5,
+    borderRadius: 16, marginHorizontal: 20, marginTop: 20, padding: 16, gap: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 3,
+  },
+  dashboardCardEmoji: { fontSize: 32 },
+  dashboardCardText:  { flex: 1 },
+  dashboardCardTitle: { fontSize: 15, fontWeight: '800', marginBottom: 2 },
+  dashboardCardSub:   { fontSize: 12, color: '#6B7280' },
+  dashboardCardArrow: { fontSize: 28, fontWeight: '300' },
+
+  // Back button inside ProfessionalHome
+  backBtn:     { alignSelf: 'flex-start', marginBottom: 16 },
+  backBtnText: { fontSize: 14, fontWeight: '700' },
 
   // Professional hero
   proHero: { paddingTop: 56, paddingBottom: 28, paddingHorizontal: 24, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },

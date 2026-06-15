@@ -5,13 +5,13 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
   Image,
 } from 'react-native';
+import { showAlert } from '../utils/alert';
 
 const LOGO = require('../../assets/icon.png');
 import { supabase } from '../api/supabase';
@@ -62,19 +62,19 @@ export default function RegisterScreen({ navigation, route }: Props & { route?: 
 
   const handleRegister = useCallback(async () => {
     if (password !== confirmPassword) {
-      Alert.alert('Password Mismatch', 'Your passwords do not match. Please re-enter.');
+      showAlert('Password Mismatch', 'Your passwords do not match. Please re-enter.');
       return;
     }
     const validationError = validate();
     if (validationError) {
-      Alert.alert('Validation Error', validationError);
+      showAlert('Validation Error', validationError);
       return;
     }
 
     const now = Date.now();
     if (lastSubmitTime.current && now - lastSubmitTime.current < COOLDOWN_MS) {
       const remaining = Math.ceil((COOLDOWN_MS - (now - lastSubmitTime.current)) / 1000);
-      Alert.alert('Please Wait', `You can request another verification email in ${remaining} seconds.`);
+      showAlert('Please Wait', `You can request another verification email in ${remaining} seconds.`);
       return;
     }
 
@@ -88,13 +88,13 @@ export default function RegisterScreen({ navigation, route }: Props & { route?: 
 
       if (error) {
         if (error.message.toLowerCase().includes('already registered')) {
-          Alert.alert(
+          showAlert(
             'Account Exists',
             'An account with this email already exists. Please sign in instead.',
             [{ text: 'Sign In', onPress: () => navigation.navigate('Auth') }],
           );
         } else {
-          Alert.alert('Registration Failed', error.message);
+          showAlert('Registration Failed', error.message);
         }
         return;
       }
@@ -127,7 +127,7 @@ export default function RegisterScreen({ navigation, route }: Props & { route?: 
         navigation.replace('MainTabs');
       }
     } catch {
-      Alert.alert('Network Error', 'Please check your connection and try again.');
+      showAlert('Network Error', 'Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -137,7 +137,7 @@ export default function RegisterScreen({ navigation, route }: Props & { route?: 
     const now = Date.now();
     if (lastSubmitTime.current && now - lastSubmitTime.current < COOLDOWN_MS) {
       const remaining = Math.ceil((COOLDOWN_MS - (now - lastSubmitTime.current)) / 1000);
-      Alert.alert('Please Wait', `You can resend the email in ${remaining} seconds.`);
+      showAlert('Please Wait', `You can resend the email in ${remaining} seconds.`);
       return;
     }
 
@@ -150,13 +150,13 @@ export default function RegisterScreen({ navigation, route }: Props & { route?: 
       });
 
       if (error) {
-        Alert.alert('Failed to Resend', error.message);
+        showAlert('Failed to Resend', error.message);
       } else {
         lastSubmitTime.current = Date.now();
-        Alert.alert('Email Sent', 'A new verification link has been sent to your inbox.');
+        showAlert('Email Sent', 'A new verification link has been sent to your inbox.');
       }
     } catch {
-      Alert.alert('Network Error', 'Please check your connection and try again.');
+      showAlert('Network Error', 'Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
