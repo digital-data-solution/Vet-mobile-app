@@ -15,7 +15,7 @@ import {
   StyleSheet,
   Pressable,
 } from 'react-native';
-import { NavigationContainer, NavigatorScreenParams, type LinkingOptions } from '@react-navigation/native';
+import { NavigationContainer, NavigatorScreenParams, type LinkingOptions, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -162,6 +162,13 @@ const AUTH_WEB_PATHS = [
   '/subscription',
   '/network',
   '/verify',
+  // Overlay / profile screens (include query-param variants like /VetProfile?vetId=...)
+  '/VetProfile',
+  '/ShopProfile',
+  '/KennelProfile',
+  '/ServiceProfile',
+  '/ExploreOptions',
+  '/VerifyProfessional',
 ];
 
 const linking: LinkingOptions<RootStackParamList> = {
@@ -183,10 +190,14 @@ const linking: LinkingOptions<RootStackParamList> = {
     // Authenticated paths: only hand to React Navigation if session is valid.
     // If the session has expired and the user refreshes at /home, returning
     // the root lets initialRouteName='Auth' take over instead of showing "Not Found".
+    // For unauthenticated deep links (referral links, email links), save the
+    // intended URL so AppNavigator can redirect there once the user logs in.
     if (matchesPath(AUTH_WEB_PATHS)) {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        return session ? href : origin + '/';
+        if (session) return href;
+        try { sessionStorage.setItem('postLoginRedirect', href); } catch {}
+        return origin + '/';
       } catch {
         return origin + '/';
       }
@@ -203,6 +214,13 @@ const linking: LinkingOptions<RootStackParamList> = {
       PrivacyPolicy: 'privacy-policy',
       Terms:         'terms-and-conditions',
       Support:       'support',
+      // Overlay screens — parse query-string params into navigation params
+      VetProfile:     { path: 'VetProfile',     parse: { vetId:          String } },
+      ShopProfile:    { path: 'ShopProfile',     parse: { shopId:         String } },
+      KennelProfile:  { path: 'KennelProfile',   parse: { kennelId:       String } },
+      ServiceProfile: { path: 'ServiceProfile',  parse: { professionalId: String } },
+      ExploreOptions: 'ExploreOptions',
+      VerifyProfessional: 'VerifyProfessional',
       MainTabs:      {
         screens: {
           Home:          'home',
@@ -399,6 +417,8 @@ export default function AppNavigator() {
   const [userRole, setUserRole] = useState<UserRole>(null);
   const [loading,  setLoading]  = useState(true);
 
+  const navigationRef = useNavigationContainerRef<RootStackParamList>();
+
   const fetchRoleFromBackend = useCallback(async (currentSession: Session | null) => {
     if (!currentSession) {
       setUserRole(null);
@@ -451,6 +471,38 @@ export default function AppNavigator() {
     };
   }, [fetchRoleFromBackend]);
 
+  // After login, redirect to the URL the user was trying to reach before being
+  // sent to the login screen (e.g. a referral link or a shared vet profile URL).
+  useEffect(() => {
+    if (!isAuthenticated || loading) return;
+    if (typeof window === 'undefined') return;
+    try {
+      const pending = sessionStorage.getItem('postLoginRedirect');
+      if (!pending) return;
+      sessionStorage.removeItem('postLoginRedirect');
+      window.location.href = pending;
+    } catch {}
+  }, [isAuthenticated, loading]);
+
+  // When the Supabase session expires (or user signs out from another tab),
+  // reset the URL to root and navigate to the sign-in screen so the user
+  // never sees "Anonymous User" or a broken authenticated screen.
+  useEffect(() => {
+    if (loading || isAuthenticated) return;
+    if (typeof window !== 'undefined' && window.history) {
+      const { pathname } = window.location;
+      const isPublic =
+        pathname === '/' ||
+        PUBLIC_WEB_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
+      if (!isPublic) {
+        window.history.replaceState({}, '', '/');
+      }
+    }
+    if (navigationRef.isReady()) {
+      navigationRef.reset({ index: 0, routes: [{ name: 'Auth' }] });
+    }
+  }, [isAuthenticated, loading]);
+
   const signOut = useCallback(async () => {
     // On web, reset the URL to root before signing out so React Navigation
     // doesn't try to render an authenticated route with no registered screens.
@@ -469,7 +521,7 @@ export default function AppNavigator() {
   return (
     <AuthContext.Provider value={{ session, userRole, isAuthenticated, signOut, refreshRole }}>
       <NavigationErrorBoundary>
-        <NavigationContainer linking={linking}>
+        <NavigationContainer linking={linking} ref={navigationRef}>
           <RootStack.Navigator
             screenOptions={{ headerShown: false }}
             initialRouteName={isAuthenticated ? 'MainTabs' : 'Auth'}
