@@ -8,9 +8,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Linking,
-  Alert,
   Modal,
 } from 'react-native';
+import { showAlert } from '../utils/alert';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../api/client';
 import SubscriptionPrompt from '../components/SubscriptionPrompt';
@@ -33,6 +33,8 @@ interface Professional {
   reviewCount?: number;
   distance?: number;
   licenseExpiry?: string;
+  profileImage?: string;
+  mediaImages?: { url: string; publicId: string }[];
   images?: { url: string; publicId: string }[];
   userId?: {
     _id?:        string;
@@ -96,7 +98,7 @@ export default function VetProfileScreen({ route, navigation }: any) {
     if (!phone) return;
     trackTap('phone');
     Linking.openURL(`tel:${phone}`).catch(() =>
-      Alert.alert('Error', 'Unable to open phone app.'),
+      showAlert('Error', 'Unable to open phone app.'),
     );
   };
 
@@ -105,7 +107,7 @@ export default function VetProfileScreen({ route, navigation }: any) {
     if (!emailAddr) return;
     trackTap('email');
     Linking.openURL(`mailto:${emailAddr}`).catch(() =>
-      Alert.alert('Error', 'Unable to open mail app.'),
+      showAlert('Error', 'Unable to open mail app.'),
     );
   };
 
@@ -115,14 +117,14 @@ export default function VetProfileScreen({ route, navigation }: any) {
     trackTap('whatsapp');
     const digits = rawPhone.replace(/\D/g, '').replace(/^0/, '234');
     Linking.openURL(`https://wa.me/${digits}`).catch(() =>
-      Alert.alert('WhatsApp', 'Could not open WhatsApp. Make sure it is installed.'),
+      showAlert('WhatsApp', 'Could not open WhatsApp. Make sure it is installed.'),
     );
   };
 
   const openChat = () => {
     const supabaseId = vet?.userId?.supabaseId;
     if (!supabaseId) {
-      Alert.alert('Unavailable', 'This professional cannot be messaged yet.');
+      showAlert('Unavailable', 'This professional cannot be messaged yet.');
       return;
     }
     const displayName = vet?.businessName || vet?.name || vet?.userId?.name || 'Professional';
@@ -175,7 +177,14 @@ export default function VetProfileScreen({ route, navigation }: any) {
       {/* ── Hero ────────────────────────────────────────────────────────────── */}
       <View style={[styles.hero, { backgroundColor: heroBg }]}>
         <View style={[styles.avatarWrap, { borderColor: accentColor + '30' }]}>
-          <Text style={styles.avatarEmoji}>{isVet ? '👨‍⚕️' : '🐕'}</Text>
+          {(vet.profileImage || vet.userId?.profileImage) ? (
+            <Image
+              source={{ uri: vet.profileImage || vet.userId?.profileImage }}
+              style={styles.avatarImage}
+            />
+          ) : (
+            <Text style={styles.avatarEmoji}>{isVet ? '👨‍⚕️' : '🐕'}</Text>
+          )}
           {vet.isVerified && (
             <View style={styles.verifiedRing}>
               <Ionicons name="checkmark-circle" size={26} color="#10B981" />
@@ -209,11 +218,11 @@ export default function VetProfileScreen({ route, navigation }: any) {
       </View>
 
       {/* ── Gallery ─────────────────────────────────────────────────────────── */}
-      {vet.images && vet.images.length > 0 ? (
+      {(vet.mediaImages ?? []).length > 0 ? (
         <View style={styles.gallerySection}>
           <Text style={styles.gallerySectionTitle}>Gallery</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryRow}>
-            {vet.images.map((img, i) => (
+            {(vet.mediaImages ?? []).map((img, i) => (
               <Image
                 key={img.publicId || String(i)}
                 source={{ uri: img.url }}
@@ -460,6 +469,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   avatarEmoji: { fontSize: 42 },
+  avatarImage: { width: 90, height: 90, borderRadius: 24 },
   verifiedRing: {
     position: 'absolute',
     bottom: -6,

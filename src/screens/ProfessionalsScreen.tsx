@@ -6,13 +6,13 @@ import {
   StyleSheet,
   FlatList,
   ScrollView,
-  Alert,
   ActivityIndicator,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
   Modal,
 } from 'react-native';
+import { showAlert } from '../utils/alert';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -168,10 +168,10 @@ export default function ProfessionalsScreen({ navigation }: Props) {
         setResults(res.body.data || []);
         checkUpsellAfterSearch();
       } else {
-        Alert.alert('Error', res.body?.message || 'Failed to fetch professionals.');
+        showAlert('Error', res.body?.message || 'Failed to fetch professionals.');
       }
     } catch {
-      Alert.alert('Error', 'Network error. Please try again.');
+      showAlert('Error', 'Network error. Please try again.');
     } finally {
       setLoading(false);
       setHasSearched(true);
@@ -185,7 +185,7 @@ export default function ProfessionalsScreen({ navigation }: Props) {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Location permission is required to find nearby professionals.');
+        showAlert('Permission Denied', 'Location permission is required to find nearby professionals.');
         return;
       }
       const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
@@ -193,9 +193,9 @@ export default function ProfessionalsScreen({ navigation }: Props) {
         lat: location.coords.latitude.toString(),
         lng: location.coords.longitude.toString(),
       });
-      Alert.alert('Location Updated', 'Now showing results near your current location.');
+      showAlert('Location Updated', 'Now showing results near your current location.');
     } catch {
-      Alert.alert('Error', 'Failed to get current location. Please try again.');
+      showAlert('Error', 'Failed to get current location. Please try again.');
     } finally {
       setLocationLoading(false);
     }
@@ -203,7 +203,7 @@ export default function ProfessionalsScreen({ navigation }: Props) {
 
   const geocodeAddress = async () => {
     if (!addressInput.trim()) {
-      Alert.alert('Error', 'Please enter an address first.');
+      showAlert('Error', 'Please enter an address first.');
       return;
     }
     setLocationLoading(true);
@@ -214,12 +214,12 @@ export default function ProfessionalsScreen({ navigation }: Props) {
           lat: geocoded[0].latitude.toString(),
           lng: geocoded[0].longitude.toString(),
         });
-        Alert.alert('Location Set', `Location updated to: ${addressInput}`);
+        showAlert('Location Set', `Location updated to: ${addressInput}`);
       } else {
-        Alert.alert('Not Found', 'Could not find that address. Try a more specific one.');
+        showAlert('Not Found', 'Could not find that address. Try a more specific one.');
       }
     } catch {
-      Alert.alert('Error', 'Failed to look up that address.');
+      showAlert('Error', 'Failed to look up that address.');
     } finally {
       setLocationLoading(false);
     }
@@ -244,10 +244,10 @@ export default function ProfessionalsScreen({ navigation }: Props) {
         setResults(res.body.data || []);
         checkUpsellAfterSearch();
       } else {
-        Alert.alert('Error', res.body?.message || 'Failed to fetch professionals.');
+        showAlert('Error', res.body?.message || 'Failed to fetch professionals.');
       }
     } catch {
-      Alert.alert('Error', 'Network error. Please try again.');
+      showAlert('Error', 'Network error. Please try again.');
     } finally {
       setLoading(false);
       setHasSearched(true);
@@ -436,7 +436,7 @@ export default function ProfessionalsScreen({ navigation }: Props) {
             style={[styles.actionBtn, styles.actionBtnFill]}
             onPress={() => {
               if (!isSubscribed) {
-                Alert.alert(
+                showAlert(
                   'Premium Feature',
                   'GPS nearby search requires a Premium subscription.',
                   [

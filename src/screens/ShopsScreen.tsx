@@ -8,11 +8,11 @@ import {
   StyleSheet,
   ActivityIndicator,
   TextInput,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Modal,
 } from 'react-native';
+import { showAlert } from '../utils/alert';
 import * as Location from 'expo-location';
 import { apiFetch } from '../api/client';
 import { Ionicons } from '@expo/vector-icons';
@@ -100,12 +100,12 @@ export default function ShopsScreen({ navigation }: Props) {
           // Subscription required — don't alert, the useFocusEffect already handled it
           setShops([]);
         } else {
-          Alert.alert('Error', res.body?.message || 'Failed to fetch shops.');
+          showAlert('Error', res.body?.message || 'Failed to fetch shops.');
           setShops([]);
         }
       }
     } catch (error) {
-      Alert.alert('Network Error', 'Could not reach server. Please check your connection.');
+      showAlert('Network Error', 'Could not reach server. Please check your connection.');
       setShops([]);
     } finally {
       setLoading(false);
@@ -118,7 +118,7 @@ export default function ShopsScreen({ navigation }: Props) {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Location access needed to find nearby shops.');
+        showAlert('Permission Denied', 'Location access needed to find nearby shops.');
         return;
       }
       const loc = await Location.getCurrentPositionAsync({
@@ -128,9 +128,9 @@ export default function ShopsScreen({ navigation }: Props) {
         lat: loc.coords.latitude.toString(),
         lng: loc.coords.longitude.toString(),
       });
-      Alert.alert('Location Set', 'Tap "Nearby" to find shops near you.');
+      showAlert('Location Set', 'Tap "Nearby" to find shops near you.');
     } catch {
-      Alert.alert('Error', 'Failed to get location.');
+      showAlert('Error', 'Failed to get location.');
     } finally {
       setLocationLoading(false);
     }
@@ -154,21 +154,21 @@ export default function ShopsScreen({ navigation }: Props) {
         setShops(nearby);
         checkUpsellAfterSearch();
         if (nearby.length === 0) {
-          Alert.alert(
+          showAlert(
             'No Nearby Shops',
             'No shops found in your area. Showing all shops instead.',
             [{ text: 'OK', onPress: fetchAllShops }],
           );
         }
       } else {
-        Alert.alert(
+        showAlert(
           'Nearby Search Failed',
           res.body?.message || 'Could not find shops nearby. Showing all shops.',
           [{ text: 'OK', onPress: fetchAllShops }],
         );
       }
     } catch {
-      Alert.alert('Unexpected Error', 'Something went wrong. Please try again.');
+      showAlert('Unexpected Error', 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
       setHasSearched(true);
@@ -286,7 +286,7 @@ export default function ShopsScreen({ navigation }: Props) {
             style={styles.searchNearbyBtn}
             onPress={() => {
               if (!isSubscribed) {
-                Alert.alert(
+                showAlert(
                   'Premium Feature',
                   'GPS nearby search requires a Premium subscription.',
                   [

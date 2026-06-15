@@ -3,12 +3,12 @@ import {
   View,
   Text,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   ScrollView,
   Pressable,
   Platform,
 } from 'react-native';
+import { showAlert } from '../utils/alert';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../api/client';
 import { storePaystackCallbacks } from '../utils/paystackCallbackStore';
@@ -221,7 +221,7 @@ export default function SubscriptionScreen({ navigation }: any) {
     setPendingReference(null);
     setPendingInitiatedAt(null);
     await fetchSubscription();
-    Alert.alert('Subscription Active!', `Payment confirmed (Ref: ${reference}). You now have full access.`);
+    showAlert('Subscription Active!', `Payment confirmed (Ref: ${reference}). You now have full access.`);
   }, [fetchSubscription]);
 
   const handlePaymentCancel = useCallback(() => {
@@ -267,11 +267,11 @@ export default function SubscriptionScreen({ navigation }: any) {
         setSubscribing(false);
         openPaystackWebView(authorization_url, reference, amount);
       } else {
-        Alert.alert('Error', res.body?.message || 'Failed to start subscription.');
+        showAlert('Error', res.body?.message || 'Failed to start subscription.');
         setSubscribing(false);
       }
     } catch {
-      Alert.alert('Error', 'Please check your connection and try again.');
+      showAlert('Error', 'Please check your connection and try again.');
       setSubscribing(false);
     } finally {
       setSelectedPlan(null);
@@ -290,16 +290,16 @@ export default function SubscriptionScreen({ navigation }: any) {
           setTransferInFlight(false);
           setPendingReference(null);
           setPendingInitiatedAt(null);
-          Alert.alert('Payment Confirmed!', 'Your subscription is now active.');
+          showAlert('Payment Confirmed!', 'Your subscription is now active.');
           return;
         }
       }
       await fetchSubscription();
       if (!currentSub?.isActive) {
-        Alert.alert('Not Confirmed Yet', 'Your payment is still processing. Bank transfers can take a few minutes.');
+        showAlert('Not Confirmed Yet', 'Your payment is still processing. Bank transfers can take a few minutes.');
       }
     } catch {
-      Alert.alert('Network error', 'Please check your connection.');
+      showAlert('Network error', 'Please check your connection.');
     } finally {
       setSubLoading(false);
     }
@@ -319,7 +319,7 @@ export default function SubscriptionScreen({ navigation }: any) {
         doCancel();
       }
     } else {
-      Alert.alert(
+      showAlert(
         'Cancel Payment',
         'Only tap "Cancel" if you did NOT send any money.',
         [

@@ -8,8 +8,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Linking,
-  Alert,
 } from 'react-native';
+import { showAlert } from '../utils/alert';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../api/client';
@@ -125,7 +125,7 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
   const handleCall = () => {
     if (!phone) return;
     Linking.openURL(`tel:${phone}`).catch(() =>
-      Alert.alert('Error', 'Unable to open phone app.'),
+      showAlert('Error', 'Unable to open phone app.'),
     );
   };
 
@@ -133,14 +133,14 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
     if (!phone) return;
     const digits = phone.replace(/\D/g, '').replace(/^0/, '234');
     Linking.openURL(`https://wa.me/${digits}`).catch(() =>
-      Alert.alert('WhatsApp', 'Could not open WhatsApp. Make sure it is installed.'),
+      showAlert('WhatsApp', 'Could not open WhatsApp. Make sure it is installed.'),
     );
   };
 
   const handleMessage = () => {
     const targetId = prof.userId?._id || prof.userId?.supabaseId;
     if (!targetId) {
-      Alert.alert('Unavailable', 'This service provider has not enabled in-app messaging yet.');
+      showAlert('Unavailable', 'This service provider has not enabled in-app messaging yet.');
       return;
     }
     try {

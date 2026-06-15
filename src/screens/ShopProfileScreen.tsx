@@ -8,9 +8,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Linking,
-  Alert,
   Modal,
 } from 'react-native';
+import { showAlert } from '../utils/alert';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../api/client';
 import SubscriptionPrompt from '../components/SubscriptionPrompt';
@@ -113,7 +113,7 @@ export default function ShopProfileScreen({ route, navigation }: any) {
     if (!phone) return;
     trackTap('phone');
     Linking.openURL(`tel:${phone}`).catch(() =>
-      Alert.alert('Error', 'Unable to open phone app.'),
+      showAlert('Error', 'Unable to open phone app.'),
     );
   };
 
@@ -122,7 +122,7 @@ export default function ShopProfileScreen({ route, navigation }: any) {
     trackTap('whatsapp');
     const digits = phone.replace(/\D/g, '').replace(/^0/, '234');
     Linking.openURL(`https://wa.me/${digits}`).catch(() =>
-      Alert.alert('WhatsApp', 'Could not open WhatsApp. Make sure it is installed.'),
+      showAlert('WhatsApp', 'Could not open WhatsApp. Make sure it is installed.'),
     );
   };
 
@@ -130,14 +130,14 @@ export default function ShopProfileScreen({ route, navigation }: any) {
     if (!email) return;
     trackTap('email');
     Linking.openURL(`mailto:${email}`).catch(() =>
-      Alert.alert('Error', 'Unable to open mail app.'),
+      showAlert('Error', 'Unable to open mail app.'),
     );
   };
 
   const openChat = () => {
     const supabaseId = shop?.owner?.supabaseId;
     if (!supabaseId) {
-      Alert.alert('Unavailable', 'This shop cannot be messaged yet.');
+      showAlert('Unavailable', 'This shop cannot be messaged yet.');
       return;
     }
     navigation.navigate('Chat', {

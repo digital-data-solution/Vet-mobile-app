@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, Image,
-  Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform,
+  ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { showAlert } from '../utils/alert';
 
 const LOGO = require('../../assets/icon.png');
 import * as LocalAuthentication from 'expo-local-authentication';
@@ -105,8 +106,8 @@ export default function AuthScreen({ navigation, route }: { navigation: any; rou
   // ─── Email / password login ─────────────────────────────────────────────────
 
   const handleLogin = useCallback(async () => {
-    if (!email.trim())  return Alert.alert('Validation', 'Please enter your email address.');
-    if (!password)      return Alert.alert('Validation', 'Please enter your password.');
+    if (!email.trim())  return showAlert('Validation', 'Please enter your email address.');
+    if (!password)      return showAlert('Validation', 'Please enter your password.');
 
     setLoading(true);
     try {
@@ -116,7 +117,7 @@ export default function AuthScreen({ navigation, route }: { navigation: any; rou
       });
 
       if (error) {
-        return Alert.alert('Sign In Failed', error.message);
+        return showAlert('Sign In Failed', error.message);
       }
 
       if (data.session) {
@@ -127,7 +128,7 @@ export default function AuthScreen({ navigation, route }: { navigation: any; rou
         );
       }
     } catch {
-      Alert.alert('Network Error', 'Please check your connection and try again.');
+      showAlert('Network Error', 'Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -149,7 +150,7 @@ export default function AuthScreen({ navigation, route }: { navigation: any; rou
       ]);
 
       if (!savedEmail || !savedPassword) {
-        return Alert.alert(
+        return showAlert(
           'No Saved Credentials',
           'Please sign in manually at least once first.',
         );
@@ -161,19 +162,19 @@ export default function AuthScreen({ navigation, route }: { navigation: any; rou
       });
 
       if (error) {
-        Alert.alert('Biometric Sign In Failed', error.message);
+        showAlert('Biometric Sign In Failed', error.message);
       } else if (data.session) {
         await afterLogin(data.session.access_token, savedEmail, savedPassword);
       }
     } catch {
-      Alert.alert('Error', 'Biometric authentication failed.');
+      showAlert('Error', 'Biometric authentication failed.');
     }
   }, [afterLogin]);
 
   // ─── Forgot password ────────────────────────────────────────────────────────
 
   const handleForgotPassword = useCallback(async () => {
-    if (!email.trim()) return Alert.alert('Required', 'Please enter your email address.');
+    if (!email.trim()) return showAlert('Required', 'Please enter your email address.');
 
     setLoading(true);
     try {
@@ -189,16 +190,16 @@ export default function AuthScreen({ navigation, route }: { navigation: any; rou
       );
 
       if (error) {
-        Alert.alert('Reset Failed', error.message);
+        showAlert('Reset Failed', error.message);
       } else {
-        Alert.alert(
+        showAlert(
           'Email Sent',
           'A password reset link has been sent to your email.',
           [{ text: 'OK', onPress: () => setStep('login') }],
         );
       }
     } catch {
-      Alert.alert('Network Error', 'Please check your connection and try again.');
+      showAlert('Network Error', 'Please check your connection and try again.');
     } finally {
       setLoading(false);
     }

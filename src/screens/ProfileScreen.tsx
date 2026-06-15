@@ -4,12 +4,12 @@ import {
   Text,
   StyleSheet,
   Pressable,
-  Alert,
   ActivityIndicator,
   ScrollView,
   Platform,
   Share,
 } from 'react-native';
+import { showAlert } from '../utils/alert';
 import { getCurrentUser, signOut } from '../api/supabase';
 import { apiFetch } from '../api/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -74,6 +74,7 @@ export default function ProfileScreen({ navigation }: Props) {
   const [subscription,         setSubscription]         = useState<SubscriptionInfo | null>(null);
   const [subLoading,           setSubLoading]           = useState(false);
   const [referralCode,         setReferralCode]         = useState<string | null>(null);
+  const [referralLink,         setReferralLink]         = useState('');
   const [referralRewards,      setReferralRewards]      = useState(0);
   const [shareMessage,         setShareMessage]         = useState('');
   const [referralLoading,      setReferralLoading]      = useState(false);
@@ -126,6 +127,7 @@ export default function ProfileScreen({ navigation }: Props) {
       const res = await apiFetch('/api/auth/referral-info', { method: 'GET' });
       if (res.ok && res.body?.data) {
         setReferralCode(res.body.data.referralCode ?? null);
+        setReferralLink(res.body.data.referralLink ?? '');
         setReferralRewards(res.body.data.referralRewardsEarned ?? 0);
         setShareMessage(res.body.data.shareMessage ?? '');
       }
@@ -155,35 +157,53 @@ export default function ProfileScreen({ navigation }: Props) {
     setUser((prev: any) => prev ? { ...prev, profileImage: newUrl } : prev);
   }, []);
 
-  const handleCopyCode = useCallback(async () => {
-    if (!referralCode) return;
-    if (Platform.OS === 'web') {
-      try {
-        await (navigator as any).clipboard.writeText(referralCode);
-        Alert.alert('Copied!', 'Share this code with friends.');
-      } catch {
-        Alert.alert('Your Code', referralCode);
+  const handleCopyLink = useCallback(async () => {
+    const toCopy = referralLink || referralCode || '';
+    if (!toCopy) return;
+    try {
+      if (Platform.OS === 'web') {
+        await (navigator as any).clipboard.writeText(toCopy);
+        showAlert('Link copied!', 'Send it to anyone — they land straight on the sign-up page with your code pre-filled.');
+      } else {
+        await Share.share({
+          message: toCopy,
+          title: 'My Xpress Vet referral link',
+        });
       }
-    } else {
-      try { await Share.share({ message: referralCode }); } catch {}
+    } catch {
+      showAlert('Your Link', toCopy);
     }
-  }, [referralCode]);
+  }, [referralLink, referralCode]);
 
   const handleShare = useCallback(async () => {
     if (!shareMessage) return;
     try {
-      await Share.share({ message: shareMessage });
-    } catch {
-      if (Platform.OS === 'web') {
+      if (Platform.OS === 'web' && typeof (navigator as any).share === 'function' && referralLink) {
+        // Use the native Web Share API when available — gives a proper share card with URL
+        await (navigator as any).share({
+          title: 'Join me on Xpress Vet 🐾',
+          text: `Use my referral code ${referralCode} to sign up`,
+          url: referralLink,
+        });
+      } else if (Platform.OS === 'web') {
+        // Fallback: copy to clipboard
         try {
           await (navigator as any).clipboard.writeText(shareMessage);
-          Alert.alert('Copied!', 'Share this with friends.');
+          showAlert('Copied!', 'Paste and send this to anyone to invite them.');
         } catch {
-          Alert.alert('Share', shareMessage);
+          showAlert('Invite Text', shareMessage);
         }
+      } else {
+        await Share.share({
+          message: shareMessage,
+          title: 'Join Xpress Vet',
+          url: referralLink || undefined,
+        } as any);
       }
+    } catch {
+      /* user dismissed the share sheet — no action needed */
     }
-  }, [shareMessage]);
+  }, [shareMessage, referralLink, referralCode]);
 
   // ─── Logout ────────────────────────────────────────────────────────────────
   const handleLogout = () => {
@@ -193,7 +213,7 @@ export default function ProfileScreen({ navigation }: Props) {
         await AsyncStorage.removeItem('access_token');
         await signOut();
       } catch {
-        Alert.alert('Error', 'Failed to log out. Please try again.');
+        showAlert('Error', 'Failed to log out. Please try again.');
       } finally {
         setLoggingOut(false);
       }
@@ -203,7 +223,7 @@ export default function ProfileScreen({ navigation }: Props) {
       // eslint-disable-next-line no-alert
       if ((window as any).confirm('Are you sure you want to log out?')) doLogout();
     } else {
-      Alert.alert('Log Out', 'Are you sure you want to log out?', [
+      showAlert('Log Out', 'Are you sure you want to log out?', [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Log Out', style: 'destructive', onPress: doLogout },
       ]);
@@ -216,13 +236,13 @@ export default function ProfileScreen({ navigation }: Props) {
       try {
         const res = await apiFetch('/api/subscriptions/cancel', { method: 'DELETE' });
         if (res.ok) {
-          Alert.alert('Subscription Cancelled', res.body?.message || 'Your subscription has been cancelled.');
+          showAlert('Subscription Cancelled', res.body?.message || 'Your subscription has been cancelled.');
           fetchSubscription();
         } else {
-          Alert.alert('Error', res.body?.message || 'Failed to cancel subscription.');
+          showAlert('Error', res.body?.message || 'Failed to cancel subscription.');
         }
       } catch {
-        Alert.alert('Error', 'Failed to cancel subscription. Please try again.');
+        showAlert('Error', 'Failed to cancel subscription. Please try again.');
       }
     };
 
@@ -231,7 +251,7 @@ export default function ProfileScreen({ navigation }: Props) {
         doCancel();
       }
     } else {
-      Alert.alert(
+      showAlert(
         'Cancel Subscription',
         'Are you sure you want to cancel? You will retain access until the end of your billing period.',
         [
@@ -412,21 +432,32 @@ export default function ProfileScreen({ navigation }: Props) {
                 <Text style={styles.referralCodeLabel}>YOUR CODE</Text>
                 <Text selectable style={styles.referralCodeText}>{referralCode}</Text>
               </View>
+              {referralLink ? (
+                <View style={styles.referralLinkBox}>
+                  <Text style={styles.referralLinkLabel}>REFERRAL LINK</Text>
+                  <Text selectable numberOfLines={1} style={styles.referralLinkText}>{referralLink}</Text>
+                  <Text style={styles.referralLinkHint}>
+                    Anyone who opens this link goes straight to sign-up with your code pre-filled
+                  </Text>
+                </View>
+              ) : null}
               <Text style={styles.referralRewardsText}>
-                Free months earned: {referralRewards}
+                🎁 Rewards earned: {referralRewards} month{referralRewards !== 1 ? 's' : ''}
               </Text>
-              <Pressable
-                style={({ pressed }) => [styles.copyButton, pressed && { opacity: 0.8 }]}
-                onPress={handleCopyCode}
-              >
-                <Text style={styles.copyButtonText}>Copy Code</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [styles.shareButton, pressed && { opacity: 0.8 }]}
-                onPress={handleShare}
-              >
-                <Text style={styles.shareButtonText}>Share Invite</Text>
-              </Pressable>
+              <View style={styles.referralBtnRow}>
+                <Pressable
+                  style={({ pressed }) => [styles.copyButton, { flex: 1 }, pressed && { opacity: 0.8 }]}
+                  onPress={handleCopyLink}
+                >
+                  <Text style={styles.copyButtonText}>Copy Link</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [styles.shareButton, { flex: 1 }, pressed && { opacity: 0.8 }]}
+                  onPress={handleShare}
+                >
+                  <Text style={styles.shareButtonText}>Share Invite</Text>
+                </Pressable>
+              </View>
             </>
           ) : null}
         </View>
@@ -834,8 +865,30 @@ const styles = StyleSheet.create({
   referralCodeText: {
     fontSize: 30, fontWeight: '900', color: '#111827', letterSpacing: 8,
   },
+  referralLinkBox: {
+    backgroundColor:   '#F0FDF4',
+    borderRadius:      10,
+    paddingVertical:   10,
+    paddingHorizontal: 14,
+    borderWidth:       1,
+    borderColor:       '#BBF7D0',
+    marginBottom:      10,
+  },
+  referralLinkLabel: {
+    fontSize: 10, fontWeight: '800', color: '#16A34A', letterSpacing: 1.2, marginBottom: 3,
+  },
+  referralLinkText: {
+    fontSize: 12, color: '#111827', fontWeight: '500',
+  },
+  referralLinkHint: {
+    fontSize: 11, color: '#6B7280', marginTop: 4, lineHeight: 16,
+  },
   referralRewardsText: {
     fontSize: 13, color: '#6B7280', textAlign: 'center', marginBottom: 10,
+  },
+  referralBtnRow: {
+    flexDirection: 'row',
+    gap: 8,
   },
   copyButton: {
     borderWidth:     1.5,
@@ -843,14 +896,13 @@ const styles = StyleSheet.create({
     borderRadius:    10,
     paddingVertical: 12,
     alignItems:      'center',
-    marginBottom:    8,
   },
-  copyButtonText: { color: '#E8610A', fontSize: 15, fontWeight: '700' },
+  copyButtonText: { color: '#E8610A', fontSize: 14, fontWeight: '700' },
   shareButton: {
     backgroundColor: '#E8610A',
     borderRadius:    10,
     paddingVertical: 13,
     alignItems:      'center',
   },
-  shareButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  shareButtonText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });

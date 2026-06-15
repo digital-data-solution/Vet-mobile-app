@@ -39,10 +39,12 @@ export default function RegisterScreen({ navigation, route }: Props & { route?: 
   const utmSource   = route?.params?.utmSource   ?? null;
   const utmCampaign = route?.params?.utmCampaign ?? null;
   const utmMedium   = route?.params?.utmMedium   ?? null;
+  // Auto-fill referral code when arriving via a referral link (?ref=CODE)
+  const refParam    = route?.params?.ref ?? route?.params?.referralCode ?? '';
   const [email,           setEmail]           = useState('');
   const [password,        setPassword]        = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [referralCode,    setReferralCode]    = useState('');
+  const [referralCode,    setReferralCode]    = useState(refParam);
   const [step,            setStep]            = useState<Step>('register');
   const [loading,         setLoading]         = useState(false);
   const [showPassword,    setShowPassword]    = useState(false);

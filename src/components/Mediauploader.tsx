@@ -6,11 +6,11 @@ import {
   StyleSheet,
   Pressable,
   ActivityIndicator,
-  Alert,
   ScrollView,
   Dimensions,
   Platform,
 } from 'react-native';
+import { showAlert } from '../utils/alert';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { apiFetch, uploadFile } from '../api/client';
@@ -79,7 +79,7 @@ export default function MediaUploader({
     (async () => {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Please grant camera roll permissions to upload images.');
+        showAlert('Permission Required', 'Please grant camera roll permissions to upload images.');
       }
     })();
   }, []);
@@ -126,7 +126,7 @@ export default function MediaUploader({
   // ── Pick images ───────────────────────────────────────────────────────────
   const pickImages = async () => {
     if (!canUploadMore) {
-      Alert.alert(
+      showAlert(
         'Upload Limit Reached',
         `You have reached the ${maxImages}-image limit for the ${currentPlan} plan.`,
         [
@@ -150,7 +150,7 @@ export default function MediaUploader({
         const selectedAssets = result.assets.slice(0, remainingSlots);
 
         if (result.assets.length > remainingSlots) {
-          Alert.alert(
+          showAlert(
             'Selection Trimmed',
             `You can only upload ${remainingSlots} more image${remainingSlots === 1 ? '' : 's'} on this plan.`,
           );
@@ -160,7 +160,7 @@ export default function MediaUploader({
       }
     } catch (error) {
       console.error('Image picker error:', error);
-      Alert.alert('Error', 'Failed to pick images. Please try again.');
+      showAlert('Error', 'Failed to pick images. Please try again.');
     }
   };
 
@@ -190,7 +190,7 @@ export default function MediaUploader({
         if (!result.ok) {
           if (result.status === 402) {
             await fetchLimits();
-            Alert.alert('Limit Reached', result.userMessage || result.body?.message || 'Upload limit reached.');
+            showAlert('Limit Reached', result.userMessage || result.body?.message || 'Upload limit reached.');
             break;
           }
           throw new Error(result.userMessage || result.body?.message || `Upload failed for image ${i + 1}`);
@@ -208,7 +208,7 @@ export default function MediaUploader({
         const newImages = [...images, ...uploadedImages];
         setImages(newImages);
         onImagesUpdate?.(newImages);
-        Alert.alert('Success', `${uploadedImages.length} image${uploadedImages.length === 1 ? '' : 's'} uploaded.`);
+        showAlert('Success', `${uploadedImages.length} image${uploadedImages.length === 1 ? '' : 's'} uploaded.`);
       }
     } catch (error: any) {
       console.error('Upload error:', error);
@@ -221,7 +221,7 @@ export default function MediaUploader({
         setImages(imagesBeforeUpload);
       }
 
-      Alert.alert('Upload Failed', error.message || 'Failed to upload images. Please try again.');
+      showAlert('Upload Failed', error.message || 'Failed to upload images. Please try again.');
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -250,7 +250,7 @@ export default function MediaUploader({
         onImagesUpdate?.(newImages);
       } catch (error: any) {
         console.error('Delete error:', error);
-        Alert.alert('Error', error.message || 'Failed to delete image.');
+        showAlert('Error', error.message || 'Failed to delete image.');
       }
     };
 
@@ -258,7 +258,7 @@ export default function MediaUploader({
       // eslint-disable-next-line no-alert
       if ((window as any).confirm('Delete this image?')) doDelete();
     } else {
-      Alert.alert('Delete Image', 'Are you sure you want to delete this image?', [
+      showAlert('Delete Image', 'Are you sure you want to delete this image?', [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Delete', style: 'destructive', onPress: doDelete },
       ]);

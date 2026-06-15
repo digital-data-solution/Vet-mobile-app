@@ -4,12 +4,12 @@ import {
   Text,
   TextInput,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   ScrollView,
   TouchableOpacity,
   Linking,
 } from 'react-native';
+import { showAlert } from '../utils/alert';
 import { apiFetch } from '../api/client';
 
 type VerificationStatus = 'idle' | 'submitting' | 'submitted';
@@ -63,7 +63,7 @@ export default function VetVerificationScreen() {
 
   const openVCNPortal = () => {
     Linking.openURL('https://portal.vcn.gov.ng').catch(() =>
-      Alert.alert('Error', 'Unable to open the VCN portal. Please visit portal.vcn.gov.ng manually.')
+      showAlert('Error', 'Unable to open the VCN portal. Please visit portal.vcn.gov.ng manually.')
     );
   };
 
@@ -85,18 +85,18 @@ export default function VetVerificationScreen() {
       if (res.ok && res.body?.success) {
         setSubmitStatus('submitted');
         await fetchStatus();
-        Alert.alert(
+        showAlert(
           'Submitted ✅',
           'Your verification request has been submitted. Our team will review it within 2–3 business days.',
           [{ text: 'OK' }]
         );
       } else {
         setSubmitStatus('idle');
-        Alert.alert('Submission Failed', res.body?.message ?? 'Please try again later.');
+        showAlert('Submission Failed', res.body?.message ?? 'Please try again later.');
       }
     } catch {
       setSubmitStatus('idle');
-      Alert.alert('Network Error', 'Please check your connection and try again.');
+      showAlert('Network Error', 'Please check your connection and try again.');
     }
   };
 

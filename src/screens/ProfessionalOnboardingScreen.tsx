@@ -6,13 +6,13 @@ import {
   Text,
   TextInput,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   Pressable,
 } from 'react-native';
+import { showAlert } from '../utils/alert';
 import { apiFetch } from '../api/client';
 import MediaUploader from '../components/Mediauploader';
 import { useAuth } from '../navigation';
@@ -232,7 +232,7 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
 
   const register = async () => {
     if (!validate()) {
-      Alert.alert('Check Your Details', 'Please fill in all required fields correctly before submitting.');
+      showAlert('Check Your Details', 'Please fill in all required fields correctly before submitting.');
       return;
     }
 
@@ -281,7 +281,7 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
 
       if (res.ok && res.body?.success) {
         if (hasExistingProfile) {
-          Alert.alert('Profile Updated', 'Your profile has been updated successfully.', [
+          showAlert('Profile Updated', 'Your profile has been updated successfully.', [
             { text: 'Done', onPress: () => navigation.goBack() },
           ]);
         } else {
@@ -289,7 +289,7 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
           const locationSet = !!res.body?.data?.location;
           const cfg = ROLE_CONFIG[role];
           if (!locationSet) {
-            Alert.alert(
+            showAlert(
               'Profile Created',
               "We couldn't automatically locate your address for map-based search. You can set it manually now so clients can find you nearby.",
               [
@@ -301,7 +301,7 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
               ],
             );
           } else {
-            Alert.alert(
+            showAlert(
               'Registration Successful!',
               cfg.requiresAdminReview
                 ? 'Your profile has been created and is pending admin review. You will be notified once approved.'
@@ -312,11 +312,11 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
         }
       } else {
         const errorMsg = res.body?.message || 'Please check your details and try again.';
-        Alert.alert(hasExistingProfile ? 'Update Failed' : 'Registration Failed', errorMsg);
+        showAlert(hasExistingProfile ? 'Update Failed' : 'Registration Failed', errorMsg);
       }
     } catch (error) {
       console.error('Save error:', error);
-      Alert.alert('Network Error', 'Please check your connection and try again.');
+      showAlert('Network Error', 'Please check your connection and try again.');
     } finally {
       setLoading(false);
     }

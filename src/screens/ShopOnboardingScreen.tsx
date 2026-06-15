@@ -6,12 +6,12 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { showAlert } from '../utils/alert';
 import { apiFetch } from '../api/client';
 import MediaUploader from '../components/Mediauploader';
 import { useAuth } from '../navigation';
@@ -90,7 +90,7 @@ export default function ShopOnboardingScreen({ navigation }: Props) {
           const subRes = await apiFetch('/api/subscriptions/me', { method: 'GET' });
           if (!isActive) return;
           if (!subRes.ok || !subRes.body?.data?.isActive) {
-            Alert.alert(
+            showAlert(
               'Subscription Required',
               'You need an active subscription to register a shop.',
               [{ text: 'Go to Subscription', onPress: () => navigation.navigate('SubscriptionScreen') }],
@@ -188,17 +188,17 @@ export default function ShopOnboardingScreen({ navigation }: Props) {
           ? 'Your shop details have been updated successfully.'
           : 'Your pet shop is now listed and visible to thousands of pet owners nearby.';
 
-        Alert.alert(successTitle, successMessage, [
+        showAlert(successTitle, successMessage, [
           { text: 'Continue', onPress: () => navigation.goBack() },
         ]);
       } else {
         const errorMsg = res.body?.message || 'Please check your details and try again.';
         console.error('Shop submit failed:', res.body);
-        Alert.alert(isEditMode ? 'Update Failed' : 'Registration Failed', errorMsg);
+        showAlert(isEditMode ? 'Update Failed' : 'Registration Failed', errorMsg);
       }
     } catch (error) {
       console.error('Submit error:', error);
-      Alert.alert('Unexpected Error', 'Something went wrong. Please try again.');
+      showAlert('Unexpected Error', 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }

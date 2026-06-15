@@ -5,13 +5,13 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
   Modal,
   FlatList,
 } from 'react-native';
+import { showAlert } from '../utils/alert';
 import { apiFetch } from '../api/client';
 
 const NIGERIAN_STATES = [
@@ -94,14 +94,14 @@ export default function AddressInputScreen({ navigation, route, onSave }: Props)
           headers: { 'Content-Type': 'application/json' },
         });
         if (res.ok && res.body?.success) {
-          Alert.alert('Location Saved', 'Your address has been updated.', [
+          showAlert('Location Saved', 'Your address has been updated.', [
             { text: 'OK', onPress: () => navigation.goBack() },
           ]);
         } else {
-          Alert.alert('Update Failed', res.body?.message || 'Could not save address. Please try again.');
+          showAlert('Update Failed', res.body?.message || 'Could not save address. Please try again.');
         }
       } catch {
-        Alert.alert('Network Error', 'Please check your connection and try again.');
+        showAlert('Network Error', 'Please check your connection and try again.');
       }
       return;
     }

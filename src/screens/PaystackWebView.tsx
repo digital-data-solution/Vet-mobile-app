@@ -18,7 +18,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -26,6 +25,7 @@ import {
   View,
   Platform,
 } from 'react-native';
+import { showAlert } from '../utils/alert';
 import { WebView, WebViewNavigation } from 'react-native-webview';
 import {
   clearPaystackCallbacks,
@@ -151,7 +151,7 @@ export default function PaystackWebView({ route, navigation }: Props) {
 
   const handleCancel = useCallback(() => {
     if (handledRef.current) return;
-    Alert.alert(
+    showAlert(
       'Cancel Payment',
       'Are you sure you want to cancel this payment?',
       [

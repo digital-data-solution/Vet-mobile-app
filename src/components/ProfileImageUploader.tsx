@@ -4,11 +4,11 @@ import {
   Text,
   Image,
   ActivityIndicator,
-  Alert,
   StyleSheet,
   Pressable,
   Platform,
 } from 'react-native';
+import { showAlert } from '../utils/alert';
 import * as ImagePicker from 'expo-image-picker';
 import { apiFetch, uploadFile } from '../api/client';
 
@@ -43,7 +43,7 @@ export default function ProfileImageUploader({
     (async () => {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(
+        showAlert(
           'Permission Required',
           'Please grant camera roll permissions to upload profile photos.',
         );
@@ -69,7 +69,7 @@ export default function ProfileImageUploader({
       }
     } catch (error) {
       console.error('Image picker error:', error);
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
+      showAlert('Error', 'Failed to pick image. Please try again.');
     }
   };
 
@@ -126,12 +126,12 @@ export default function ProfileImageUploader({
       // Replace local preview with the final Cloudinary URL
       setImage(publicUrl);
       onUploadSuccess?.(publicUrl);
-      Alert.alert('Success', 'Profile photo updated successfully! ✓');
+      showAlert('Success', 'Profile photo updated successfully! ✓');
     } catch (error: any) {
       console.error('Upload error:', error);
       // Roll back preview to the previous remote URL on failure
       setImage(currentImageUrl ?? null);
-      Alert.alert('Upload Failed', error.message || 'Failed to upload image. Please try again.');
+      showAlert('Upload Failed', error.message || 'Failed to upload image. Please try again.');
     } finally {
       setUploading(false);
     }
@@ -150,10 +150,10 @@ export default function ProfileImageUploader({
         if (!updateRes.ok) throw new Error(updateRes.body?.message ?? 'Failed to remove photo.');
         setImage(null);
         onUploadSuccess?.('');
-        Alert.alert('Success', 'Profile photo removed.');
+        showAlert('Success', 'Profile photo removed.');
       } catch (error: any) {
         console.error('Remove error:', error);
-        Alert.alert('Error', error.message || 'Failed to remove photo.');
+        showAlert('Error', error.message || 'Failed to remove photo.');
       } finally {
         setUploading(false);
       }
@@ -163,7 +163,7 @@ export default function ProfileImageUploader({
       // eslint-disable-next-line no-alert
       if ((window as any).confirm('Remove your profile photo?')) doRemove();
     } else {
-      Alert.alert('Remove Photo', 'Are you sure you want to remove your profile photo?', [
+      showAlert('Remove Photo', 'Are you sure you want to remove your profile photo?', [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Remove', style: 'destructive', onPress: doRemove },
       ]);

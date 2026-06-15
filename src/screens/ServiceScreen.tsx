@@ -8,10 +8,10 @@ import {
   StyleSheet,
   ActivityIndicator,
   TextInput,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { showAlert } from '../utils/alert';
 import * as Location from 'expo-location';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -121,10 +121,10 @@ export default function ServiceScreen({ navigation }: any) {
         );
         setResults(all);
       } else {
-        Alert.alert('Error', res.body?.message || 'Failed to load services.');
+        showAlert('Error', res.body?.message || 'Failed to load services.');
       }
     } catch {
-      Alert.alert('Network Error', 'Could not connect. Please try again.');
+      showAlert('Network Error', 'Could not connect. Please try again.');
     } finally {
       setLoading(false);
       setHasLoaded(true);
@@ -155,12 +155,12 @@ export default function ServiceScreen({ navigation }: any) {
         );
         setResults(filtered);
         if (filtered.length === 0)
-          Alert.alert('No Results', 'No service providers found nearby. Try a wider area.');
+          showAlert('No Results', 'No service providers found nearby. Try a wider area.');
       } else {
-        Alert.alert('No Results', 'No service providers found nearby.');
+        showAlert('No Results', 'No service providers found nearby.');
       }
     } catch {
-      Alert.alert('Network Error', 'Please try again.');
+      showAlert('Network Error', 'Please try again.');
     } finally {
       setLoading(false);
       setHasLoaded(true);
@@ -174,7 +174,7 @@ export default function ServiceScreen({ navigation }: any) {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Location access is needed to find nearby services.');
+        showAlert('Permission Denied', 'Location access is needed to find nearby services.');
         return;
       }
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
@@ -182,9 +182,9 @@ export default function ServiceScreen({ navigation }: any) {
         lat: loc.coords.latitude.toString(),
         lng: loc.coords.longitude.toString(),
       });
-      Alert.alert('Location Updated', 'Tap "Search Nearby" to find services near you.');
+      showAlert('Location Updated', 'Tap "Search Nearby" to find services near you.');
     } catch {
-      Alert.alert('Error', 'Failed to get location.');
+      showAlert('Error', 'Failed to get location.');
     } finally {
       setLocationLoading(false);
     }
@@ -317,7 +317,7 @@ export default function ServiceScreen({ navigation }: any) {
             style={styles.nearbyBtn}
             onPress={() => {
               if (!isSubscribed) {
-                Alert.alert(
+                showAlert(
                   'Premium Feature',
                   'GPS nearby search requires a Premium subscription.',
                   [

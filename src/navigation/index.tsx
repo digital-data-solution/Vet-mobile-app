@@ -195,6 +195,18 @@ class NavigationErrorBoundary extends Component<
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[NavigationErrorBoundary]', error, info);
+    // Fire-and-forget crash report to admin
+    const { Platform } = require('react-native');
+    fetch(`${BASE_URL}/api/v1/report-error`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        error:    error.message,
+        stack:    error.stack,
+        platform: Platform.OS,
+        url:      typeof window !== 'undefined' ? window.location?.href : undefined,
+      }),
+    }).catch(() => {});
   }
 
   handleRetry = () => this.setState({ hasError: false, message: '' });
@@ -375,8 +387,14 @@ export default function AppNavigator() {
   }, [fetchRoleFromBackend]);
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    // On web, reset the URL to root before signing out so React Navigation
+    // doesn't try to render an authenticated route with no registered screens.
+    if (typeof window !== 'undefined' && window.history) {
+      window.history.replaceState({}, '', '/');
+    }
+    setSession(null);
     setUserRole(null);
+    await supabase.auth.signOut();
   }, []);
 
   const isAuthenticated = !!session;

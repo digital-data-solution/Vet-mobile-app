@@ -5,13 +5,13 @@ import {
   Text,
   TextInput,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
+import { showAlert } from '../utils/alert';
 import { apiFetch } from '../api/client';
 
 interface Props {
@@ -45,14 +45,14 @@ export default function KennelOnboardingScreen({ navigation }: Props) {
           const res = await apiFetch('/api/subscriptions/me', { method: 'GET' });
           if (!res.ok || !res.body?.data?.isActive) {
             if (isActive) {
-              Alert.alert('Subscription Required', 'You need an active subscription to register a kennel.', [
+              showAlert('Subscription Required', 'You need an active subscription to register a kennel.', [
                 { text: 'Go to Subscription', onPress: () => navigation.navigate('SubscriptionScreen') },
               ]);
             }
           }
         } catch (e) {
           if (isActive) {
-            Alert.alert('Error', 'Could not verify subscription.');
+            showAlert('Error', 'Could not verify subscription.');
           }
         }
       };
@@ -113,12 +113,12 @@ export default function KennelOnboardingScreen({ navigation }: Props) {
         });
       } catch (err) {
         console.error('API call failed:', err);
-        Alert.alert('Network Error', 'Could not reach server. Please check your connection.');
+        showAlert('Network Error', 'Could not reach server. Please check your connection.');
         setLoading(false);
         return;
       }
       if (res.ok && res.body?.success) {
-        Alert.alert(
+        showAlert(
           'Registration Successful! 🎉',
           'Your kennel has been registered and is now live! Pet owners can find you in our directory.',
           [{ text: 'Continue', onPress: () => navigation.navigate('MainTabs') }]
@@ -126,11 +126,11 @@ export default function KennelOnboardingScreen({ navigation }: Props) {
       } else {
         const errorMsg = res.body?.message || 'Please check your details and try again.';
         console.error('Kennel registration failed:', res.body);
-        Alert.alert('Registration Failed', errorMsg);
+        showAlert('Registration Failed', errorMsg);
       }
     } catch (error) {
       console.error('Registration error:', error);
-      Alert.alert('Unexpected Error', 'Something went wrong. Please try again.');
+      showAlert('Unexpected Error', 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }

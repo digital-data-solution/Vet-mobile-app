@@ -6,10 +6,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   Linking,
-  Alert,
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
+import { showAlert } from '../utils/alert';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../api/client';
 
@@ -40,7 +40,7 @@ export default function VerifyProfessionalScreen() {
 
   const checkInApp = async () => {
     if (!vcnNumber.trim()) {
-      Alert.alert('Required', 'Please enter a VCN number first.');
+      showAlert('Required', 'Please enter a VCN number first.');
       return;
     }
     setCheckStatus('checking');
@@ -68,7 +68,7 @@ export default function VerifyProfessionalScreen() {
       ? `?search=${encodeURIComponent(vcnNumber.trim())}`
       : '';
     Linking.openURL(`https://portal.vcn.gov.ng/verify${query}`).catch(() =>
-      Alert.alert('Error', 'Unable to open browser.'),
+      showAlert('Error', 'Unable to open browser.'),
     );
   };
 

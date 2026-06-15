@@ -5,10 +5,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   Linking,
-  Alert,
   ScrollView,
   StatusBar,
 } from 'react-native';
+import { showAlert } from '../utils/alert';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
@@ -86,7 +86,7 @@ export default function ExploreOptionsScreen() {
       bg: '#ECFDF5',
       onPress: () =>
         Linking.openURL('https://portal.vcn.gov.ng/verify').catch(() =>
-          Alert.alert('Error', 'Unable to open browser')
+          showAlert('Error', 'Unable to open browser')
         ),
     },
   ];
@@ -144,7 +144,7 @@ export default function ExploreOptionsScreen() {
                 try {
                   rootNavigation.navigate('ProfessionalOnboarding', { role: 'vet' });
                 } catch (e) {
-                  Alert.alert('Navigation Error', 'Unable to navigate to registration. Please try from the main menu.');
+                  showAlert('Navigation Error', 'Unable to navigate to registration. Please try from the main menu.');
                 }
               }}
               activeOpacity={0.8}
@@ -160,7 +160,7 @@ export default function ExploreOptionsScreen() {
                 try {
                   navigation.navigate('KennelOnboarding');
                 } catch (e) {
-                  Alert.alert('Navigation Error', 'Unable to navigate to registration. Please try from the main menu.');
+                  showAlert('Navigation Error', 'Unable to navigate to registration. Please try from the main menu.');
                 }
               }}
               activeOpacity={0.8}
@@ -177,7 +177,7 @@ export default function ExploreOptionsScreen() {
               try {
                 rootNavigation.navigate('ShopOnboardingScreen');
               } catch (e) {
-                Alert.alert('Navigation Error', 'Unable to navigate to registration. Please try from the main menu.');
+                showAlert('Navigation Error', 'Unable to navigate to registration. Please try from the main menu.');
               }
             }}
             activeOpacity={0.8}

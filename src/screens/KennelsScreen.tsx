@@ -8,11 +8,11 @@ import {
   StyleSheet,
   ActivityIndicator,
   TextInput,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Modal,
 } from 'react-native';
+import { showAlert } from '../utils/alert';
 import * as Location from 'expo-location';
 import { apiFetch } from '../api/client';
 import { Ionicons } from '@expo/vector-icons';
@@ -90,11 +90,11 @@ export default function KennelsScreen({ navigation }: any) {
       } else if (res.status === 402) {
         setKennels([]);
       } else {
-        Alert.alert('Error', res.body?.message || 'Failed to load kennels.');
+        showAlert('Error', res.body?.message || 'Failed to load kennels.');
         setKennels([]);
       }
     } catch {
-      Alert.alert('Network Error', 'Could not connect. Please check your connection.');
+      showAlert('Network Error', 'Could not connect. Please check your connection.');
       setKennels([]);
     } finally {
       setLoading(false);
@@ -115,13 +115,13 @@ export default function KennelsScreen({ navigation }: any) {
         setKennels(res.body.data || []);
         checkUpsellAfterSearch();
         if ((res.body.data || []).length === 0) {
-          Alert.alert('No Results', 'No kennels found nearby. Try a wider search area.');
+          showAlert('No Results', 'No kennels found nearby. Try a wider search area.');
         }
       } else {
-        Alert.alert('No Results', 'No kennels found nearby. Try a wider search area.');
+        showAlert('No Results', 'No kennels found nearby. Try a wider search area.');
       }
     } catch {
-      Alert.alert('Network Error', 'Could not connect. Please try again.');
+      showAlert('Network Error', 'Could not connect. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -132,7 +132,7 @@ export default function KennelsScreen({ navigation }: any) {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Location access is needed to find nearby kennels.');
+        showAlert('Permission Denied', 'Location access is needed to find nearby kennels.');
         return;
       }
       const loc = await Location.getCurrentPositionAsync({
@@ -142,9 +142,9 @@ export default function KennelsScreen({ navigation }: any) {
         lat: loc.coords.latitude.toString(),
         lng: loc.coords.longitude.toString(),
       });
-      Alert.alert('Location Updated', 'Tap "Search Nearby" to find kennels near you.');
+      showAlert('Location Updated', 'Tap "Search Nearby" to find kennels near you.');
     } catch {
-      Alert.alert('Error', 'Failed to get location.');
+      showAlert('Error', 'Failed to get location.');
     } finally {
       setLocationLoading(false);
     }
@@ -255,7 +255,7 @@ export default function KennelsScreen({ navigation }: any) {
             style={styles.searchNearbyBtn}
             onPress={() => {
               if (!isSubscribed) {
-                Alert.alert(
+                showAlert(
                   'Premium Feature',
                   'GPS nearby search requires a Premium subscription.',
                   [
