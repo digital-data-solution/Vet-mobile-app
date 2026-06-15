@@ -131,7 +131,7 @@ export default function RegisterScreen({ navigation, route }: Props & { route?: 
     } finally {
       setLoading(false);
     }
-  }, [email, password, confirmPassword, navigation]);
+  }, [email, password, confirmPassword, agreedToTerms, navigation]);
 
   const handleResendEmail = useCallback(async () => {
     const now = Date.now();
