@@ -139,21 +139,29 @@ const Tab       = createBottomTabNavigator<TabParamList>();
 // Web:    https://xpressvetmarketplace.com/auth/callback  → EmailVerified
 // Native: xpressvet://verify-email                        → EmailVerified
 // ─────────────────────────────────────────────────────────────────────────────
-// Paths that React Navigation owns. Anything else (overlay screens, stale
-// browser history) should fall back to the initial route rather than showing
-// React Navigation's built-in "Not Found" screen.
-const KNOWN_WEB_PATHS = [
+// Public paths (no auth needed) — always pass through to React Navigation.
+const PUBLIC_WEB_PATHS = [
   '/auth/callback',
   '/auth/login',
   '/auth/register',
   '/privacy-policy',
   '/terms-and-conditions',
   '/support',
+];
+
+// Authenticated paths — only pass through when a valid session exists;
+// otherwise fall back to root so initialRouteName ('Auth') takes over.
+const AUTH_WEB_PATHS = [
   '/home',
   '/professionals',
   '/kennels',
   '/shops',
   '/profile',
+  '/services',
+  '/messages',
+  '/subscription',
+  '/network',
+  '/verify',
 ];
 
 const linking: LinkingOptions<RootStackParamList> = {
@@ -162,16 +170,30 @@ const linking: LinkingOptions<RootStackParamList> = {
     'http://xpressvetmarketplace.com',
     'xpressvet://',
   ],
-  // On web, only hand known paths to React Navigation. Unknown paths (overlay
-  // screens that don't have URLs, stale entries, etc.) return the origin root
-  // so initialRouteName takes over instead of showing "Not Found".
   getInitialURL: async () => {
     if (typeof window === 'undefined') return null;
     const { pathname, origin, href } = window.location;
-    const isKnown = KNOWN_WEB_PATHS.some(
-      (p) => pathname === p || pathname.startsWith(p + '?') || pathname.startsWith(p + '/'),
-    );
-    return isKnown ? href : origin + '/';
+
+    const matchesPath = (list: string[]) =>
+      list.some((p) => pathname === p || pathname.startsWith(p + '?') || pathname.startsWith(p + '/'));
+
+    // Public paths: always hand to React Navigation
+    if (matchesPath(PUBLIC_WEB_PATHS)) return href;
+
+    // Authenticated paths: only hand to React Navigation if session is valid.
+    // If the session has expired and the user refreshes at /home, returning
+    // the root lets initialRouteName='Auth' take over instead of showing "Not Found".
+    if (matchesPath(AUTH_WEB_PATHS)) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        return session ? href : origin + '/';
+      } catch {
+        return origin + '/';
+      }
+    }
+
+    // Unknown path — fall back to root so initialRouteName takes over
+    return origin + '/';
   },
   config: {
     screens: {
@@ -187,6 +209,11 @@ const linking: LinkingOptions<RootStackParamList> = {
           Professionals: 'professionals',
           Kennels:       'kennels',
           Shops:         'shops',
+          Services:      'services',
+          Messages:      'messages',
+          Subscription:  'subscription',
+          Network:       'network',
+          VetVerification: 'verify',
           Profile:       'profile',
         },
       },
