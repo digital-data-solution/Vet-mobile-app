@@ -10,8 +10,9 @@ import {
   Share,
 } from 'react-native';
 import { showAlert } from '../utils/alert';
-import { getCurrentUser, signOut } from '../api/supabase';
+import { getCurrentUser } from '../api/supabase';
 import { apiFetch } from '../api/client';
+import { useAuth } from '../navigation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ProfileImageUploader from '../components/ProfileImageUploader';
@@ -68,6 +69,7 @@ function goToSubscription(navigation: any) {
 // COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ProfileScreen({ navigation }: Props) {
+  const { signOut } = useAuth();
   const [user,                 setUser]                 = useState<any>(null);
   const [loading,              setLoading]              = useState(true);
   const [loggingOut,           setLoggingOut]           = useState(false);
@@ -211,7 +213,7 @@ export default function ProfileScreen({ navigation }: Props) {
       setLoggingOut(true);
       try {
         await AsyncStorage.removeItem('access_token');
-        await signOut();
+        await signOut(); // useAuth().signOut resets the web URL and clears auth state
       } catch {
         showAlert('Error', 'Failed to log out. Please try again.');
       } finally {

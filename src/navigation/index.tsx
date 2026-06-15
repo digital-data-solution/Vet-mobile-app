@@ -139,12 +139,40 @@ const Tab       = createBottomTabNavigator<TabParamList>();
 // Web:    https://xpressvetmarketplace.com/auth/callback  → EmailVerified
 // Native: xpressvet://verify-email                        → EmailVerified
 // ─────────────────────────────────────────────────────────────────────────────
+// Paths that React Navigation owns. Anything else (overlay screens, stale
+// browser history) should fall back to the initial route rather than showing
+// React Navigation's built-in "Not Found" screen.
+const KNOWN_WEB_PATHS = [
+  '/auth/callback',
+  '/auth/login',
+  '/auth/register',
+  '/privacy-policy',
+  '/terms-and-conditions',
+  '/support',
+  '/home',
+  '/professionals',
+  '/kennels',
+  '/shops',
+  '/profile',
+];
+
 const linking: LinkingOptions<RootStackParamList> = {
   prefixes: [
     'https://xpressvetmarketplace.com',
     'http://xpressvetmarketplace.com',
     'xpressvet://',
   ],
+  // On web, only hand known paths to React Navigation. Unknown paths (overlay
+  // screens that don't have URLs, stale entries, etc.) return the origin root
+  // so initialRouteName takes over instead of showing "Not Found".
+  getInitialURL: async () => {
+    if (typeof window === 'undefined') return null;
+    const { pathname, origin, href } = window.location;
+    const isKnown = KNOWN_WEB_PATHS.some(
+      (p) => pathname === p || pathname.startsWith(p + '?') || pathname.startsWith(p + '/'),
+    );
+    return isKnown ? href : origin + '/';
+  },
   config: {
     screens: {
       EmailVerified: 'auth/callback',
@@ -276,6 +304,10 @@ function ProfessionalTabs() {
     <Tab.Navigator screenOptions={tabScreenOptions}>
       <Tab.Screen name="Home"            component={HomeScreen}            options={{ tabBarIcon: TabIcon('home'),                headerShown: false }} />
       <Tab.Screen name="Network"         component={ProfessionalsScreen}   options={{ tabBarIcon: TabIcon('people'),              headerShown: false }} />
+      {/* Hidden alias so HomeScreen tiles (navigate('Professionals')) work for professional roles */}
+      <Tab.Screen name="Professionals"   component={ProfessionalsScreen}   options={{ tabBarButton: () => null,                  headerShown: false }} />
+      {/* Hidden tab so HomeScreen Kennels tile works for professional roles */}
+      <Tab.Screen name="Kennels"         component={KennelsScreen}         options={{ tabBarButton: () => null,                  headerShown: false }} />
       <Tab.Screen name="Services"        component={ServiceScreen}         options={{ title: 'Pet Services', tabBarLabel: 'Services', tabBarIcon: TabIcon('grid-outline'), headerShown: false }} />
       <Tab.Screen name="Shops"           component={ShopsScreen}           options={{ title: 'Pet Shops', tabBarLabel: 'Shops',   tabBarIcon: TabIcon('basket'),          headerShown: false }} />
       <Tab.Screen name="Subscription"    component={SubscriptionScreen}    options={{ title: 'Subscription', tabBarIcon: TabIcon('star'),                                  headerShown: false }} />
@@ -289,11 +321,14 @@ function ProfessionalTabs() {
 function KennelOwnerTabs() {
   return (
     <Tab.Navigator screenOptions={tabScreenOptions}>
-      <Tab.Screen name="Home"         component={HomeScreen}         options={{ tabBarIcon: TabIcon('home'),  headerShown: false }} />
-      <Tab.Screen name="Kennels"      component={KennelsScreen}      options={{ tabBarIcon: TabIcon('paw'),   headerShown: false }} />
-      <Tab.Screen name="Messages"     component={ConversationsScreen} options={{ title: 'Messages', tabBarIcon: TabIcon('chatbubbles-outline'), headerShown: false }} />
-      <Tab.Screen name="Subscription" component={SubscriptionScreen} options={{ title: 'Subscription', tabBarIcon: TabIcon('star'),   headerShown: false }} />
-      <Tab.Screen name="Profile"      component={ProfileScreen}      options={{ tabBarIcon: TabIcon('person'), headerShown: false }} />
+      <Tab.Screen name="Home"          component={HomeScreen}          options={{ tabBarIcon: TabIcon('home'),  headerShown: false }} />
+      <Tab.Screen name="Kennels"       component={KennelsScreen}       options={{ tabBarIcon: TabIcon('paw'),   headerShown: false }} />
+      <Tab.Screen name="Professionals" component={ProfessionalsScreen} options={{ tabBarButton: () => null,     headerShown: false }} />
+      <Tab.Screen name="Services"      component={ServiceScreen}       options={{ tabBarButton: () => null,     headerShown: false }} />
+      <Tab.Screen name="Shops"         component={ShopsScreen}         options={{ tabBarButton: () => null,     headerShown: false }} />
+      <Tab.Screen name="Messages"      component={ConversationsScreen} options={{ title: 'Messages', tabBarIcon: TabIcon('chatbubbles-outline'), headerShown: false }} />
+      <Tab.Screen name="Subscription"  component={SubscriptionScreen}  options={{ title: 'Subscription', tabBarIcon: TabIcon('star'), headerShown: false }} />
+      <Tab.Screen name="Profile"       component={ProfileScreen}       options={{ tabBarIcon: TabIcon('person'), headerShown: false }} />
     </Tab.Navigator>
   );
 }
@@ -301,11 +336,14 @@ function KennelOwnerTabs() {
 function ShopOwnerTabs() {
   return (
     <Tab.Navigator screenOptions={tabScreenOptions}>
-      <Tab.Screen name="Home"         component={HomeScreen}         options={{ tabBarIcon: TabIcon('home'),   headerShown: false }} />
-      <Tab.Screen name="Shops"        component={ShopsScreen}        options={{ title: 'My Shops', tabBarIcon: TabIcon('basket'), headerShown: false }} />
-      <Tab.Screen name="Messages"     component={ConversationsScreen} options={{ title: 'Messages', tabBarIcon: TabIcon('chatbubbles-outline'), headerShown: false }} />
-      <Tab.Screen name="Subscription" component={SubscriptionScreen} options={{ title: 'Subscription', tabBarIcon: TabIcon('star'),    headerShown: false }} />
-      <Tab.Screen name="Profile"      component={ProfileScreen}      options={{ tabBarIcon: TabIcon('person'), headerShown: false }} />
+      <Tab.Screen name="Home"          component={HomeScreen}          options={{ tabBarIcon: TabIcon('home'),   headerShown: false }} />
+      <Tab.Screen name="Shops"         component={ShopsScreen}         options={{ title: 'My Shops', tabBarIcon: TabIcon('basket'), headerShown: false }} />
+      <Tab.Screen name="Professionals" component={ProfessionalsScreen} options={{ tabBarButton: () => null,     headerShown: false }} />
+      <Tab.Screen name="Kennels"       component={KennelsScreen}       options={{ tabBarButton: () => null,     headerShown: false }} />
+      <Tab.Screen name="Services"      component={ServiceScreen}       options={{ tabBarButton: () => null,     headerShown: false }} />
+      <Tab.Screen name="Messages"      component={ConversationsScreen} options={{ title: 'Messages', tabBarIcon: TabIcon('chatbubbles-outline'), headerShown: false }} />
+      <Tab.Screen name="Subscription"  component={SubscriptionScreen}  options={{ title: 'Subscription', tabBarIcon: TabIcon('star'), headerShown: false }} />
+      <Tab.Screen name="Profile"       component={ProfileScreen}       options={{ tabBarIcon: TabIcon('person'), headerShown: false }} />
     </Tab.Navigator>
   );
 }
@@ -436,12 +474,15 @@ export default function AppNavigator() {
               options={{ headerShown: false }}
             />
 
-            {!isAuthenticated ? (
-              <>
-                <RootStack.Screen name="Auth"     component={AuthScreen} />
-                <RootStack.Screen name="Register" component={RegisterScreen} />
-              </>
-            ) : (
+            {/*
+             * Auth + Register are ALWAYS registered so that deep links like
+             * /auth/register?ref=CODE work even when the user is already signed
+             * in — the screens themselves redirect to MainTabs in that case.
+             */}
+            <RootStack.Screen name="Auth"     component={AuthScreen} />
+            <RootStack.Screen name="Register" component={RegisterScreen} />
+
+            {isAuthenticated && (
               <>
                 <RootStack.Screen name="MainTabs" component={MainTabs} />
 

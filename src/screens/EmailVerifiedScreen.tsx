@@ -30,6 +30,10 @@ export default function EmailVerifiedScreen({ navigation }: any) {
     if (stage !== 'verified') return;
     if (!isAuthenticated) return;
     const timer = setTimeout(() => {
+      // Reset URL to '/' so '/auth/callback' doesn't re-trigger this screen on next load
+      if (typeof window !== 'undefined' && window.history) {
+        window.history.replaceState({}, '', '/');
+      }
       navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
     }, 800);
     return () => clearTimeout(timer);

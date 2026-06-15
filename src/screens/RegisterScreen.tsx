@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ const LOGO = require('../../assets/icon.png');
 import { supabase } from '../api/supabase';
 import { apiFetch } from '../api/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../navigation';
 
 type Step = 'register' | 'emailSent';
 
@@ -36,6 +37,16 @@ const EMAIL_VERIFY_REDIRECT = Platform.OS === 'web'
   : 'xpressvet://auth/callback';
 
 export default function RegisterScreen({ navigation, route }: Props & { route?: any }) {
+  const { isAuthenticated } = useAuth();
+
+  // Authenticated users who land here (e.g. via a shared referral link) should
+  // go straight to the app — they don't need to register again.
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigation.replace('MainTabs');
+    }
+  }, [isAuthenticated, navigation]);
+
   const utmSource   = route?.params?.utmSource   ?? null;
   const utmCampaign = route?.params?.utmCampaign ?? null;
   const utmMedium   = route?.params?.utmMedium   ?? null;

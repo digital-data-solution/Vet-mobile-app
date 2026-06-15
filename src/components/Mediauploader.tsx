@@ -96,19 +96,6 @@ export default function MediaUploader({
         setMaxImages(data.maxImages);
         setPlanLimits(data.limits ?? {});
 
-        // FIX: Use unique sentinel keys with timestamp to avoid duplicate key warnings
-        setImages((prev) => {
-          if (prev.length < data.usedImages) {
-            const missing = data.usedImages - prev.length;
-            const sentinels: MediaImage[] = Array.from({ length: missing }, (_, i) => ({
-              url:      '',
-              // FIX: was __sentinel__0, __sentinel__0 (duplicate) — now uses Date + index
-              publicId: `__sentinel__${Date.now()}_${i}`,
-            }));
-            return [...prev, ...sentinels];
-          }
-          return prev;
-        });
       } else {
         console.warn('Could not fetch upload limits:', res.body?.message);
       }

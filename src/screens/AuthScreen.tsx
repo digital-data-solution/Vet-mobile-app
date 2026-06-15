@@ -10,6 +10,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage             from '@react-native-async-storage/async-storage';
 import { supabase }             from '../api/supabase';
 import { apiFetch }             from '../api/client';
+import { useAuth }              from '../navigation';
 
 type Step = 'login' | 'forgot';
 
@@ -59,6 +60,7 @@ async function syncWithBackend(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function AuthScreen({ navigation, route }: { navigation: any; route?: any }) {
+  const { isAuthenticated } = useAuth();
   const utmSource   = route?.params?.utmSource   ?? null;
   const utmCampaign = route?.params?.utmCampaign ?? null;
   const utmMedium   = route?.params?.utmMedium   ?? null;
@@ -68,6 +70,13 @@ export default function AuthScreen({ navigation, route }: { navigation: any; rou
   const [loading,            setLoading]            = useState(false);
   const [showPassword,       setShowPassword]       = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
+
+  // Redirect already-authenticated users away from the login screen
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigation.replace('MainTabs');
+    }
+  }, [isAuthenticated, navigation]);
 
   useEffect(() => {
     (async () => {
