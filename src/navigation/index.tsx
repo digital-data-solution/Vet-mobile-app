@@ -22,7 +22,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { supabase } from '../api/supabase';
-import type { Session } from '@supabase/supabase-js';
 
 import HomeScreen                   from '../screens/HomeScreen';
 import AuthScreen                   from '../screens/AuthScreen';
@@ -53,6 +52,13 @@ import TermsScreen                  from '../screens/TermsScreen';
 import SupportScreen                from '../screens/SupportScreen';
 
 const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://vet-market-place-jsj5.onrender.com';
+
+// Module-level session cache so getInitialURL can check auth state synchronously.
+// Set by bootstrap() BEFORE setLoading(false), which is BEFORE NavigationContainer
+// mounts — so by the time getInitialURL is called, this is always populated.
+// undefined = bootstrap not yet run; null = no session; Session = authenticated.
+import type { Session } from '@supabase/supabase-js';
+let _bootstrapSession: Session | null | undefined = undefined;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -187,20 +193,16 @@ const linking: LinkingOptions<RootStackParamList> = {
     // Public paths: always hand to React Navigation
     if (matchesPath(PUBLIC_WEB_PATHS)) return href;
 
-    // Authenticated paths: only hand to React Navigation if session is valid.
-    // If the session has expired and the user refreshes at /home, returning
-    // the root lets initialRouteName='Auth' take over instead of showing "Not Found".
-    // For unauthenticated deep links (referral links, email links), save the
-    // intended URL so AppNavigator can redirect there once the user logs in.
+    // Authenticated paths: only hand to React Navigation if a session exists.
+    // _bootstrapSession is set synchronously by bootstrap() before setLoading(false),
+    // which fires before NavigationContainer mounts — so no async call is needed here.
+    // Avoiding an async getSession() call prevents the blank-screen flash that occurs
+    // while React Navigation waits for the promise to resolve.
     if (matchesPath(AUTH_WEB_PATHS)) {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) return href;
-        try { sessionStorage.setItem('postLoginRedirect', href); } catch {}
-        return origin + '/';
-      } catch {
-        return origin + '/';
-      }
+      if (_bootstrapSession) return href;
+      // No session: save URL for post-login redirect, fall back to root (→ Auth screen)
+      try { sessionStorage.setItem('postLoginRedirect', href); } catch {}
+      return origin + '/';
     }
 
     // Unknown path — fall back to root so initialRouteName takes over
@@ -452,6 +454,10 @@ export default function AppNavigator() {
     const bootstrap = async () => {
       const { data: { session: initial } } = await supabase.auth.getSession();
       if (!mounted) return;
+      // Cache session at module level so getInitialURL can read it synchronously.
+      // Must be set BEFORE setLoading(false) because NavigationContainer mounts
+      // on the re-render triggered by setLoading(false).
+      _bootstrapSession = initial;
       setSession(initial);
       await fetchRoleFromBackend(initial);
       setLoading(false);
@@ -462,6 +468,7 @@ export default function AppNavigator() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, newSession) => {
         if (!mounted) return;
+        _bootstrapSession = newSession;
         // When session expires, reset the URL to root so the navigator
         // doesn't try to render an authenticated route with no registered screens.
         if (!newSession && typeof window !== 'undefined' && window.history) {
