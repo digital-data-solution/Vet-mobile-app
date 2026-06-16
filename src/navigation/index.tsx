@@ -53,10 +53,6 @@ import SupportScreen                from '../screens/SupportScreen';
 
 const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://vet-market-place-jsj5.onrender.com';
 
-// Module-level session cache so getInitialURL can check auth state synchronously.
-// Set by bootstrap() BEFORE setLoading(false), which is BEFORE NavigationContainer
-// mounts — so by the time getInitialURL is called, this is always populated.
-// undefined = bootstrap not yet run; null = no session; Session = authenticated.
 import type { Session } from '@supabase/supabase-js';
 let _bootstrapSession: Session | null | undefined = undefined;
 
@@ -99,7 +95,6 @@ export type RootStackParamList = {
   Register:         undefined;
   MainTabs:         NavigatorScreenParams<TabParamList> | undefined;
   EmailVerified:    undefined;
-  // Shared overlay screens
   VetProfile:             { vetId?: string } | undefined;
   ShopProfile:            { shopId?: string } | undefined;
   KennelProfile:          { kennelId?: string } | undefined;
@@ -141,11 +136,7 @@ const Tab       = createBottomTabNavigator<TabParamList>();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DEEP LINKING CONFIG
-// Maps incoming URLs to screen names in RootStack.
-// Web:    https://xpressvetmarketplace.com/auth/callback  → EmailVerified
-// Native: xpressvet://verify-email                        → EmailVerified
 // ─────────────────────────────────────────────────────────────────────────────
-// Public paths (no auth needed) — always pass through to React Navigation.
 const PUBLIC_WEB_PATHS = [
   '/auth/callback',
   '/auth/login',
@@ -155,8 +146,6 @@ const PUBLIC_WEB_PATHS = [
   '/support',
 ];
 
-// Authenticated paths — only pass through when a valid session exists;
-// otherwise fall back to root so initialRouteName ('Auth') takes over.
 const AUTH_WEB_PATHS = [
   '/home',
   '/professionals',
@@ -168,7 +157,6 @@ const AUTH_WEB_PATHS = [
   '/subscription',
   '/network',
   '/verify',
-  // Overlay / profile screens (include query-param variants like /VetProfile?vetId=...)
   '/VetProfile',
   '/ShopProfile',
   '/KennelProfile',
@@ -190,22 +178,17 @@ const linking: LinkingOptions<RootStackParamList> = {
     const matchesPath = (list: string[]) =>
       list.some((p) => pathname === p || pathname.startsWith(p + '?') || pathname.startsWith(p + '/'));
 
-    // Public paths: always hand to React Navigation
     if (matchesPath(PUBLIC_WEB_PATHS)) return href;
 
-    // Authenticated paths: only hand to React Navigation if a session exists.
-    // _bootstrapSession is set synchronously by bootstrap() before setLoading(false),
-    // which fires before NavigationContainer mounts — so no async call is needed here.
-    // Avoiding an async getSession() call prevents the blank-screen flash that occurs
-    // while React Navigation waits for the promise to resolve.
     if (matchesPath(AUTH_WEB_PATHS)) {
       if (_bootstrapSession) return href;
-      // No session: save URL for post-login redirect, fall back to root (→ Auth screen)
-      try { sessionStorage.setItem('postLoginRedirect', href); } catch {}
+      // Only save non-root paths as redirect targets to avoid loop
+      if (pathname !== '/') {
+        try { sessionStorage.setItem('postLoginRedirect', href); } catch {}
+      }
       return origin + '/';
     }
 
-    // Unknown path — fall back to root so initialRouteName takes over
     return origin + '/';
   },
   config: {
@@ -216,7 +199,6 @@ const linking: LinkingOptions<RootStackParamList> = {
       PrivacyPolicy: 'privacy-policy',
       Terms:         'terms-and-conditions',
       Support:       'support',
-      // Overlay screens — parse query-string params into navigation params
       VetProfile:     { path: 'VetProfile',     parse: { vetId:          String } },
       ShopProfile:    { path: 'ShopProfile',     parse: { shopId:         String } },
       KennelProfile:  { path: 'KennelProfile',   parse: { kennelId:       String } },
@@ -258,7 +240,7 @@ function LoadingScreen() {
 // ─────────────────────────────────────────────────────────────────────────────
 type ErrorBoundaryState = { hasError: boolean; message: string };
 
-class NavigationErrorBoundary extends Component<
+class NavigationErrorBoundary extends Component
   { children: ReactNode },
   ErrorBoundaryState
 > {
@@ -270,7 +252,6 @@ class NavigationErrorBoundary extends Component<
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[NavigationErrorBoundary]', error, info);
-    // Fire-and-forget crash report to admin
     const { Platform } = require('react-native');
     fetch(`${BASE_URL}/api/v1/report-error`, {
       method:  'POST',
@@ -351,9 +332,7 @@ function ProfessionalTabs() {
     <Tab.Navigator screenOptions={tabScreenOptions}>
       <Tab.Screen name="Home"            component={HomeScreen}            options={{ tabBarIcon: TabIcon('home'),                headerShown: false }} />
       <Tab.Screen name="Network"         component={ProfessionalsScreen}   options={{ tabBarIcon: TabIcon('people'),              headerShown: false }} />
-      {/* Hidden alias so HomeScreen tiles (navigate('Professionals')) work for professional roles */}
       <Tab.Screen name="Professionals"   component={ProfessionalsScreen}   options={{ tabBarButton: () => null,                  headerShown: false }} />
-      {/* Hidden tab so HomeScreen Kennels tile works for professional roles */}
       <Tab.Screen name="Kennels"         component={KennelsScreen}         options={{ tabBarButton: () => null,                  headerShown: false }} />
       <Tab.Screen name="Services"        component={ServiceScreen}         options={{ title: 'Pet Services', tabBarLabel: 'Services', tabBarIcon: TabIcon('grid-outline'), headerShown: false }} />
       <Tab.Screen name="Shops"           component={ShopsScreen}           options={{ title: 'Pet Shops', tabBarLabel: 'Shops',   tabBarIcon: TabIcon('basket'),          headerShown: false }} />
@@ -374,7 +353,7 @@ function KennelOwnerTabs() {
       <Tab.Screen name="Services"      component={ServiceScreen}       options={{ tabBarButton: () => null,     headerShown: false }} />
       <Tab.Screen name="Shops"         component={ShopsScreen}         options={{ tabBarButton: () => null,     headerShown: false }} />
       <Tab.Screen name="Messages"      component={ConversationsScreen} options={{ title: 'Messages', tabBarIcon: TabIcon('chatbubbles-outline'), headerShown: false }} />
-      <Tab.Screen name="Subscription"  component={SubscriptionScreen}  options={{ title: 'Subscription', tabBarIcon: TabIcon('star'), headerShown: false }} />
+      <Tab.Screen name="Subscription" component={SubscriptionScreen} options={{ title: 'Subscription', tabBarIcon: TabIcon('star'), headerShown: false }} />
       <Tab.Screen name="Profile"       component={ProfileScreen}       options={{ tabBarIcon: TabIcon('person'), headerShown: false }} />
     </Tab.Navigator>
   );
@@ -419,8 +398,6 @@ export default function AppNavigator() {
   const [userRole, setUserRole] = useState<UserRole>(null);
   const [loading,  setLoading]  = useState(true);
 
-  // Derive isAuthenticated immediately so effects below can reference it safely
-  // (avoids temporal dead zone if placed after the effects).
   const isAuthenticated = !!session;
 
   const fetchRoleFromBackend = useCallback(async (currentSession: Session | null) => {
@@ -454,9 +431,6 @@ export default function AppNavigator() {
     const bootstrap = async () => {
       const { data: { session: initial } } = await supabase.auth.getSession();
       if (!mounted) return;
-      // Cache session at module level so getInitialURL can read it synchronously.
-      // Must be set BEFORE setLoading(false) because NavigationContainer mounts
-      // on the re-render triggered by setLoading(false).
       _bootstrapSession = initial;
       setSession(initial);
       await fetchRoleFromBackend(initial);
@@ -469,8 +443,6 @@ export default function AppNavigator() {
       async (_event, newSession) => {
         if (!mounted) return;
         _bootstrapSession = newSession;
-        // When session expires, reset the URL to root so the navigator
-        // doesn't try to render an authenticated route with no registered screens.
         if (!newSession && typeof window !== 'undefined' && window.history) {
           const { pathname } = window.location;
           const isPublic =
@@ -489,8 +461,8 @@ export default function AppNavigator() {
     };
   }, [fetchRoleFromBackend]);
 
-  // After login, redirect to the URL the user was trying to reach before being
-  // sent to the login screen (e.g. a referral link or a shared vet profile URL).
+  // After login, redirect to the URL the user was trying to reach before auth.
+  // Use history.replaceState instead of window.location.href to avoid full reload loop.
   useEffect(() => {
     if (!isAuthenticated || loading) return;
     if (typeof window === 'undefined') return;
@@ -498,12 +470,15 @@ export default function AppNavigator() {
       const pending = sessionStorage.getItem('postLoginRedirect');
       if (!pending) return;
       sessionStorage.removeItem('postLoginRedirect');
-      window.location.href = pending;
+      const url = new URL(pending);
+      // Only redirect if it's a different non-root path to avoid loop
+      if (url.pathname !== '/' && url.pathname !== window.location.pathname) {
+        window.history.replaceState({}, '', url.pathname + url.search);
+      }
     } catch {}
   }, [isAuthenticated, loading]);
 
-  // Belt-and-suspenders URL reset: if React re-renders before onAuthStateChange fires
-  // the URL reset above, this effect also clears any protected pathname.
+  // Reset URL to root when unauthenticated and on a protected path
   useEffect(() => {
     if (loading || isAuthenticated) return;
     if (typeof window !== 'undefined' && window.history) {
@@ -516,8 +491,6 @@ export default function AppNavigator() {
   }, [isAuthenticated, loading]);
 
   const signOut = useCallback(async () => {
-    // On web, reset the URL to root before signing out so React Navigation
-    // doesn't try to render an authenticated route with no registered screens.
     if (typeof window !== 'undefined' && window.history) {
       window.history.replaceState({}, '', '/');
     }
@@ -536,22 +509,8 @@ export default function AppNavigator() {
             screenOptions={{ headerShown: false }}
             initialRouteName={isAuthenticated ? 'MainTabs' : 'Auth'}
           >
-
-            {/*
-             * Auth + Register are first so that when the navigation state becomes
-             * empty (e.g. after session expiry removes MainTabs), React Navigation
-             * falls back to Auth — not EmailVerified.
-             * They're also ALWAYS registered so deep links like /auth/register?ref=CODE
-             * work even when the user is already signed in.
-             */}
             <RootStack.Screen name="Auth"     component={AuthScreen} />
             <RootStack.Screen name="Register" component={RegisterScreen} />
-
-            {/*
-             * EmailVerified is ALWAYS registered regardless of auth state.
-             * The email confirmation link hits /auth/callback whether the
-             * user is logged in or not — so it must be reachable from both.
-             */}
             <RootStack.Screen
               name="EmailVerified"
               component={EmailVerifiedScreen}
@@ -576,7 +535,6 @@ export default function AppNavigator() {
             {isAuthenticated && (
               <>
                 <RootStack.Screen name="MainTabs" component={MainTabs} />
-
                 <RootStack.Screen
                   name="VetProfile"
                   component={VetProfileScreen}
