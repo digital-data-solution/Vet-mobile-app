@@ -7,8 +7,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "export": "expo export --platform web --clear",
-    "postexport": "node -e \"require('fs').copyFileSync('_redirects','dist/_redirects')\""
+    "export": "expo export --platform web --clear"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
