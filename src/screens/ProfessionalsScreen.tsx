@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
+  Image,
 } from 'react-native';
 import { showAlert } from '../utils/alert';
 import * as Location from 'expo-location';
@@ -24,7 +25,8 @@ import { apiFetch } from '../api/client';
 
 type ProfRole =
   | 'vet' | 'kennel' | 'groomer' | 'trainer' | 'pet_sitter'
-  | 'pet_transport' | 'cremation_service' | 'agro_vet_supplier' | 'insurance_provider';
+  | 'pet_transport' | 'cremation_service' | 'agro_vet_supplier' | 'insurance_provider'
+  | 'pet_pharmacy' | 'rescue_center' | 'pet_hotel' | 'farm';
 
 const ROLE_META: Record<ProfRole, { label: string; emoji: string; color: string; avatarBg: string }> = {
   vet:               { label: 'Veterinarian',       emoji: '👨‍⚕️', color: '#2563EB', avatarBg: '#EFF6FF' },
@@ -36,6 +38,10 @@ const ROLE_META: Record<ProfRole, { label: string; emoji: string; color: string;
   cremation_service: { label: 'Cremation Service',   emoji: '🕊️',  color: '#64748B', avatarBg: '#F8FAFC' },
   agro_vet_supplier: { label: 'Agro-Vet Supplier',  emoji: '🌾',   color: '#65A30D', avatarBg: '#F7FEE7' },
   insurance_provider:{ label: 'Insurance Provider', emoji: '🛡️',  color: '#7C3AED', avatarBg: '#F5F3FF' },
+  pet_pharmacy:      { label: 'Pet Pharmacy',       emoji: '💊',   color: '#0891B2', avatarBg: '#ECFEFF' },
+  rescue_center:     { label: 'Rescue Center',      emoji: '🐾',   color: '#EA580C', avatarBg: '#FFF7ED' },
+  pet_hotel:         { label: 'Pet Hotel',          emoji: '🏨',   color: '#0D9488', avatarBg: '#F0FDFA' },
+  farm:              { label: 'Farm',               emoji: '🐐',   color: '#92400E', avatarBg: '#FEF9E7' },
 };
 
 const FILTER_CHIPS: { key: ProfRole | 'all'; label: string; emoji: string }[] = [
@@ -49,6 +55,10 @@ const FILTER_CHIPS: { key: ProfRole | 'all'; label: string; emoji: string }[] = 
   { key: 'cremation_service', label: 'Cremation',         emoji: '🕊️' },
   { key: 'agro_vet_supplier', label: 'Agro-Vet',         emoji: '🌾' },
   { key: 'insurance_provider',label: 'Insurance',        emoji: '🛡️' },
+  { key: 'pet_pharmacy',      label: 'Pharmacy',         emoji: '💊' },
+  { key: 'rescue_center',     label: 'Rescue',           emoji: '🐾' },
+  { key: 'pet_hotel',         label: 'Pet Hotel',        emoji: '🏨' },
+  { key: 'farm',              label: 'Farms',            emoji: '🐐' },
 ];
 
 interface Professional {
@@ -67,6 +77,8 @@ interface Professional {
   isVerified: boolean;
   rating?: number;
   reviewCount?: number;
+  profileImage?: string;
+  mediaImages?: { url: string; publicId: string }[];
 }
 
 interface Props {
@@ -273,6 +285,7 @@ export default function ProfessionalsScreen({ navigation }: Props) {
     const meta = ROLE_META[item.role] ?? ROLE_META.vet;
     const displayName = item.businessName || item.name || item.userId?.name || 'Unknown';
     const showOwnerLine = item.businessName && item.name && item.name !== item.businessName;
+    const avatarUri = item.profileImage || item.mediaImages?.[0]?.url;
 
     return (
       <TouchableOpacity
@@ -282,7 +295,11 @@ export default function ProfessionalsScreen({ navigation }: Props) {
       >
         <View style={styles.cardHeader}>
           <View style={[styles.avatarCircle, { backgroundColor: meta.avatarBg }]}>
-            <Text style={styles.avatarEmoji}>{meta.emoji}</Text>
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+            ) : (
+              <Text style={styles.avatarEmoji}>{meta.emoji}</Text>
+            )}
           </View>
           <View style={styles.cardMeta}>
             <Text style={styles.vetName}>{displayName}</Text>
@@ -673,7 +690,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    overflow: 'hidden',
   },
+  avatarImage: { width: 48, height: 48 },
   avatarEmoji: { fontSize: 22 },
   cardMeta: { flex: 1 },
   vetName: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 1 },

@@ -23,7 +23,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ProfessionalOnboarding'
 type Role =
   | 'vet' | 'kennel' | 'groomer' | 'trainer' | 'pet_sitter'
   | 'pet_transport' | 'cremation_service' | 'agro_vet_supplier' | 'insurance_provider'
-  | 'pet_pharmacy' | 'rescue_center' | 'pet_hotel';
+  | 'pet_pharmacy' | 'rescue_center' | 'pet_hotel' | 'farm';
 
 interface MediaImage { url: string; publicId: string; }
 
@@ -133,12 +133,20 @@ const ROLE_CONFIG: Record<Role, RoleConfig> = {
     specializationPlaceholder: 'e.g. Luxury suites, Pool, Grooming, 24h care',
     requiresVCN: false, requiresBusinessName: true, requiresAdminReview: false,
   },
+  farm: {
+    label: 'Farm', emoji: '🐐', color: '#92400E',
+    businessNameLabel: 'Farm Name *',
+    specializationLabel: 'Farm Type(s)',
+    specializationPlaceholder: 'e.g. Goat Farm, Poultry, Livestock',
+    requiresVCN: false, requiresBusinessName: true, requiresAdminReview: true,
+  },
 };
 
 const ROLE_GROUPS: { label: string; roles: Role[] }[] = [
   { label: 'Medical & Welfare',  roles: ['vet', 'pet_pharmacy', 'rescue_center'] },
   { label: 'Care & Boarding',    roles: ['kennel', 'pet_hotel', 'groomer', 'trainer', 'pet_sitter'] },
   { label: 'Business & Trade',   roles: ['pet_transport', 'cremation_service', 'agro_vet_supplier', 'insurance_provider'] },
+  { label: 'Farming & Livestock', roles: ['farm'] },
 ];
 
 const VET_SPECIALIZATIONS = [
@@ -147,6 +155,18 @@ const VET_SPECIALIZATIONS = [
   'Dermatology', 'Oncology', 'Cardiology', 'Ophthalmology',
   'Reproduction', 'Aquatic Animals',
 ];
+
+const FARM_SPECIALIZATIONS = [
+  'Goat Farm', 'Poultry Farm', 'Egg Production', 'Dog Breeding Farm',
+  'Livestock Farm', 'Snail Farm', 'Fish Farm', 'Piggery',
+  'Cattle Ranch', 'Dairy Farm', 'Rabbit Farm', 'Sheep Farm',
+  'Bee Farm / Apiary', 'Mixed Farm',
+];
+
+const SPECIALIZATION_CHIPS: Partial<Record<Role, string[]>> = {
+  vet: VET_SPECIALIZATIONS,
+  farm: FARM_SPECIALIZATIONS,
+};
 
 export default function ProfessionalOnboardingScreen({ navigation, route }: Props) {
   const { refreshRole } = useAuth();
@@ -435,6 +455,7 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
                 : role === 'kennel' ? 'e.g. Happy Paws Kennel'
                 : role === 'pet_transport' ? 'e.g. SafePaws Logistics'
                 : role === 'insurance_provider' ? 'e.g. PetGuard Insurance Ltd'
+                : role === 'farm' ? 'e.g. Sunrise Goat & Poultry Farm'
                 : 'e.g. Your business name'
               }
               error={errors.businessName}
@@ -450,12 +471,12 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
             multiline
           />
 
-          {/* Vet specialization chips */}
-          {role === 'vet' ? (
+          {/* Specialization chips — roles with a curated list (vet, farm) */}
+          {SPECIALIZATION_CHIPS[role] ? (
             <View style={fieldStyles.wrapper}>
               <Text style={fieldStyles.label}>{cfg.specializationLabel}</Text>
               <View style={styles.specChipsWrap}>
-                {VET_SPECIALIZATIONS.map((spec) => {
+                {SPECIALIZATION_CHIPS[role]!.map((spec) => {
                   const active = specialization.split(',').map((s) => s.trim()).includes(spec);
                   return (
                     <Pressable
@@ -562,7 +583,7 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
             </View>
 
             {/* CAC — business roles */}
-            {['kennel', 'pet_transport', 'cremation_service', 'agro_vet_supplier', 'insurance_provider'].includes(role) && (
+            {['kennel', 'pet_transport', 'cremation_service', 'agro_vet_supplier', 'insurance_provider', 'farm'].includes(role) && (
               <View style={styles.docField}>
                 <Text style={styles.docLabel}>CAC Registration Number</Text>
                 <TextInput

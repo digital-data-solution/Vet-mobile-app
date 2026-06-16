@@ -22,7 +22,7 @@ import { apiFetch } from '../api/client';
 type ServiceRole =
   | 'groomer' | 'trainer' | 'pet_sitter'
   | 'pet_transport' | 'cremation_service' | 'agro_vet_supplier' | 'insurance_provider'
-  | 'pet_pharmacy' | 'rescue_center' | 'pet_hotel';
+  | 'pet_pharmacy' | 'rescue_center' | 'pet_hotel' | 'farm';
 
 const ROLE_META: Record<ServiceRole, { label: string; emoji: string; color: string; avatarBg: string }> = {
   groomer:            { label: 'Groomer',            emoji: '✂️',  color: '#DB2777', avatarBg: '#FDF2F8' },
@@ -35,6 +35,7 @@ const ROLE_META: Record<ServiceRole, { label: string; emoji: string; color: stri
   pet_pharmacy:       { label: 'Pet Pharmacy',        emoji: '💊',  color: '#0891B2', avatarBg: '#ECFEFF' },
   rescue_center:      { label: 'Rescue Center',       emoji: '🐾',  color: '#EA580C', avatarBg: '#FFF7ED' },
   pet_hotel:          { label: 'Pet Hotel',           emoji: '🏨',  color: '#0D9488', avatarBg: '#F0FDFA' },
+  farm:               { label: 'Farm',                emoji: '🐐',  color: '#92400E', avatarBg: '#FEF9E7' },
 };
 
 const FILTER_CHIPS: { key: ServiceRole | 'all'; label: string; emoji: string }[] = [
@@ -49,12 +50,13 @@ const FILTER_CHIPS: { key: ServiceRole | 'all'; label: string; emoji: string }[]
   { key: 'pet_pharmacy',      label: 'Pharmacy',      emoji: '💊' },
   { key: 'rescue_center',     label: 'Rescue',        emoji: '🐾' },
   { key: 'pet_hotel',         label: 'Pet Hotel',     emoji: '🏨' },
+  { key: 'farm',              label: 'Farms',         emoji: '🐐' },
 ];
 
 const SERVICE_ROLES: ServiceRole[] = [
   'groomer', 'trainer', 'pet_sitter',
   'pet_transport', 'cremation_service', 'agro_vet_supplier', 'insurance_provider',
-  'pet_pharmacy', 'rescue_center', 'pet_hotel',
+  'pet_pharmacy', 'rescue_center', 'pet_hotel', 'farm',
 ];
 
 interface ServiceProfessional {

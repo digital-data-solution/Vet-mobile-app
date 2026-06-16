@@ -16,6 +16,7 @@ import { apiFetch } from '../api/client';
 import SubscriptionPrompt from '../components/SubscriptionPrompt';
 import ReviewsSection    from '../components/ReviewsSection';
 import WriteReviewModal  from '../components/WriteReviewModal';
+import GalleryViewer     from '../components/GalleryViewer';
 
 interface Professional {
   _id: string;
@@ -57,6 +58,7 @@ export default function VetProfileScreen({ route, navigation }: any) {
   const [showSubModal, setShowSubModal]     = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewRefreshKey, setReviewRefreshKey] = useState(0);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   const fetchVet = useCallback(async () => {
     if (!vetId) {
@@ -225,15 +227,20 @@ export default function VetProfileScreen({ route, navigation }: any) {
           <Text style={styles.gallerySectionTitle}>Gallery</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryRow}>
             {(vet.mediaImages ?? []).map((img, i) => (
-              <Image
-                key={img.publicId || String(i)}
-                source={{ uri: img.url }}
-                style={styles.galleryImage}
-              />
+              <TouchableOpacity key={img.publicId || String(i)} onPress={() => setViewerIndex(i)} activeOpacity={0.85}>
+                <Image source={{ uri: img.url }} style={styles.galleryImage} />
+              </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
       ) : null}
+
+      <GalleryViewer
+        visible={viewerIndex !== null}
+        images={vet.mediaImages ?? []}
+        initialIndex={viewerIndex ?? 0}
+        onClose={() => setViewerIndex(null)}
+      />
 
       {/* ── Contact actions ─────────────────────────────────────────────────── */}
       {isPreview ? (

@@ -63,7 +63,7 @@ type UserRole =
   | 'vet' | 'kennel_owner' | 'shop_owner' | 'pet_owner'
   | 'groomer' | 'trainer' | 'pet_sitter'
   | 'pet_transport' | 'cremation_service' | 'agro_vet_supplier' | 'insurance_provider'
-  | 'pet_pharmacy' | 'rescue_center' | 'pet_hotel'
+  | 'pet_pharmacy' | 'rescue_center' | 'pet_hotel' | 'farm'
   | null;
 
 type AuthContextType = {
@@ -377,7 +377,7 @@ function ShopOwnerTabs() {
 const SERVICE_PROFESSIONAL_ROLES = new Set([
   'vet', 'groomer', 'trainer', 'pet_sitter',
   'pet_transport', 'cremation_service', 'agro_vet_supplier', 'insurance_provider',
-  'pet_pharmacy', 'rescue_center', 'pet_hotel',
+  'pet_pharmacy', 'rescue_center', 'pet_hotel', 'farm',
 ]);
 
 function MainTabs() {

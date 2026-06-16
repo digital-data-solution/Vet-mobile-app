@@ -37,6 +37,7 @@ const ROLE_LABELS: Record<string, string> = {
   pet_pharmacy:       'Pet Pharmacy',
   rescue_center:      'Rescue Center',
   pet_hotel:          'Pet Hotel',
+  farm:               'Farm',
 };
 
 interface SubscriptionInfo {
@@ -286,7 +287,7 @@ export default function ProfileScreen({ navigation }: Props) {
     'vet', 'kennel_owner',
     'groomer', 'trainer', 'pet_sitter',
     'pet_transport', 'cremation_service', 'agro_vet_supplier', 'insurance_provider',
-    'pet_pharmacy', 'rescue_center', 'pet_hotel',
+    'pet_pharmacy', 'rescue_center', 'pet_hotel', 'farm',
   ]);
   const isProfessional = PROF_ROLES.has(user?.role ?? '');
   const isShopOwner    = user?.role === 'shop_owner';
@@ -591,6 +592,12 @@ export default function ProfileScreen({ navigation }: Props) {
           label="Register Pet Hotel"
           onPress={() => navigation.navigate('ProfessionalOnboarding', { role: 'pet_hotel' })}
           tint="#0D9488"
+        />
+        <MenuButton
+          emoji="🐐"
+          label="Register Your Farm"
+          onPress={() => navigation.navigate('ProfessionalOnboarding', { role: 'farm' })}
+          tint="#92400E"
         />
       </View>
 

@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
+  Image,
 } from 'react-native';
 import { showAlert } from '../utils/alert';
 import * as Location from 'expo-location';
@@ -34,6 +35,7 @@ interface Kennel {
   specialization?: string;
   distance?: number;
   isVerified?: boolean;
+  profileImage?: string;
 }
 
 export default function KennelsScreen({ navigation }: any) {
@@ -171,7 +173,11 @@ export default function KennelsScreen({ navigation }: any) {
     >
       <View style={styles.cardLeft}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarEmoji}>🐕</Text>
+          {item.profileImage ? (
+            <Image source={{ uri: item.profileImage }} style={styles.avatarImage} />
+          ) : (
+            <Text style={styles.avatarEmoji}>🐕</Text>
+          )}
         </View>
         {item.isVerified && <View style={styles.verifiedDot} />}
       </View>
@@ -429,7 +435,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F3FF',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
+  avatarImage: { width: 52, height: 52 },
   avatarEmoji: { fontSize: 26 },
   verifiedDot: {
     position: 'absolute',

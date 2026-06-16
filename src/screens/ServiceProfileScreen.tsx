@@ -17,10 +17,12 @@ import { apiFetch } from '../api/client';
 import SubscriptionPrompt from '../components/SubscriptionPrompt';
 import ReviewsSection from '../components/ReviewsSection';
 import WriteReviewModal from '../components/WriteReviewModal';
+import GalleryViewer from '../components/GalleryViewer';
 
 type ProfRole =
   | 'groomer' | 'trainer' | 'pet_sitter'
-  | 'pet_transport' | 'cremation_service' | 'agro_vet_supplier' | 'insurance_provider';
+  | 'pet_transport' | 'cremation_service' | 'agro_vet_supplier' | 'insurance_provider'
+  | 'pet_pharmacy' | 'rescue_center' | 'pet_hotel' | 'farm';
 
 const ROLE_META: Record<string, { label: string; emoji: string; color: string; avatarBg: string }> = {
   groomer:            { label: 'Groomer',            emoji: '✂️',  color: '#DB2777', avatarBg: '#FDF2F8' },
@@ -30,6 +32,10 @@ const ROLE_META: Record<string, { label: string; emoji: string; color: string; a
   cremation_service:  { label: 'Cremation Service',   emoji: '🕊️', color: '#64748B', avatarBg: '#F8FAFC' },
   agro_vet_supplier:  { label: 'Agro-Vet Supplier',  emoji: '🌾',  color: '#65A30D', avatarBg: '#F7FEE7' },
   insurance_provider: { label: 'Insurance Provider',  emoji: '🛡️', color: '#7C3AED', avatarBg: '#F5F3FF' },
+  pet_pharmacy:       { label: 'Pet Pharmacy',        emoji: '💊',  color: '#0891B2', avatarBg: '#ECFEFF' },
+  rescue_center:      { label: 'Rescue Center',       emoji: '🐾',  color: '#EA580C', avatarBg: '#FFF7ED' },
+  pet_hotel:          { label: 'Pet Hotel',           emoji: '🏨',  color: '#0D9488', avatarBg: '#F0FDFA' },
+  farm:               { label: 'Farm',                emoji: '🐐',  color: '#92400E', avatarBg: '#FEF9E7' },
 };
 
 interface Professional {
@@ -45,7 +51,8 @@ interface Professional {
   isActive?: boolean;
   rating?: number;
   reviewCount?: number;
-  images?: { url: string; publicId: string }[];
+  profileImage?: string;
+  mediaImages?: { url: string; publicId: string }[];
   userId?: {
     _id?: string;
     supabaseId?: string;
@@ -67,6 +74,7 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
   const [currentPlan, setCurrentPlan]     = useState<string | null>(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewRefreshKey, setReviewRefreshKey] = useState(0);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   const fetchProf = useCallback(async () => {
     if (!professionalId) {
@@ -161,8 +169,11 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
 
       {/* Hero */}
       <View style={[styles.hero, { backgroundColor: meta.avatarBg }]}>
-        {prof.images && prof.images.length > 0 ? (
-          <Image source={{ uri: prof.images[0].url }} style={styles.heroImage} />
+        {(prof.profileImage || prof.userId?.profileImage || prof.mediaImages?.[0]?.url) ? (
+          <Image
+            source={{ uri: prof.profileImage || prof.userId?.profileImage || prof.mediaImages?.[0]?.url }}
+            style={styles.heroImage}
+          />
         ) : (
           <View style={[styles.heroPlaceholder, { backgroundColor: meta.avatarBg }]}>
             <Text style={styles.heroEmoji}>{meta.emoji}</Text>
@@ -250,16 +261,25 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
       </View>
 
       {/* Gallery */}
-      {prof.images && prof.images.length > 1 && (
+      {prof.mediaImages && prof.mediaImages.length > 0 && (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Gallery</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
-            {prof.images.map((img, i) => (
-              <Image key={i} source={{ uri: img.url }} style={styles.galleryThumb} />
+            {prof.mediaImages.map((img, i) => (
+              <TouchableOpacity key={img.publicId || String(i)} onPress={() => setViewerIndex(i)} activeOpacity={0.85}>
+                <Image source={{ uri: img.url }} style={styles.galleryThumb} />
+              </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
       )}
+
+      <GalleryViewer
+        visible={viewerIndex !== null}
+        images={prof.mediaImages ?? []}
+        initialIndex={viewerIndex ?? 0}
+        onClose={() => setViewerIndex(null)}
+      />
 
       {/* Write a Review */}
       <TouchableOpacity

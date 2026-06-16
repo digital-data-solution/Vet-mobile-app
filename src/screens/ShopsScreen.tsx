@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
+  Image,
 } from 'react-native';
 import { showAlert } from '../utils/alert';
 import * as Location from 'expo-location';
@@ -36,6 +37,8 @@ interface Shop {
   description?: string;
   distance?: number;
   services?: string[];
+  images?: string[];
+  profileImage?: string;
 }
 
 interface Props {
@@ -191,14 +194,20 @@ export default function ShopsScreen({ navigation }: Props) {
         .includes(searchTerm.toLowerCase()),
   );
 
-  const renderShop = ({ item }: { item: Shop }) => (
+  const renderShop = ({ item }: { item: Shop }) => {
+    const avatarUri = item.images?.[0] || item.profileImage;
+    return (
     <TouchableOpacity
       style={styles.card}
       onPress={() => navigation.navigate('ShopProfile', { shop: item, shopId: item._id })}
       activeOpacity={0.78}
     >
       <View style={styles.avatarWrap}>
-        <Text style={styles.avatarEmoji}>🛒</Text>
+        {avatarUri ? (
+          <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+        ) : (
+          <Text style={styles.avatarEmoji}>🛒</Text>
+        )}
       </View>
       <View style={styles.cardBody}>
         <Text style={styles.shopName} numberOfLines={1}>
@@ -223,7 +232,8 @@ export default function ShopsScreen({ navigation }: Props) {
       </View>
       <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
     </TouchableOpacity>
-  );
+    );
+  };
 
   return (
     <KeyboardAvoidingView
@@ -492,7 +502,9 @@ const styles = StyleSheet.create({
     marginRight: 12,
     borderWidth: 1.5,
     borderColor: '#FED7AA',
+    overflow: 'hidden',
   },
+  avatarImage: { width: 52, height: 52 },
   avatarEmoji: { fontSize: 24 },
   cardBody: { flex: 1, marginRight: 4 },
   shopName:    { fontSize: 15, fontWeight: '700', color: '#0F172A', marginBottom: 3 },

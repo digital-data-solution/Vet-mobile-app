@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  Image,
   TouchableOpacity,
   ActivityIndicator,
   Linking,
@@ -15,6 +16,7 @@ import { apiFetch } from '../api/client';
 import SubscriptionPrompt from '../components/SubscriptionPrompt';
 import ReviewsSection    from '../components/ReviewsSection';
 import WriteReviewModal  from '../components/WriteReviewModal';
+import GalleryViewer     from '../components/GalleryViewer';
 
 interface Kennel {
   _id?: string;
@@ -30,12 +32,15 @@ interface Kennel {
   isVerified?: boolean;
   rating?: number;
   reviewCount?: number;
+  profileImage?: string;
+  mediaImages?: { url: string; publicId: string }[];
   userId?: {
     _id?:        string;
     supabaseId?: string;
     name?:       string;
     phone?:      string;
     email?:      string;
+    profileImage?: string;
   };
 }
 
@@ -50,6 +55,7 @@ export default function KennelProfileScreen({ route, navigation }: any) {
   const [showSubModal, setShowSubModal]         = useState(false);
   const [showReviewModal, setShowReviewModal]   = useState(false);
   const [reviewRefreshKey, setReviewRefreshKey] = useState(0);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   const fetchKennel = useCallback(async () => {
     if (!kennelId) {
@@ -168,7 +174,14 @@ export default function KennelProfileScreen({ route, navigation }: any) {
       <View style={styles.hero}>
         <View style={styles.avatarWrapper}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarEmoji}>🐕</Text>
+            {(kennel.profileImage || kennel.userId?.profileImage) ? (
+              <Image
+                source={{ uri: kennel.profileImage || kennel.userId?.profileImage }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <Text style={styles.avatarEmoji}>🐕</Text>
+            )}
           </View>
           {kennel.isVerified && (
             <View style={styles.verifiedRing}>
@@ -215,6 +228,27 @@ export default function KennelProfileScreen({ route, navigation }: any) {
           </View>
         )}
       </View>
+
+      {/* ── Gallery ──────────────────────────────────────────────────────── */}
+      {(kennel.mediaImages ?? []).length > 0 ? (
+        <View style={styles.gallerySection}>
+          <Text style={styles.cardTitle}>Gallery</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryRow}>
+            {(kennel.mediaImages ?? []).map((img, i) => (
+              <TouchableOpacity key={img.publicId || String(i)} onPress={() => setViewerIndex(i)} activeOpacity={0.85}>
+                <Image source={{ uri: img.url }} style={styles.galleryImage} />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
+
+      <GalleryViewer
+        visible={viewerIndex !== null}
+        images={kennel.mediaImages ?? []}
+        initialIndex={viewerIndex ?? 0}
+        onClose={() => setViewerIndex(null)}
+      />
 
       {/* ── Services chips ────────────────────────────────────────────────── */}
       {services.length > 0 && (
@@ -434,7 +468,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 3,
     borderColor: '#DDD6FE',
+    overflow: 'hidden',
   },
+  avatarImage: { width: '100%', height: '100%' },
   avatarEmoji: { fontSize: 46 },
   verifiedRing: {
     position: 'absolute',
@@ -456,6 +492,12 @@ const styles = StyleSheet.create({
   ratingRow:  { flexDirection: 'row', alignItems: 'center', gap: 3 },
   ratingText: { fontSize: 13, color: '#64748B', marginLeft: 4 },
 
+  gallerySection: { marginHorizontal: 16, marginBottom: 14 },
+  galleryRow: { gap: 10, paddingRight: 4 },
+  galleryImage: {
+    width: 100, height: 100, borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+  },
   servicesCard: {
     backgroundColor: '#fff', marginHorizontal: 16, borderRadius: 16,
     padding: 16, marginBottom: 14,

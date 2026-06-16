@@ -20,7 +20,7 @@ interface Props {
 const PROFESSIONAL_ROLES = new Set([
   'vet', 'kennel_owner', 'shop_owner', 'groomer', 'trainer',
   'pet_sitter', 'pet_transport', 'cremation_service', 'agro_vet_supplier', 'insurance_provider',
-  'pet_pharmacy', 'rescue_center', 'pet_hotel',
+  'pet_pharmacy', 'rescue_center', 'pet_hotel', 'farm',
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -41,6 +41,7 @@ const PET_OWNER_SERVICES = [
   { emoji: '\u{1F48A}',  label: 'Pet Pharmacy',   color: '#ECFEFF', borderColor: '#A5F3FC', tab: 'Services'  },
   { emoji: '\u{1F43E}',  label: 'Rescue Centers', color: '#FFF7ED', borderColor: '#FED7AA', tab: 'Services'  },
   { emoji: '\u{1F3E8}',  label: 'Pet Hotels',     color: '#F0FDFA', borderColor: '#99F6E4', tab: 'Services'  },
+  { emoji: '\u{1F410}',  label: 'Farms',          color: '#FEF9E7', borderColor: '#FDE9AE', tab: 'Services'  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -48,7 +49,7 @@ const PET_OWNER_SERVICES = [
 // Tab sets:
 //   ProfessionalTabs  (vet, groomer, trainer, pet_sitter, pet_transport,
 //                      cremation_service, agro_vet_supplier, insurance_provider,
-//                      pet_pharmacy, rescue_center, pet_hotel):
+//                      pet_pharmacy, rescue_center, pet_hotel, farm):
 //     Home | Network | Services | Shops | Subscription | Messages | VetVerification | Profile
 //   KennelOwnerTabs   (kennel_owner):
 //     Home | Kennels | Messages | Subscription | Profile
@@ -345,6 +346,28 @@ const ROLE_CONFIG: Record<string, RoleConfig> = {
     tips: [
       'High-quality room photos are the single biggest driver of bookings for pet hotels.',
       'List all amenities (private suites, pool, grooming, live cameras) to justify premium pricing.',
+    ],
+  },
+  // ProfessionalTabs — requires admin review (livestock/animal sale — trust-sensitive)
+  farm: {
+    emoji: '\u{1F410}',
+    color: '#92400E', bgColor: '#FEF9E7', pendingReview: true,
+    title: 'Farm Dashboard',
+    subtitle: 'Your profile requires admin review before going live.',
+    actions: [
+      { emoji: '\u{1F4B3}',  label: 'Subscription', tab: 'Subscription' },
+      { emoji: '\u{1F6D2}',  label: 'Pet Shops',    tab: 'Shops'        },
+      { emoji: '\u{1F4AC}',  label: 'Messages',     tab: 'Messages'     },
+      { emoji: '\u{1F464}',  label: 'My Profile',   tab: 'Profile'      },
+    ],
+    explores: [
+      { emoji: '\u{1F6D2}',  label: 'Pet Shops', tab: 'Shops'        },
+      { emoji: '⭐',     label: 'Services',  tab: 'Services'     },
+      { emoji: '\u{1F4B3}',  label: 'Plans',     tab: 'Subscription' },
+    ],
+    tips: [
+      'Admin approval takes 1-3 business days after business registration verification.',
+      'List your farm type (goat, poultry, livestock, snail, etc.) and gallery photos to attract more buyers.',
     ],
   },
 };

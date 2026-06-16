@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { showAlert } from '../utils/alert';
 import { apiFetch } from '../api/client';
+import MediaUploader from '../components/Mediauploader';
 
 interface Props {
   navigation: any;
@@ -26,6 +27,8 @@ interface FormErrors {
   email?: string;
 }
 
+interface MediaImage { url: string; publicId: string; }
+
 export default function KennelOnboardingScreen({ navigation }: Props) {
   const [ownerName, setOwnerName] = useState('');
   const [businessName, setBusinessName] = useState('');
@@ -35,6 +38,7 @@ export default function KennelOnboardingScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
+  const [galleryImages, setGalleryImages] = useState<MediaImage[]>([]);
 
   // Subscription check on focus
   useFocusEffect(
@@ -164,6 +168,18 @@ export default function KennelOnboardingScreen({ navigation }: Props) {
           <BenefitRow emoji="📍" text="Show up in location-based searches" />
           <BenefitRow emoji="⚡" text="No verification delay — go live instantly" />
           <BenefitRow emoji="📞" text="Receive direct inquiries and bookings" />
+        </View>
+
+        {/* Gallery */}
+        <View style={{ marginVertical: 18 }}>
+          <Text style={{ fontWeight: '700', fontSize: 16, marginBottom: 8, paddingHorizontal: 16 }}>
+            Kennel Gallery (optional)
+          </Text>
+          <MediaUploader
+            userType="kennel_owner"
+            existingImages={galleryImages}
+            onImagesUpdate={setGalleryImages}
+          />
         </View>
 
         {/* Form */}
