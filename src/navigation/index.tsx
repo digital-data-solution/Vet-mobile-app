@@ -240,7 +240,7 @@ function LoadingScreen() {
 // ─────────────────────────────────────────────────────────────────────────────
 type ErrorBoundaryState = { hasError: boolean; message: string };
 
-class NavigationErrorBoundary extends Component
+class NavigationErrorBoundary extends Component<
   { children: ReactNode },
   ErrorBoundaryState
 > {
