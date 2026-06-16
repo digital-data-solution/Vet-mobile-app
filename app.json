@@ -28,6 +28,8 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
+      "bundler": "metro",
+      "output": "single",
       "title": "Xpress Vet — Nigeria's Pet Care Marketplace",
       "description": "Find trusted vets, kennels, and pet shops near you across Nigeria.",
       "favicon": "./assets/icon.png"
