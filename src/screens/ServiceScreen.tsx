@@ -253,8 +253,8 @@ export default function ServiceScreen({ navigation }: any) {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={90}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <View style={styles.root}>
 
@@ -385,6 +385,16 @@ export default function ServiceScreen({ navigation }: any) {
                   <Text style={styles.emptyEmoji}>🔍</Text>
                   <Text style={styles.emptyTitle}>No services found</Text>
                   <Text style={styles.emptyText}>Try a different filter or tap "Show All"</Text>
+                  <TouchableOpacity
+                    style={styles.emptyRegisterBtn}
+                    onPress={() => {
+                      try { navigation.getParent()?.navigate('ProfessionalOnboarding') ?? navigation.navigate('ProfessionalOnboarding'); }
+                      catch { navigation.navigate('ProfessionalOnboarding'); }
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.emptyRegisterBtnText}>Register Your Service — It's Free</Text>
+                  </TouchableOpacity>
                 </View>
               ) : null
             }
@@ -533,8 +543,10 @@ const styles = StyleSheet.create({
   distance:      { fontSize: 12, fontWeight: '600', marginTop: 3 },
   rating:        { fontSize: 12, color: '#64748B', marginTop: 2 },
 
-  emptyState: { alignItems: 'center', paddingTop: 60 },
+  emptyState: { alignItems: 'center', paddingTop: 60, paddingHorizontal: 24 },
   emptyEmoji: { fontSize: 52, marginBottom: 16 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: '#0F172A', marginBottom: 8 },
-  emptyText:  { fontSize: 14, color: '#64748B', textAlign: 'center' },
+  emptyText:  { fontSize: 14, color: '#64748B', textAlign: 'center', marginBottom: 20 },
+  emptyRegisterBtn: { backgroundColor: '#2563EB', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
+  emptyRegisterBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 });

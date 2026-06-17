@@ -42,6 +42,8 @@ interface Shop {
   services?: string[];
   images?: string[];
   profileImage?: string;
+  isVerified?: boolean;
+  rating?: number;
 }
 
 interface Props {
