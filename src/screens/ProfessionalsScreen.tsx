@@ -49,7 +49,6 @@ const ROLE_META: Record<ProfRole, { label: string; emoji: string; color: string;
 };
 
 const FILTER_CHIPS: { key: ProfRole | 'all'; label: string; emoji: string }[] = [
-  { key: 'all',               label: 'All',               emoji: '🔍' },
   { key: 'vet',               label: 'Vets',              emoji: '👨‍⚕️' },
   { key: 'kennel',            label: 'Kennels',           emoji: '🐕' },
   { key: 'groomer',           label: 'Groomers',          emoji: '✂️' },
