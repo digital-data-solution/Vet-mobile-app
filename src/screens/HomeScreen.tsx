@@ -34,7 +34,7 @@ const MARKETPLACE_TICKER_MSGS = [
 ];
 
 const GUEST_TICKER_MSGS = [
-  'Nigeria's trusted pet care marketplace — 100% free to browse',
+  "Nigeria's trusted pet care marketplace — 100% free to browse",
   'VCN-verified vets, kennels, groomers, trainers and more',
   'Are you a vet or pet professional? List your services for free',
   'New listings added every week — check back often',
