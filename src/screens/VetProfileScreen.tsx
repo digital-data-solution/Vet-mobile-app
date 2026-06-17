@@ -9,10 +9,14 @@ import {
   ActivityIndicator,
   Linking,
   Modal,
+  Share,
+  Platform,
 } from 'react-native';
 import { showAlert } from '../utils/alert';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../api/client';
+import { toggleFavorite, isFavorite } from '../utils/favorites';
+import { addRecentlyViewed } from '../utils/recentlyViewed';
 import SubscriptionPrompt from '../components/SubscriptionPrompt';
 import ReviewsSection    from '../components/ReviewsSection';
 import WriteReviewModal  from '../components/WriteReviewModal';
@@ -59,6 +63,7 @@ export default function VetProfileScreen({ route, navigation }: any) {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewRefreshKey, setReviewRefreshKey] = useState(0);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [isFav, setIsFav] = useState(false);
 
   const fetchVet = useCallback(async () => {
     if (!vetId) {
@@ -71,9 +76,19 @@ export default function VetProfileScreen({ route, navigation }: any) {
     try {
       const res = await apiFetch(`/api/v1/professionals/${vetId}`, { method: 'GET' });
       if (res.ok && res.body?.success && res.body?.data) {
-        setVet(res.body.data);
-        setIsPreview(res.body.data.isPreview === true);
-        setViewerPlan(res.body.data.viewerPlan ?? null);
+        const data = res.body.data;
+        setVet(data);
+        setIsPreview(data.isPreview === true);
+        setViewerPlan(data.viewerPlan ?? null);
+        addRecentlyViewed({
+          id: data._id,
+          type: 'professional',
+          name: data.businessName || data.name || data.userId?.name || 'Professional',
+          role: data.role,
+          emoji: data.role === 'vet' ? '👨‍⚕️' : '🐕',
+          color: data.role === 'vet' ? '#2563EB' : '#7C3AED',
+        }).catch(() => {});
+        isFavorite(data._id).then(setIsFav).catch(() => {});
       } else {
         setError(res.body?.message || 'Could not load professional profile.');
       }
@@ -123,6 +138,33 @@ export default function VetProfileScreen({ route, navigation }: any) {
     Linking.openURL(`https://wa.me/${digits}`).catch(() =>
       showAlert('WhatsApp', 'Could not open WhatsApp. Make sure it is installed.'),
     );
+  };
+
+  const shareProfile = async () => {
+    if (!vet) return;
+    const name = vet.businessName || vet.name || vet.userId?.name || 'Professional';
+    const profileUrl = `https://xpressvetmarketplace.com/VetProfile?vetId=${vet._id}`;
+    const msg = `Check out ${name} on Xpress Vet 🐾\n${vet.address ? vet.address + '\n' : ''}${profileUrl}`;
+    try {
+      if (Platform.OS === 'web') {
+        if ((navigator as any).share) {
+          await (navigator as any).share({ title: name, text: msg, url: profileUrl });
+        } else {
+          await (navigator as any).clipboard.writeText(profileUrl);
+          showAlert('Link Copied!', 'Share this link with anyone to show them this profile.');
+        }
+      } else {
+        await Share.share({ message: msg, url: profileUrl });
+      }
+    } catch {}
+  };
+
+  const handleFavorite = async () => {
+    if (!vet) return;
+    const name = vet.businessName || vet.name || vet.userId?.name || 'Professional';
+    const added = await toggleFavorite({ id: vet._id, type: 'professional', name, role: vet.role, address: vet.address });
+    setIsFav(added);
+    showAlert(added ? 'Saved!' : 'Removed', added ? `${name} added to your favourites.` : `${name} removed from favourites.`);
   };
 
   const openChat = () => {
@@ -219,6 +261,19 @@ export default function VetProfileScreen({ route, navigation }: any) {
             </View>
           )}
         </View>
+
+        <View style={styles.heroActions}>
+          <TouchableOpacity style={styles.heroActionBtn} onPress={shareProfile} activeOpacity={0.8}>
+            <Ionicons name="share-social-outline" size={18} color={accentColor} />
+            <Text style={[styles.heroActionText, { color: accentColor }]}>Share</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.heroActionBtn} onPress={handleFavorite} activeOpacity={0.8}>
+            <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={18} color={isFav ? '#EF4444' : accentColor} />
+            <Text style={[styles.heroActionText, { color: isFav ? '#EF4444' : accentColor }]}>
+              {isFav ? 'Saved' : 'Save'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* ── Gallery ─────────────────────────────────────────────────────────── */}
@@ -243,6 +298,15 @@ export default function VetProfileScreen({ route, navigation }: any) {
       />
 
       {/* ── Contact actions ─────────────────────────────────────────────────── */}
+      {isPreview && (
+        <TouchableOpacity style={styles.subHintBanner} onPress={() => setShowSubModal(true)} activeOpacity={0.85}>
+          <Ionicons name="lock-closed" size={15} color="#fff" />
+          <Text style={styles.subHintText}>
+            Subscribe to call, WhatsApp or message this {isVet ? 'vet' : 'professional'} directly — tap to unlock
+          </Text>
+          <Ionicons name="chevron-forward" size={15} color="#fff" />
+        </TouchableOpacity>
+      )}
       {isPreview ? (
         <View style={styles.contactRow}>
           {(['Call', 'WhatsApp', 'Message'] as const).map((label) => (
@@ -502,7 +566,23 @@ const styles = StyleSheet.create({
     fontSize: 14, color: '#64748B', textAlign: 'center',
     marginBottom: 12, lineHeight: 20,
   },
-  badgeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'center' },
+  badgeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 4 },
+  heroActions: {
+    flexDirection: 'row', gap: 12, marginTop: 14, justifyContent: 'center',
+  },
+  heroActionBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20,
+    backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#E2E8F0',
+  },
+  heroActionText: { fontSize: 14, fontWeight: '600' },
+  subHintBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: 16, marginBottom: 8,
+    backgroundColor: '#2563EB', borderRadius: 10,
+    paddingVertical: 10, paddingHorizontal: 14,
+  },
+  subHintText: { flex: 1, color: '#fff', fontSize: 13, fontWeight: '600' },
   verifiedBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: '#D1FAE5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8,

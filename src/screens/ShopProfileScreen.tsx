@@ -9,10 +9,14 @@ import {
   ActivityIndicator,
   Linking,
   Modal,
+  Share,
+  Platform,
 } from 'react-native';
 import { showAlert } from '../utils/alert';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../api/client';
+import { toggleFavorite, isFavorite } from '../utils/favorites';
+import { addRecentlyViewed } from '../utils/recentlyViewed';
 import SubscriptionPrompt from '../components/SubscriptionPrompt';
 import ReviewsSection    from '../components/ReviewsSection';
 import WriteReviewModal  from '../components/WriteReviewModal';
@@ -57,6 +61,7 @@ export default function ShopProfileScreen({ route, navigation }: any) {
   const [showReviewModal, setShowReviewModal]   = useState(false);
   const [reviewRefreshKey, setReviewRefreshKey] = useState(0);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [isFav, setIsFav] = useState(false);
 
   const fetchShop = useCallback(async () => {
     if (!shopId) {
@@ -69,8 +74,15 @@ export default function ShopProfileScreen({ route, navigation }: any) {
     try {
       const res = await apiFetch(`/api/v1/shops/${shopId}`, { method: 'GET' });
       if (res.ok && res.body?.success && res.body?.data) {
-        setShop(res.body.data);
-        setIsPreview(res.body.data.isPreview === true);
+        const data = res.body.data;
+        setShop(data);
+        setIsPreview(data.isPreview === true);
+        addRecentlyViewed({
+          id: data._id, type: 'shop',
+          name: data.shopName || data.businessName || data.name || 'Pet Shop',
+          emoji: '🛒', color: '#EA580C',
+        }).catch(() => {});
+        isFavorite(data._id).then(setIsFav).catch(() => {});
       } else {
         setError(res.body?.message || 'Could not load shop profile.');
       }
@@ -148,6 +160,33 @@ export default function ShopProfileScreen({ route, navigation }: any) {
     });
   };
 
+  const shareProfile = async () => {
+    if (!shop?._id) return;
+    const name = getDisplayName();
+    const profileUrl = `https://xpressvetmarketplace.com/VetProfile?vetId=${shop._id}`;
+    const msg = `Check out ${name} on Xpress Vet 🛒\n${address ? address + '\n' : ''}${profileUrl}`;
+    try {
+      if (Platform.OS === 'web') {
+        if ((navigator as any).share) {
+          await (navigator as any).share({ title: name, text: msg, url: profileUrl });
+        } else {
+          await (navigator as any).clipboard.writeText(profileUrl);
+          showAlert('Link Copied!', 'Share this link to let others find this shop.');
+        }
+      } else {
+        await Share.share({ message: msg, url: profileUrl });
+      }
+    } catch {}
+  };
+
+  const handleFavorite = async () => {
+    if (!shop?._id) return;
+    const name = getDisplayName();
+    const added = await toggleFavorite({ id: shop._id, type: 'shop', name, address });
+    setIsFav(added);
+    showAlert(added ? 'Saved!' : 'Removed', added ? `${name} added to your favourites.` : `${name} removed from favourites.`);
+  };
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -219,6 +258,18 @@ export default function ShopProfileScreen({ route, navigation }: any) {
         </View>
       </View>
 
+      {/* Share / Favorite */}
+      <View style={styles.heroActions}>
+        <TouchableOpacity style={styles.heroActionBtn} onPress={shareProfile} activeOpacity={0.8}>
+          <Ionicons name="share-social-outline" size={18} color="#EA580C" />
+          <Text style={[styles.heroActionText, { color: '#EA580C' }]}>Share</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.heroActionBtn} onPress={handleFavorite} activeOpacity={0.8}>
+          <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={18} color={isFav ? '#EF4444' : '#EA580C'} />
+          <Text style={[styles.heroActionText, { color: isFav ? '#EF4444' : '#EA580C' }]}>{isFav ? 'Saved' : 'Save'}</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* ── Gallery ──────────────────────────────────────────────────────── */}
       {shop.images && shop.images.length > 0 ? (
         <View style={styles.gallerySection}>
@@ -239,6 +290,15 @@ export default function ShopProfileScreen({ route, navigation }: any) {
         initialIndex={viewerIndex ?? 0}
         onClose={() => setViewerIndex(null)}
       />
+
+      {/* Subscription hint */}
+      {isPreview && (
+        <TouchableOpacity style={styles.subHintBanner} onPress={() => setShowSubModal(true)} activeOpacity={0.85}>
+          <Ionicons name="lock-closed" size={15} color="#fff" />
+          <Text style={styles.subHintText}>Subscribe to call, WhatsApp or message this shop — tap to unlock</Text>
+          <Ionicons name="chevron-forward" size={15} color="#fff" />
+        </TouchableOpacity>
+      )}
 
       {/* ── Contact actions ───────────────────────────────────────────────── */}
       {isPreview ? (
@@ -470,6 +530,22 @@ const styles = StyleSheet.create({
     lineHeight: 20, marginBottom: 12,
   },
   badgeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'center' },
+  heroActions: {
+    flexDirection: 'row', gap: 12, marginHorizontal: 16, marginTop: 4, marginBottom: 4, justifyContent: 'center',
+  },
+  heroActionBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20,
+    backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#E2E8F0',
+  },
+  heroActionText: { fontSize: 14, fontWeight: '600' },
+  subHintBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: 16, marginBottom: 8,
+    backgroundColor: '#EA580C', borderRadius: 10,
+    paddingVertical: 10, paddingHorizontal: 14,
+  },
+  subHintText: { flex: 1, color: '#fff', fontSize: 13, fontWeight: '600' },
   verifiedBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: '#D1FAE5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8,

@@ -328,6 +328,36 @@ export default function ProfileScreen({ navigation }: Props) {
         </View>
       </View>
 
+      {/* ── Profile completion bar ──────────────────────────────────────── */}
+      {(() => {
+        const checks = [
+          getUserDisplayName() !== 'Anonymous User',
+          !!(user?.profileImage || user?.user_metadata?.profileImage),
+          !!(user?.phone || user?.user_metadata?.phone),
+          !!(user?.email && user?.isVerified),
+          !!(subscription?.isActive),
+        ];
+        const score = checks.filter(Boolean).length;
+        const pct = Math.round((score / checks.length) * 100);
+        if (pct === 100) return null;
+        const labels = ['Set your name', 'Add a profile photo', 'Add your phone number', 'Verify your email', 'Get a subscription'];
+        const missing = labels.filter((_, i) => !checks[i]);
+        return (
+          <View style={styles.completionCard}>
+            <View style={styles.completionHeader}>
+              <Text style={styles.completionTitle}>Profile {pct}% complete</Text>
+              <Text style={styles.completionPct}>{score}/{checks.length}</Text>
+            </View>
+            <View style={styles.completionBarBg}>
+              <View style={[styles.completionBarFill, { width: `${pct}%` as any }]} />
+            </View>
+            {missing.slice(0, 2).map((item) => (
+              <Text key={item} style={styles.completionTip}>• {item}</Text>
+            ))}
+          </View>
+        );
+      })()}
+
       {/* ── Subscription card ───────────────────────────────────────────── */}
       {subLoading ? (
         <View style={styles.infoCard}>
@@ -715,6 +745,18 @@ const styles = StyleSheet.create({
     borderColor:       '#FDDCCC',
   },
   roleBadgeText: { color: '#E8610A', fontSize: 13, fontWeight: '700' },
+
+  completionCard: {
+    marginHorizontal: 16, marginBottom: 14,
+    backgroundColor: '#F0FDF4', borderRadius: 14, padding: 14,
+    borderWidth: 1, borderColor: '#BBF7D0',
+  },
+  completionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  completionTitle: { fontSize: 13, fontWeight: '700', color: '#065F46' },
+  completionPct: { fontSize: 13, fontWeight: '700', color: '#065F46' },
+  completionBarBg: { height: 8, borderRadius: 4, backgroundColor: '#D1FAE5', marginBottom: 8 },
+  completionBarFill: { height: 8, borderRadius: 4, backgroundColor: '#10B981' },
+  completionTip: { fontSize: 12, color: '#374151', marginTop: 2 },
 
   subscriptionCard: {
     marginHorizontal: 16, borderRadius: 16, padding: 18, marginBottom: 14, borderWidth: 2,

@@ -9,8 +9,10 @@ import {
   Animated,
 } from 'react-native';
 import { useAuth } from '../navigation';
+import { useFocusEffect } from '@react-navigation/native';
 import MarketplaceBanner from '../components/MarketplaceBanner';
 import { apiFetch } from '../api/client';
+import { getRecentlyViewed, RecentItem } from '../utils/recentlyViewed';
 
 interface Props {
   navigation: any;
@@ -617,6 +619,14 @@ function PetOwnerHome({
   onOpenDashboard: () => void;
   stats: any;
 }) {
+  const [recentlyViewed, setRecentlyViewed] = useState<RecentItem[]>([]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      getRecentlyViewed().then(setRecentlyViewed).catch(() => {});
+    }, []),
+  );
+
   const dynamicTicker = [
     ...MARKETPLACE_TICKER_MSGS,
     ...(stats?.vetCount    ? [`${stats.vetCount} verified vets listed on the platform`]      : []),
@@ -641,6 +651,20 @@ function PetOwnerHome({
       <View style={styles.tickerWrap}>
         <MarketplaceBanner messages={dynamicTicker} />
       </View>
+
+      {/* Emergency Vet quick button */}
+      <TouchableOpacity
+        style={styles.emergencyBtn}
+        onPress={() => navigation.navigate('Professionals')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.emergencyBtnIcon}>🚨</Text>
+        <View style={styles.emergencyBtnText}>
+          <Text style={styles.emergencyBtnTitle}>Find a Vet Urgently</Text>
+          <Text style={styles.emergencyBtnSub}>Tap to search VCN-verified vets near you now</Text>
+        </View>
+        <Text style={styles.emergencyBtnArrow}>›</Text>
+      </TouchableOpacity>
 
       {dashboardCfg && (
         <TouchableOpacity
@@ -678,6 +702,32 @@ function PetOwnerHome({
           ))}
         </View>
       </View>
+
+      {/* Recently Viewed */}
+      {recentlyViewed.length > 0 && (
+        <View style={styles.sectionPad}>
+          <Text style={styles.sectionHeading}>Recently Viewed</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+            {recentlyViewed.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[styles.recentCard, { borderLeftColor: item.color ?? '#2563EB' }]}
+                onPress={() => {
+                  if (item.type === 'kennel') navigation.navigate('KennelProfile', { kennelId: item.id });
+                  else if (item.type === 'shop') navigation.navigate('ShopProfile', { shopId: item.id });
+                  else if (item.role === 'vet' || item.role === 'kennel') navigation.navigate('VetProfile', { vetId: item.id });
+                  else navigation.navigate('ServiceProfile', { professionalId: item.id });
+                }}
+                activeOpacity={0.82}
+              >
+                <Text style={styles.recentEmoji}>{item.emoji ?? '🐾'}</Text>
+                <Text style={styles.recentName} numberOfLines={1}>{item.name}</Text>
+                {item.role ? <Text style={styles.recentRole} numberOfLines={1}>{item.role.replace(/_/g, ' ')}</Text> : null}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       {/* Professional Registration Guide */}
       {!dashboardCfg && (
@@ -1052,6 +1102,29 @@ const styles = StyleSheet.create({
 
   // Marketplace ticker
   tickerWrap: { paddingHorizontal: 20, marginTop: 14 },
+
+  // Emergency vet button
+  emergencyBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginHorizontal: 20, marginTop: 12, marginBottom: 4,
+    backgroundColor: '#FEF2F2', borderWidth: 1.5, borderColor: '#FCA5A5',
+    borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14,
+  },
+  emergencyBtnIcon: { fontSize: 26 },
+  emergencyBtnText: { flex: 1 },
+  emergencyBtnTitle: { fontSize: 15, fontWeight: '800', color: '#991B1B' },
+  emergencyBtnSub: { fontSize: 12, color: '#EF4444', marginTop: 2 },
+  emergencyBtnArrow: { fontSize: 22, color: '#EF4444', fontWeight: '700' },
+
+  // Recently viewed
+  recentCard: {
+    width: 110, backgroundColor: '#fff', borderRadius: 12, padding: 10,
+    borderLeftWidth: 3, alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2,
+  },
+  recentEmoji: { fontSize: 22, marginBottom: 4 },
+  recentName: { fontSize: 12, fontWeight: '700', color: '#111827', textAlign: 'center' },
+  recentRole: { fontSize: 10, color: '#6B7280', marginTop: 2, textAlign: 'center', textTransform: 'capitalize' },
 
   // Professional registration guide row
   proGuideRow: { flexDirection: 'row', gap: 8, marginTop: 12 },

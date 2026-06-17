@@ -9,11 +9,15 @@ import {
   ActivityIndicator,
   Linking,
   Modal,
+  Share,
+  Platform,
 } from 'react-native';
 import { showAlert } from '../utils/alert';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../api/client';
+import { toggleFavorite, isFavorite } from '../utils/favorites';
+import { addRecentlyViewed } from '../utils/recentlyViewed';
 import SubscriptionPrompt from '../components/SubscriptionPrompt';
 import ReviewsSection from '../components/ReviewsSection';
 import WriteReviewModal from '../components/WriteReviewModal';
@@ -75,6 +79,7 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewRefreshKey, setReviewRefreshKey] = useState(0);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [isFav, setIsFav] = useState(false);
 
   const fetchProf = useCallback(async () => {
     if (!professionalId) {
@@ -90,7 +95,15 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
       ]);
 
       if (profRes.ok && profRes.body?.data) {
-        setProf(profRes.body.data);
+        const data = profRes.body.data;
+        setProf(data);
+        const roleMeta = ROLE_META[data.role] ?? { emoji: '🐾', color: '#2563EB' };
+        addRecentlyViewed({
+          id: data._id, type: 'professional',
+          name: data.businessName || data.name || 'Professional',
+          role: data.role, emoji: roleMeta.emoji, color: roleMeta.color,
+        }).catch(() => {});
+        isFavorite(data._id).then(setIsFav).catch(() => {});
       } else {
         setError(profRes.body?.message || 'Professional not found.');
       }
@@ -164,6 +177,29 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
 
   const handleLockedContact = () => setShowSubModal(true);
 
+  const shareProfile = async () => {
+    const profileUrl = `https://xpressvetmarketplace.com/VetProfile?vetId=${prof._id}`;
+    const msg = `Check out ${displayName} on Xpress Vet 🐾\n${prof.address ? prof.address + '\n' : ''}${profileUrl}`;
+    try {
+      if (Platform.OS === 'web') {
+        if ((navigator as any).share) {
+          await (navigator as any).share({ title: displayName, text: msg, url: profileUrl });
+        } else {
+          await (navigator as any).clipboard.writeText(profileUrl);
+          showAlert('Link Copied!', 'Share this link to let others find this profile.');
+        }
+      } else {
+        await Share.share({ message: msg, url: profileUrl });
+      }
+    } catch {}
+  };
+
+  const handleFavorite = async () => {
+    const added = await toggleFavorite({ id: prof._id, type: 'professional', name: displayName, role: prof.role, address: prof.address });
+    setIsFav(added);
+    showAlert(added ? 'Saved!' : 'Removed', added ? `${displayName} added to your favourites.` : `${displayName} removed from favourites.`);
+  };
+
   return (
     <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
 
@@ -202,6 +238,18 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
         </View>
       )}
 
+      {/* Share / Favorite */}
+      <View style={styles.heroActions}>
+        <TouchableOpacity style={styles.heroActionBtn} onPress={shareProfile} activeOpacity={0.8}>
+          <Ionicons name="share-social-outline" size={18} color={meta.color} />
+          <Text style={[styles.heroActionText, { color: meta.color }]}>Share</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.heroActionBtn} onPress={handleFavorite} activeOpacity={0.8}>
+          <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={18} color={isFav ? '#EF4444' : meta.color} />
+          <Text style={[styles.heroActionText, { color: isFav ? '#EF4444' : meta.color }]}>{isFav ? 'Saved' : 'Save'}</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Details card */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>About</Text>
@@ -223,6 +271,15 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Subscription hint for locked contacts */}
+      {!isSubscribed && (
+        <TouchableOpacity style={[styles.subHintBanner, { backgroundColor: meta.color }]} onPress={() => setShowSubModal(true)} activeOpacity={0.85}>
+          <Ionicons name="lock-closed" size={15} color="#fff" />
+          <Text style={styles.subHintText}>Subscribe to call, WhatsApp or message this {meta.label.toLowerCase()} — tap to unlock</Text>
+          <Ionicons name="chevron-forward" size={15} color="#fff" />
+        </TouchableOpacity>
+      )}
 
       {/* Contact action row */}
       <View style={styles.contactRow}>
@@ -390,6 +447,23 @@ const styles = StyleSheet.create({
   rolePillText: { fontSize: 12, fontWeight: '700', color: '#fff' },
   verifiedPill: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', backgroundColor: '#D1FAE5', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3 },
   verifiedPillText: { fontSize: 11, fontWeight: '700', color: '#059669' },
+
+  heroActions: {
+    flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingVertical: 10,
+    justifyContent: 'center', backgroundColor: '#fff',
+  },
+  heroActionBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20,
+    borderWidth: 1.5, borderColor: '#E2E8F0',
+  },
+  heroActionText: { fontSize: 14, fontWeight: '600' },
+  subHintBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: 16, marginBottom: 6,
+    borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14,
+  },
+  subHintText: { flex: 1, color: '#fff', fontSize: 13, fontWeight: '600' },
 
   ratingRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#fff', gap: 4 },
   ratingStars: { fontSize: 14, color: '#F59E0B' },

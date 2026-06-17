@@ -147,6 +147,7 @@ export default function ProfessionalsScreen({ navigation }: Props) {
   const [subscriptionChecked, setSubscriptionChecked] = useState(false);
   const [currentPlan,        setCurrentPlan]        = useState<string | null>(null);
   const [showUpsell,         setShowUpsell]         = useState(false);
+  const [verifiedOnly,       setVerifiedOnly]       = useState(false);
   const [showGalleryNudge,   setShowGalleryNudge]   = useState(false);
   const [referralNudge,      setReferralNudge]      = useState(false);
   const galleryNudgeShownRef = useRef(false);
@@ -353,6 +354,13 @@ export default function ProfessionalsScreen({ navigation }: Props) {
           <View style={styles.cardMeta}>
             <Text style={styles.vetName}>{displayName}</Text>
             <Text style={[styles.roleLabel, { color: meta.color }]}>{meta.label}</Text>
+            {item.rating && item.rating > 0 ? (
+              <View style={styles.ratingInline}>
+                <Text style={styles.ratingStarsInline}>{'★'.repeat(Math.min(5, Math.round(item.rating)))}</Text>
+                <Text style={[styles.ratingValInline, { color: meta.color }]}>{item.rating.toFixed(1)}</Text>
+                {item.reviewCount ? <Text style={styles.ratingCntInline}>({item.reviewCount})</Text> : null}
+              </View>
+            ) : null}
             {item.specialization ? (
               <Text style={styles.specialization} numberOfLines={1}>{item.specialization}</Text>
             ) : null}
@@ -390,9 +398,11 @@ export default function ProfessionalsScreen({ navigation }: Props) {
 
   // ─── Filtered list ───────────────────────────────────────────────────────────
 
-  const professionals = results.filter((item) =>
-    roleFilter === 'all' ? true : item.role === roleFilter,
-  );
+  const professionals = results.filter((item) => {
+    if (roleFilter !== 'all' && item.role !== roleFilter) return false;
+    if (verifiedOnly && !item.isVerified) return false;
+    return true;
+  });
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
@@ -441,6 +451,18 @@ export default function ProfessionalsScreen({ navigation }: Props) {
             </TouchableOpacity>
           ))}
         </ScrollView>
+
+        {/* Verified-only toggle */}
+        <TouchableOpacity
+          style={[styles.verifiedToggle, verifiedOnly && styles.verifiedToggleActive]}
+          onPress={() => setVerifiedOnly((v) => !v)}
+          activeOpacity={0.8}
+        >
+          <Ionicons name={verifiedOnly ? 'shield-checkmark' : 'shield-checkmark-outline'} size={14} color={verifiedOnly ? '#fff' : '#059669'} />
+          <Text style={[styles.verifiedToggleText, verifiedOnly && { color: '#fff' }]}>
+            {verifiedOnly ? '✓ Verified Only (on)' : 'Show Verified Only'}
+          </Text>
+        </TouchableOpacity>
 
         {/* Location card */}
         <View style={styles.locationCard}>
@@ -612,6 +634,21 @@ export default function ProfessionalsScreen({ navigation }: Props) {
                   <Text style={styles.emptySubtitle}>
                     Try expanding your search radius or searching in a different area.
                   </Text>
+                  <Text style={styles.emptyRegisterHint}>
+                    Are you a {roleFilter !== 'all' ? (ROLE_META[roleFilter as ProfRole]?.label ?? 'Professional') : 'Professional'} in this area?
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.emptyRegisterBtn}
+                    onPress={() => {
+                      const screen = roleFilter === 'kennel' || roleFilter === 'farm'
+                        ? 'KennelOnboarding'
+                        : 'ProfessionalOnboarding';
+                      try { navigation.getParent()?.navigate(screen) ?? navigation.navigate(screen); } catch { navigation.navigate(screen); }
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.emptyRegisterBtnText}>Register Your Business — It's Free</Text>
+                  </TouchableOpacity>
                 </View>
               ) : null
             }
@@ -815,10 +852,29 @@ const styles = StyleSheet.create({
   detailValue: { fontSize: 13, color: '#6B7280', flex: 1 },
   detailValueHighlight: { color: '#2563EB', fontWeight: '600' },
 
+  ratingInline: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
+  ratingStarsInline: { fontSize: 12, color: '#F59E0B' },
+  ratingValInline: { fontSize: 12, fontWeight: '700' },
+  ratingCntInline: { fontSize: 11, color: '#9CA3AF' },
+
+  verifiedToggle: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    alignSelf: 'flex-start', marginHorizontal: 16, marginBottom: 8,
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
+    borderWidth: 1.5, borderColor: '#059669', backgroundColor: '#fff',
+  },
+  verifiedToggleActive: { backgroundColor: '#059669' },
+  verifiedToggleText: { fontSize: 13, fontWeight: '600', color: '#059669' },
+
   emptyState: { alignItems: 'center', paddingTop: 40, paddingBottom: 40 },
   emptyEmoji: { fontSize: 48, marginBottom: 16 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 8 },
-  emptySubtitle: { fontSize: 14, color: '#6B7280', textAlign: 'center', lineHeight: 20 },
+  emptySubtitle: { fontSize: 14, color: '#6B7280', textAlign: 'center', lineHeight: 20, marginBottom: 16 },
+  emptyRegisterHint: { fontSize: 14, color: '#374151', textAlign: 'center', marginBottom: 10 },
+  emptyRegisterBtn: {
+    backgroundColor: '#2563EB', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12,
+  },
+  emptyRegisterBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   teaserBanner: {
     flexDirection: 'row',
     alignItems: 'center',
