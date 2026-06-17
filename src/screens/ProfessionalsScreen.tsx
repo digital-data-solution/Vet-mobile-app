@@ -12,6 +12,7 @@ import {
   Platform,
   Modal,
   Image,
+  Animated,
 } from 'react-native';
 import { showAlert } from '../utils/alert';
 import * as Location from 'expo-location';
@@ -86,6 +87,27 @@ interface Props {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Context-aware upsell content — title + message by active role filter
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ROLE_UPSELL: Record<string, { title: string; msg: string }> = {
+  vet:               { title: 'Contact Your Vet Directly',   msg: 'Subscribe to call, WhatsApp or message any vet and book a consultation.' },
+  kennel:            { title: 'Book This Kennel',            msg: 'Subscribe to contact kennels, check availability, and arrange boarding.' },
+  groomer:           { title: 'Book a Groomer',              msg: 'Subscribe to see groomer galleries and contact them directly for bookings.' },
+  trainer:           { title: 'Book a Trainer',              msg: 'Subscribe to contact trainers, discuss your pet\'s needs, and start a training program.' },
+  pet_sitter:        { title: 'Find a Pet Sitter',           msg: 'Subscribe to see full sitter profiles and contact them directly.' },
+  pet_transport:     { title: 'Book Pet Transport',          msg: 'Subscribe to contact transport providers and arrange safe pet travel.' },
+  cremation_service: { title: 'Cremation Services',          msg: 'Subscribe to contact verified cremation providers in your area.' },
+  agro_vet_supplier: { title: 'Order from Agro-Vet Suppliers', msg: 'Subscribe to contact suppliers and order livestock products directly.' },
+  insurance_provider:{ title: 'Get Pet Insurance',          msg: 'Subscribe to contact insurance providers and get a personalised quote.' },
+  pet_pharmacy:      { title: 'Order Medications',          msg: 'Subscribe to contact pet pharmacies and get your pet\'s meds delivered.' },
+  rescue_center:     { title: 'Adopt a Pet',                msg: 'Subscribe to contact rescue centres and start your adoption process.' },
+  pet_hotel:         { title: 'Book a Premium Pet Hotel',   msg: 'Subscribe to view hotel galleries and make a premium boarding booking.' },
+  farm:              { title: 'Order from Farms',           msg: 'Subscribe to contact verified farms and order livestock or farm produce directly.' },
+  all:               { title: 'Unlock Full Access',         msg: 'Subscribe to call, WhatsApp or message any professional directly from the app.' },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // HELPER
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -124,7 +146,12 @@ export default function ProfessionalsScreen({ navigation }: Props) {
   const [isSubscribed,       setIsSubscribed]       = useState(false);
   const [subscriptionChecked, setSubscriptionChecked] = useState(false);
   const [currentPlan,        setCurrentPlan]        = useState<string | null>(null);
-  const [showUpsell, setShowUpsell] = useState(false);
+  const [showUpsell,         setShowUpsell]         = useState(false);
+  const [showGalleryNudge,   setShowGalleryNudge]   = useState(false);
+  const [referralNudge,      setReferralNudge]      = useState(false);
+  const galleryNudgeShownRef = useRef(false);
+  const profileTapsRef       = useRef<number>(0);
+  const nudgeOpacity         = useRef(new Animated.Value(0)).current;
 
   const handleDismissUpsell = () => {
     setShowUpsell(false);
@@ -180,8 +207,25 @@ export default function ProfessionalsScreen({ navigation }: Props) {
       const res = await apiFetch(`/api/v1/professionals/list?${params}`, { method: 'GET' });
 
       if (res.ok && res.body?.success) {
-        setResults(res.body.data || []);
+        const data: Professional[] = res.body.data || [];
+        setResults(data);
         checkUpsellAfterSearch();
+        // Show gallery nudge once if any result has a profile photo or gallery
+        if (!galleryNudgeShownRef.current && data.some((p) => p.profileImage || (p.mediaImages?.length ?? 0) > 0)) {
+          galleryNudgeShownRef.current = true;
+          setShowGalleryNudge(true);
+          Animated.timing(nudgeOpacity, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+          // Auto-hide after 6 seconds
+          setTimeout(() => {
+            Animated.timing(nudgeOpacity, { toValue: 0, duration: 400, useNativeDriver: true }).start(
+              () => setShowGalleryNudge(false),
+            );
+          }, 6000);
+        }
+        // Show referral nudge after first successful search with results
+        if (data.length > 0 && !referralNudge) {
+          setTimeout(() => setReferralNudge(true), 3000);
+        }
       } else {
         showAlert('Error', res.body?.message || 'Failed to fetch professionals.');
       }
@@ -272,6 +316,11 @@ export default function ProfessionalsScreen({ navigation }: Props) {
   // ─── Render card ─────────────────────────────────────────────────────────────
 
   const navigateToProfile = (item: Professional) => {
+    profileTapsRef.current += 1;
+    // After 3rd tap, nudge unsubscribed users toward subscribing
+    if (profileTapsRef.current >= 3 && !isSubscribed) {
+      checkUpsellAfterSearch();
+    }
     if (item.role === 'vet') {
       navigation.navigate('VetProfile', { vetId: item._id });
     } else if (item.role === 'kennel') {
@@ -489,6 +538,45 @@ export default function ProfessionalsScreen({ navigation }: Props) {
           </View>
         )}
 
+        {/* Gallery nudge — fades in when profiles with images are loaded */}
+        {showGalleryNudge && (
+          <Animated.View style={[styles.galleryNudge, { opacity: nudgeOpacity }]}>
+            <Text style={styles.galleryNudgeIcon}>🖼️</Text>
+            <Text style={styles.galleryNudgeText}>
+              Tap any card to see their profile photo and full gallery before contacting
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                Animated.timing(nudgeOpacity, { toValue: 0, duration: 300, useNativeDriver: true }).start(
+                  () => setShowGalleryNudge(false),
+                );
+              }}
+            >
+              <Text style={styles.galleryNudgeClose}>✕</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+
+        {/* Referral nudge — appears 3s after first results load */}
+        {referralNudge && !isSubscribed && (
+          <TouchableOpacity
+            style={styles.referralNudge}
+            onPress={() => {
+              setReferralNudge(false);
+              navigation.navigate('Profile');
+            }}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.referralNudgeIcon}>🎁</Text>
+            <Text style={styles.referralNudgeText}>
+              Know a vet or groomer? Invite them — earn 7 free days
+            </Text>
+            <TouchableOpacity onPress={() => setReferralNudge(false)}>
+              <Text style={styles.galleryNudgeClose}>✕</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        )}
+
         {/* Results */}
         {loading ? (
           <View style={styles.loadingBox}>
@@ -504,9 +592,16 @@ export default function ProfessionalsScreen({ navigation }: Props) {
             showsVerticalScrollIndicator={false}
             ListHeaderComponent={
               hasSearched ? (
-                <Text style={styles.resultCount}>
-                  {professionals.length} professional{professionals.length !== 1 ? 's' : ''} found
-                </Text>
+                <>
+                  <Text style={styles.resultCount}>
+                    {professionals.length} professional{professionals.length !== 1 ? 's' : ''} found
+                  </Text>
+                  {professionals.length > 0 && (
+                    <Text style={styles.galleryHint}>
+                      🖼️ Tap any card to see their profile photo, gallery and contact details
+                    </Text>
+                  )}
+                </>
               ) : null
             }
             ListEmptyComponent={
@@ -523,15 +618,23 @@ export default function ProfessionalsScreen({ navigation }: Props) {
           />
         )}
 
-        {/* Upsell modal — shown after free search limit is reached */}
+        {/* Upsell modal — context-aware copy based on active role filter */}
         <Modal visible={showUpsell} transparent animationType="slide" onRequestClose={handleDismissUpsell}>
           <TouchableOpacity style={styles.upsellOverlay} onPress={handleDismissUpsell} activeOpacity={1}>
             <View style={styles.upsellSheet} onStartShouldSetResponder={() => true}>
               <View style={styles.upsellHandle} />
-              <Text style={styles.upsellTitle}>Unlock Unlimited Search</Text>
-              <Text style={styles.upsellMsg}>
-                You've used your free searches this week. Subscribe to search without limits and contact professionals directly.
+              <Text style={styles.upsellTitle}>
+                {(ROLE_UPSELL[roleFilter] ?? ROLE_UPSELL.all).title}
               </Text>
+              <Text style={styles.upsellMsg}>
+                {(ROLE_UPSELL[roleFilter] ?? ROLE_UPSELL.all).msg}
+              </Text>
+              <View style={styles.upsellBenefits}>
+                <Text style={styles.upsellBenefit}>✅ View full contact details</Text>
+                <Text style={styles.upsellBenefit}>📞 Call or WhatsApp directly</Text>
+                <Text style={styles.upsellBenefit}>💬 Send in-app messages</Text>
+                <Text style={styles.upsellBenefit}>📡 GPS nearby search</Text>
+              </View>
               <TouchableOpacity
                 style={styles.upsellBtn}
                 onPress={() => { handleDismissUpsell(); goToSubscription(navigation); }}
@@ -737,9 +840,33 @@ const styles = StyleSheet.create({
   upsellSheet:      { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
   upsellHandle:     { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0', alignSelf: 'center', marginBottom: 20 },
   upsellTitle:      { fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 10, textAlign: 'center' },
-  upsellMsg:        { fontSize: 14, color: '#6B7280', lineHeight: 21, textAlign: 'center', marginBottom: 24 },
+  upsellMsg:        { fontSize: 14, color: '#6B7280', lineHeight: 21, textAlign: 'center', marginBottom: 16 },
+  upsellBenefits:   { backgroundColor: '#F8FAFC', borderRadius: 12, padding: 14, marginBottom: 20, gap: 8 },
+  upsellBenefit:    { fontSize: 14, color: '#374151', fontWeight: '500' },
   upsellBtn:        { backgroundColor: '#2563EB', paddingVertical: 15, borderRadius: 12, alignItems: 'center', marginBottom: 12, shadowColor: '#2563EB', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
   upsellBtnText:    { color: '#fff', fontSize: 16, fontWeight: '700' },
   upsellNotNow:     { alignItems: 'center', paddingVertical: 8 },
   upsellNotNowText: { fontSize: 14, color: '#94A3B8', fontWeight: '600' },
+
+  // Gallery nudge banner
+  galleryNudge: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#F0FDF4', borderRadius: 10, borderWidth: 1, borderColor: '#BBF7D0',
+    marginHorizontal: 16, marginBottom: 8, paddingHorizontal: 14, paddingVertical: 10, gap: 8,
+  },
+  galleryNudgeIcon:  { fontSize: 18 },
+  galleryNudgeText:  { flex: 1, fontSize: 12, color: '#14532D', fontWeight: '600', lineHeight: 17 },
+  galleryNudgeClose: { fontSize: 14, color: '#6B7280', paddingHorizontal: 4 },
+
+  // Gallery hint in list header
+  galleryHint: { fontSize: 12, color: '#6B7280', marginBottom: 10, fontStyle: 'italic', lineHeight: 17 },
+
+  // Referral nudge in list
+  referralNudge: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#FFFBEB', borderRadius: 10, borderWidth: 1, borderColor: '#FDE68A',
+    marginHorizontal: 16, marginBottom: 8, paddingHorizontal: 14, paddingVertical: 10, gap: 8,
+  },
+  referralNudgeIcon: { fontSize: 18 },
+  referralNudgeText: { flex: 1, fontSize: 12, color: '#78350F', fontWeight: '600', lineHeight: 17 },
 });

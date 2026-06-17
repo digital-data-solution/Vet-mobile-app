@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -12,6 +12,7 @@ import {
   Platform,
   Modal,
   Image,
+  Animated,
 } from 'react-native';
 import { showAlert } from '../utils/alert';
 import * as Location from 'expo-location';
@@ -56,7 +57,10 @@ export default function ShopsScreen({ navigation }: Props) {
   const [hasSearched,        setHasSearched]        = useState(false);
   const [isSubscribed,       setIsSubscribed]       = useState(false);
   const [subscriptionChecked, setSubscriptionChecked] = useState(false);
-  const [showUpsell, setShowUpsell] = useState(false);
+  const [showUpsell,         setShowUpsell]         = useState(false);
+  const [showGalleryNudge,   setShowGalleryNudge]   = useState(false);
+  const galleryNudgeShownRef = useRef(false);
+  const nudgeOpacity         = useRef(new Animated.Value(0)).current;
 
   const handleDismissUpsell = () => {
     setShowUpsell(false);
@@ -95,9 +99,19 @@ export default function ShopsScreen({ navigation }: Props) {
       const res = await apiFetch('/api/v1/shops/list?limit=50', { method: 'GET' });
 
       if (res.ok && (res.body?.success || Array.isArray(res.body?.data) || Array.isArray(res.body))) {
-        const data = res.body?.data ?? res.body ?? [];
-        setShops(Array.isArray(data) ? data : []);
+        const data: Shop[] = Array.isArray(res.body?.data ?? res.body) ? (res.body?.data ?? res.body) : [];
+        setShops(data);
         checkUpsellAfterSearch();
+        if (!galleryNudgeShownRef.current && data.some((s) => s.images?.[0] || s.profileImage)) {
+          galleryNudgeShownRef.current = true;
+          setShowGalleryNudge(true);
+          Animated.timing(nudgeOpacity, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+          setTimeout(() => {
+            Animated.timing(nudgeOpacity, { toValue: 0, duration: 400, useNativeDriver: true }).start(
+              () => setShowGalleryNudge(false),
+            );
+          }, 7000);
+        }
       } else {
         if (res.status === 402) {
           // Subscription required — don't alert, the useFocusEffect already handled it
@@ -322,6 +336,25 @@ export default function ShopsScreen({ navigation }: Props) {
           <Text style={styles.allShopsBtnText}>Show All Pet Shops</Text>
         </TouchableOpacity>
 
+        {/* Gallery nudge */}
+        {showGalleryNudge && (
+          <Animated.View style={[styles.galleryNudge, { opacity: nudgeOpacity }]}>
+            <Text style={styles.galleryNudgeIcon}>🖼️</Text>
+            <Text style={styles.galleryNudgeText}>
+              Tap any shop to see their product photos and gallery before contacting
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                Animated.timing(nudgeOpacity, { toValue: 0, duration: 300, useNativeDriver: true }).start(
+                  () => setShowGalleryNudge(false),
+                );
+              }}
+            >
+              <Text style={styles.galleryNudgeClose}>✕</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+
         {/* Teaser banner */}
         {subscriptionChecked && !isSubscribed && (
           <View style={styles.teaserBanner}>
@@ -348,9 +381,16 @@ export default function ShopsScreen({ navigation }: Props) {
             showsVerticalScrollIndicator={false}
             ListHeaderComponent={
               hasSearched ? (
-                <Text style={styles.resultCount}>
-                  {filtered.length} shop{filtered.length !== 1 ? 's' : ''} found
-                </Text>
+                <>
+                  <Text style={styles.resultCount}>
+                    {filtered.length} shop{filtered.length !== 1 ? 's' : ''} found
+                  </Text>
+                  {filtered.length > 0 && (
+                    <Text style={styles.galleryHint}>
+                      🖼️ Tap any shop to view their photos, products and contact details
+                    </Text>
+                  )}
+                </>
               ) : null
             }
             ListEmptyComponent={
@@ -367,15 +407,21 @@ export default function ShopsScreen({ navigation }: Props) {
           />
         )}
 
-        {/* Upsell modal */}
+        {/* Upsell modal — shop specific */}
         <Modal visible={showUpsell} transparent animationType="slide" onRequestClose={handleDismissUpsell}>
           <TouchableOpacity style={styles.upsellOverlay} onPress={handleDismissUpsell} activeOpacity={1}>
             <View style={styles.upsellSheet} onStartShouldSetResponder={() => true}>
               <View style={styles.upsellHandle} />
-              <Text style={styles.upsellTitle}>Unlock Unlimited Search</Text>
+              <Text style={styles.upsellTitle}>Contact This Pet Shop</Text>
               <Text style={styles.upsellMsg}>
-                You've used your free searches this week. Subscribe to search without limits and contact shops directly.
+                Subscribe to call or WhatsApp pet shops directly, view product galleries, and get the best deals near you.
               </Text>
+              <View style={styles.upsellBenefits}>
+                <Text style={styles.upsellBenefit}>📞 Call or WhatsApp shops directly</Text>
+                <Text style={styles.upsellBenefit}>💬 Send in-app messages</Text>
+                <Text style={styles.upsellBenefit}>📡 GPS search for nearby shops</Text>
+                <Text style={styles.upsellBenefit}>🖼️ View full product galleries</Text>
+              </View>
               <TouchableOpacity
                 style={styles.upsellBtn}
                 onPress={() => { handleDismissUpsell(); goToSubscription(navigation); }}
@@ -536,9 +582,21 @@ const styles = StyleSheet.create({
   upsellSheet:      { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
   upsellHandle:     { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0', alignSelf: 'center', marginBottom: 20 },
   upsellTitle:      { fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 10, textAlign: 'center' },
-  upsellMsg:        { fontSize: 14, color: '#6B7280', lineHeight: 21, textAlign: 'center', marginBottom: 24 },
+  upsellMsg:        { fontSize: 14, color: '#6B7280', lineHeight: 21, textAlign: 'center', marginBottom: 16 },
+  upsellBenefits:   { backgroundColor: '#F8FAFC', borderRadius: 12, padding: 14, marginBottom: 20, gap: 8 },
+  upsellBenefit:    { fontSize: 14, color: '#374151', fontWeight: '500' },
   upsellBtn:        { backgroundColor: '#EA580C', paddingVertical: 15, borderRadius: 12, alignItems: 'center', marginBottom: 12, shadowColor: '#EA580C', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
   upsellBtnText:    { color: '#fff', fontSize: 16, fontWeight: '700' },
   upsellNotNow:     { alignItems: 'center', paddingVertical: 8 },
   upsellNotNowText: { fontSize: 14, color: '#94A3B8', fontWeight: '600' },
+
+  galleryNudge: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#FFF7ED', borderRadius: 10, borderWidth: 1, borderColor: '#FED7AA',
+    marginHorizontal: 16, marginBottom: 8, paddingHorizontal: 14, paddingVertical: 10, gap: 8,
+  },
+  galleryNudgeIcon:  { fontSize: 18 },
+  galleryNudgeText:  { flex: 1, fontSize: 12, color: '#92400E', fontWeight: '600', lineHeight: 17 },
+  galleryNudgeClose: { fontSize: 14, color: '#6B7280', paddingHorizontal: 4 },
+  galleryHint:       { fontSize: 12, color: '#6B7280', marginBottom: 8, fontStyle: 'italic', lineHeight: 17 },
 });

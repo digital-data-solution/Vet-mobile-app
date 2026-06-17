@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -12,6 +12,7 @@ import {
   Platform,
   Modal,
   Image,
+  Animated,
 } from 'react-native';
 import { showAlert } from '../utils/alert';
 import * as Location from 'expo-location';
@@ -47,7 +48,10 @@ export default function KennelsScreen({ navigation }: any) {
   const [isSubscribed,        setIsSubscribed]        = useState(false);
   const [subscriptionChecked, setSubscriptionChecked] = useState(false);
   const [currentPlan,         setCurrentPlan]         = useState<string | null>(null);
-  const [showUpsell, setShowUpsell] = useState(false);
+  const [showUpsell,         setShowUpsell]         = useState(false);
+  const [showGalleryNudge,   setShowGalleryNudge]   = useState(false);
+  const galleryNudgeShownRef = useRef(false);
+  const nudgeOpacity         = useRef(new Animated.Value(0)).current;
 
   const handleDismissUpsell = () => {
     setShowUpsell(false);
@@ -90,8 +94,19 @@ export default function KennelsScreen({ navigation }: any) {
     try {
       const res = await apiFetch('/api/v1/kennels/list?limit=50', { method: 'GET' });
       if (res.ok && res.body?.success) {
-        setKennels(res.body.data || []);
+        const data: Kennel[] = res.body.data || [];
+        setKennels(data);
         checkUpsellAfterSearch();
+        if (!galleryNudgeShownRef.current && data.some((k) => k.profileImage)) {
+          galleryNudgeShownRef.current = true;
+          setShowGalleryNudge(true);
+          Animated.timing(nudgeOpacity, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+          setTimeout(() => {
+            Animated.timing(nudgeOpacity, { toValue: 0, duration: 400, useNativeDriver: true }).start(
+              () => setShowGalleryNudge(false),
+            );
+          }, 7000);
+        }
       } else if (res.status === 402) {
         setKennels([]);
       } else {
@@ -300,6 +315,25 @@ export default function KennelsScreen({ navigation }: any) {
           </View>
         )}
 
+        {/* Gallery nudge */}
+        {showGalleryNudge && (
+          <Animated.View style={[styles.galleryNudge, { opacity: nudgeOpacity }]}>
+            <Text style={styles.galleryNudgeIcon}>🖼️</Text>
+            <Text style={styles.galleryNudgeText}>
+              Tap any kennel to see their facility photos and gallery before booking
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                Animated.timing(nudgeOpacity, { toValue: 0, duration: 300, useNativeDriver: true }).start(
+                  () => setShowGalleryNudge(false),
+                );
+              }}
+            >
+              <Text style={styles.galleryNudgeClose}>✕</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+
         {/* Results */}
         {loading ? (
           <View style={styles.loadingBox}>
@@ -314,9 +348,16 @@ export default function KennelsScreen({ navigation }: any) {
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
             ListHeaderComponent={
-              <Text style={styles.resultCount}>
-                {filtered.length} kennel{filtered.length !== 1 ? 's' : ''} found
-              </Text>
+              <>
+                <Text style={styles.resultCount}>
+                  {filtered.length} kennel{filtered.length !== 1 ? 's' : ''} found
+                </Text>
+                {filtered.length > 0 && (
+                  <Text style={styles.galleryHint}>
+                    🖼️ Tap any kennel to view facility photos and full gallery
+                  </Text>
+                )}
+              </>
             }
             ListEmptyComponent={
               <View style={styles.emptyState}>
@@ -330,15 +371,21 @@ export default function KennelsScreen({ navigation }: any) {
           />
         )}
 
-        {/* Upsell modal */}
+        {/* Upsell modal — kennel specific */}
         <Modal visible={showUpsell} transparent animationType="slide" onRequestClose={handleDismissUpsell}>
           <TouchableOpacity style={styles.upsellOverlay} onPress={handleDismissUpsell} activeOpacity={1}>
             <View style={styles.upsellSheet} onStartShouldSetResponder={() => true}>
               <View style={styles.upsellHandle} />
-              <Text style={styles.upsellTitle}>Unlock Unlimited Search</Text>
+              <Text style={styles.upsellTitle}>Book This Kennel</Text>
               <Text style={styles.upsellMsg}>
-                You've used your free searches this week. Subscribe to search without limits and contact kennels directly.
+                Subscribe to contact kennel owners directly, check availability, and arrange boarding for your pet.
               </Text>
+              <View style={styles.upsellBenefits}>
+                <Text style={styles.upsellBenefit}>📞 Call or WhatsApp kennel owners</Text>
+                <Text style={styles.upsellBenefit}>💬 Send in-app messages</Text>
+                <Text style={styles.upsellBenefit}>📡 GPS search for kennels nearby</Text>
+                <Text style={styles.upsellBenefit}>🖼️ View full facility gallery</Text>
+              </View>
               <TouchableOpacity
                 style={styles.upsellBtn}
                 onPress={() => { handleDismissUpsell(); goToSubscription(navigation); }}
@@ -494,9 +541,21 @@ const styles = StyleSheet.create({
   upsellSheet:      { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
   upsellHandle:     { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0', alignSelf: 'center', marginBottom: 20 },
   upsellTitle:      { fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 10, textAlign: 'center' },
-  upsellMsg:        { fontSize: 14, color: '#6B7280', lineHeight: 21, textAlign: 'center', marginBottom: 24 },
+  upsellMsg:        { fontSize: 14, color: '#6B7280', lineHeight: 21, textAlign: 'center', marginBottom: 16 },
+  upsellBenefits:   { backgroundColor: '#F8FAFC', borderRadius: 12, padding: 14, marginBottom: 20, gap: 8 },
+  upsellBenefit:    { fontSize: 14, color: '#374151', fontWeight: '500' },
   upsellBtn:        { backgroundColor: '#7C3AED', paddingVertical: 15, borderRadius: 12, alignItems: 'center', marginBottom: 12, shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
   upsellBtnText:    { color: '#fff', fontSize: 16, fontWeight: '700' },
   upsellNotNow:     { alignItems: 'center', paddingVertical: 8 },
   upsellNotNowText: { fontSize: 14, color: '#94A3B8', fontWeight: '600' },
+
+  galleryNudge: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#F0FDF4', borderRadius: 10, borderWidth: 1, borderColor: '#BBF7D0',
+    marginHorizontal: 16, marginBottom: 8, paddingHorizontal: 14, paddingVertical: 10, gap: 8,
+  },
+  galleryNudgeIcon:  { fontSize: 18 },
+  galleryNudgeText:  { flex: 1, fontSize: 12, color: '#14532D', fontWeight: '600', lineHeight: 17 },
+  galleryNudgeClose: { fontSize: 14, color: '#6B7280', paddingHorizontal: 4 },
+  galleryHint:       { fontSize: 12, color: '#6B7280', marginBottom: 8, fontStyle: 'italic', lineHeight: 17 },
 });

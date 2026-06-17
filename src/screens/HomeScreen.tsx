@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,12 +6,40 @@ import {
   TouchableOpacity,
   ScrollView,
   StatusBar,
+  Animated,
 } from 'react-native';
 import { useAuth } from '../navigation';
+import MarketplaceBanner from '../components/MarketplaceBanner';
+import { apiFetch } from '../api/client';
 
 interface Props {
   navigation: any;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Marketplace ticker messages — rotate every 4.5s on home screen
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MARKETPLACE_TICKER_MSGS = [
+  'Tap any service card to browse verified professionals near you',
+  'Check profile photos and gallery before contacting any provider',
+  'VCN-verified vets available — search by city or use GPS',
+  'Subscribe once to call, WhatsApp or message any provider',
+  'New kennels, pet shops and farms listed every week',
+  'Share your referral link and earn 7 free days of Premium',
+  'Looking for livestock or a farm? Check our verified farm listings',
+  'Pet groomers, trainers, sitters, transport — all in one place',
+  'Read verified reviews from pet owners before making contact',
+  'Browse our kennel gallery to see boarding facilities before booking',
+];
+
+const GUEST_TICKER_MSGS = [
+  'Nigeria's trusted pet care marketplace — 100% free to browse',
+  'VCN-verified vets, kennels, groomers, trainers and more',
+  'Are you a vet or pet professional? List your services for free',
+  'New listings added every week — check back often',
+  'Browse profiles, view galleries, read reviews — all before signing up',
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Role sets
@@ -373,18 +401,49 @@ const ROLE_CONFIG: Record<string, RoleConfig> = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Sub-component: Pro registration guide card
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ProGuideCard({
+  emoji, title, desc, color, bgColor, onPress,
+}: {
+  emoji: string; title: string; desc: string;
+  color: string; bgColor: string; onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.proGuideCard, { backgroundColor: bgColor, borderColor: color + '40' }]}
+      onPress={onPress}
+      activeOpacity={0.82}
+    >
+      <Text style={styles.proGuideEmoji}>{emoji}</Text>
+      <Text style={[styles.proGuideTitle, { color }]}>{title}</Text>
+      <Text style={styles.proGuideDesc}>{desc}</Text>
+      <Text style={[styles.proGuideLink, { color }]}>Register →</Text>
+    </TouchableOpacity>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main screen
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function HomeScreen({ navigation }: Props) {
   const { userRole, isAuthenticated } = useAuth();
   const [showDashboard, setShowDashboard] = useState(false);
+  const [stats, setStats] = useState<{ vetCount: number; kennelCount: number; shopCount: number; totalProfessionals: number } | null>(null);
+
+  useEffect(() => {
+    apiFetch('/api/v1/upsell/stats', { method: 'GET' })
+      .then((r) => { if (r.ok && r.body?.data) setStats(r.body.data); })
+      .catch(() => {});
+  }, []);
 
   const isProfessional = PROFESSIONAL_ROLES.has(userRole ?? '');
   const cfg: RoleConfig | undefined = userRole ? ROLE_CONFIG[userRole] : undefined;
 
   if (!isAuthenticated) {
-    return <GuestHome navigation={navigation} />;
+    return <GuestHome navigation={navigation} stats={stats} />;
   }
 
   if (isProfessional && cfg && showDashboard) {
@@ -402,6 +461,7 @@ export default function HomeScreen({ navigation }: Props) {
       navigation={navigation}
       dashboardCfg={isProfessional && cfg ? cfg : null}
       onOpenDashboard={() => setShowDashboard(true)}
+      stats={stats}
     />
   );
 }
@@ -410,7 +470,14 @@ export default function HomeScreen({ navigation }: Props) {
 // Guest home
 // ─────────────────────────────────────────────────────────────────────────────
 
-function GuestHome({ navigation }: { navigation: any }) {
+function GuestHome({ navigation, stats }: { navigation: any; stats: any }) {
+  const dynamicTicker = [
+    ...GUEST_TICKER_MSGS,
+    ...(stats?.vetCount    ? [`${stats.vetCount} verified vets listed and ready to help`] : []),
+    ...(stats?.shopCount   ? [`${stats.shopCount} pet shops listing products near you`]   : []),
+    ...(stats?.kennelCount ? [`${stats.kennelCount} kennels showcasing their facilities`] : []),
+  ];
+
   return (
     <ScrollView
       style={styles.scroll}
@@ -443,9 +510,19 @@ function GuestHome({ navigation }: { navigation: any }) {
         </View>
       </View>
 
+      {/* Rotating marketplace ticker */}
+      <View style={styles.tickerWrap}>
+        <MarketplaceBanner
+          messages={dynamicTicker}
+          color="#1A56DB"
+          bgColor="#EFF6FF"
+          intervalMs={4500}
+        />
+      </View>
+
       <View style={styles.sectionPad}>
         <Text style={styles.sectionHeading}>All Pet Services</Text>
-        <Text style={styles.sectionSubtitle}>Discover verified professionals across 10 categories</Text>
+        <Text style={styles.sectionSubtitle}>Browse verified professionals across 14 categories</Text>
         <View style={styles.serviceGrid}>
           {PET_OWNER_SERVICES.map((svc) => (
             <TouchableOpacity
@@ -461,11 +538,38 @@ function GuestHome({ navigation }: { navigation: any }) {
         </View>
       </View>
 
+      {/* Professional Registration Guide */}
+      <View style={styles.sectionPad}>
+        <Text style={styles.sectionHeading}>Are you a Pet Professional?</Text>
+        <Text style={styles.sectionSubtitle}>Join and reach thousands of pet owners near you</Text>
+        <View style={styles.proGuideRow}>
+          <ProGuideCard
+            emoji="👨‍⚕️" title="Vet / Groomer"
+            desc="Get verified, attract clients"
+            color="#2563EB" bgColor="#EFF6FF"
+            onPress={() => navigation.navigate('ExploreOptions')}
+          />
+          <ProGuideCard
+            emoji="🛒" title="Pet Shop"
+            desc="List products, reach buyers"
+            color="#EA580C" bgColor="#FFF7ED"
+            onPress={() => navigation.navigate('ExploreOptions')}
+          />
+          <ProGuideCard
+            emoji="🏠" title="Kennel / Farm"
+            desc="Showcase your facility"
+            color="#16A34A" bgColor="#F0FDF4"
+            onPress={() => navigation.navigate('ExploreOptions')}
+          />
+        </View>
+      </View>
+
       <View style={styles.sectionPad}>
         <Text style={styles.sectionHeading}>Why Choose Xpress Vet?</Text>
         <FeatureCard emoji="✅" title="Verified Professionals" description="Every vet is VCN-registered. Transport, insurance and cremation providers are admin-reviewed before listing." />
+        <FeatureCard emoji="🖼️" title="View Galleries First" description="Browse profile photos and full galleries of any provider before deciding to contact them." />
         <FeatureCard emoji="📍" title="Find Nearby Care" description="Search by your city or use GPS to find the closest vets, groomers, kennels, and sitters." />
-        <FeatureCard emoji="💬" title="Direct Contact" description="Call, WhatsApp, or message service providers directly — no middlemen, no booking fees." />
+        <FeatureCard emoji="💬" title="Direct Contact" description="Call, WhatsApp, or message providers directly — no middlemen, no booking fees." />
         <FeatureCard emoji="⭐" title="Real Reviews" description="Read verified reviews from other pet owners before you book or contact any provider." />
       </View>
 
@@ -506,11 +610,20 @@ function PetOwnerHome({
   navigation,
   dashboardCfg,
   onOpenDashboard,
+  stats,
 }: {
   navigation: any;
   dashboardCfg: RoleConfig | null;
   onOpenDashboard: () => void;
+  stats: any;
 }) {
+  const dynamicTicker = [
+    ...MARKETPLACE_TICKER_MSGS,
+    ...(stats?.vetCount    ? [`${stats.vetCount} verified vets listed on the platform`]      : []),
+    ...(stats?.shopCount   ? [`${stats.shopCount} pet shops listing products near you`]       : []),
+    ...(stats?.kennelCount ? [`${stats.kennelCount} kennels available — tap to browse`]       : []),
+  ];
+
   return (
     <ScrollView
       style={styles.scroll}
@@ -522,6 +635,11 @@ function PetOwnerHome({
       <View style={styles.ownerHeader}>
         <Text style={styles.ownerHeaderTitle}>🐾 Xpress Vet</Text>
         <Text style={styles.ownerHeaderSub}>Find trusted pet care near you</Text>
+      </View>
+
+      {/* Rotating marketplace ticker */}
+      <View style={styles.tickerWrap}>
+        <MarketplaceBanner messages={dynamicTicker} />
       </View>
 
       {dashboardCfg && (
@@ -543,6 +661,9 @@ function PetOwnerHome({
 
       <View style={styles.sectionPad}>
         <Text style={styles.sectionHeading}>Browse Services</Text>
+        <Text style={styles.sectionSubtitle}>
+          Tap any category — check profiles, photos, gallery before contacting
+        </Text>
         <View style={styles.serviceGrid}>
           {PET_OWNER_SERVICES.map((svc) => (
             <TouchableOpacity
@@ -558,6 +679,34 @@ function PetOwnerHome({
         </View>
       </View>
 
+      {/* Professional Registration Guide */}
+      {!dashboardCfg && (
+        <View style={styles.sectionPad}>
+          <Text style={styles.sectionHeading}>Are you a Pet Professional?</Text>
+          <Text style={styles.sectionSubtitle}>Reach thousands of pet owners near you — free to list</Text>
+          <View style={styles.proGuideRow}>
+            <ProGuideCard
+              emoji="👨‍⚕️" title="Vet / Groomer"
+              desc="Get verified, attract local clients"
+              color="#2563EB" bgColor="#EFF6FF"
+              onPress={() => navigation.getParent()?.navigate('ProfessionalOnboarding')}
+            />
+            <ProGuideCard
+              emoji="🛒" title="Pet Shop"
+              desc="List products, reach buyers"
+              color="#EA580C" bgColor="#FFF7ED"
+              onPress={() => navigation.getParent()?.navigate('ShopOnboarding')}
+            />
+            <ProGuideCard
+              emoji="🏠" title="Kennel / Farm"
+              desc="Showcase your facility"
+              color="#16A34A" bgColor="#F0FDF4"
+              onPress={() => navigation.getParent()?.navigate('KennelOnboarding')}
+            />
+          </View>
+        </View>
+      )}
+
       <TouchableOpacity
         style={styles.upsellBanner}
         onPress={() => navigation.navigate('Subscription')}
@@ -565,25 +714,40 @@ function PetOwnerHome({
       >
         <Text style={styles.upsellEmoji}>⭐</Text>
         <View style={styles.upsellText}>
-          <Text style={styles.upsellTitle}>Unlock Premium</Text>
+          <Text style={styles.upsellTitle}>Unlock Premium — from ₦1,500/mo</Text>
           <Text style={styles.upsellSub}>
-            WhatsApp, in-app messaging, and direct contact with all providers
+            Call, WhatsApp or message any vet, shop, kennel or farm directly
           </Text>
         </View>
         <Text style={styles.upsellArrow}>›</Text>
       </TouchableOpacity>
 
+      {/* Referral nudge */}
+      <TouchableOpacity
+        style={styles.referralCard}
+        onPress={() => navigation.navigate('Profile')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.referralCardEmoji}>🎁</Text>
+        <View style={styles.referralCardText}>
+          <Text style={styles.referralCardTitle}>Invite friends, earn 7 free days</Text>
+          <Text style={styles.referralCardSub}>Get your personal referral link from your Profile page</Text>
+        </View>
+        <Text style={styles.referralCardArrow}>›</Text>
+      </TouchableOpacity>
+
       <View style={styles.sectionPad}>
         <Text style={styles.sectionHeading}>All on Xpress Vet</Text>
         <FeatureCard emoji="👨‍⚕️" title="VCN-Verified Vets" description="Every vet on the platform is registered with the Veterinary Council of Nigeria." />
-        <FeatureCard emoji="🔍" title="10 Service Categories" description="From grooming to cremation — find every pet care professional in one place." />
+        <FeatureCard emoji="🖼️" title="View Galleries First" description="Browse profile photos and facility galleries of any provider before contacting." />
+        <FeatureCard emoji="🔍" title="14 Service Categories" description="From grooming to farms and cremation — every pet care professional in one place." />
         <FeatureCard emoji="⭐" title="Real Reviews" description="Read reviews from verified pet owners before reaching out to any provider." />
       </View>
 
       <View style={[styles.sectionPad, styles.registerBanner]}>
         <Text style={styles.registerBannerTitle}>Do you offer pet services?</Text>
         <Text style={styles.registerBannerSub}>
-          Vets, groomers, trainers, kennels, sitters, transport, shops and more — list your business today.
+          Vets, groomers, trainers, kennels, sitters, transport, shops, farms and more — list your business today.
         </Text>
         <TouchableOpacity
           style={styles.registerBannerBtn}
@@ -885,6 +1049,33 @@ const styles = StyleSheet.create({
   // Disclaimer
   disclaimerCard: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, padding: 14 },
   disclaimerText: { fontSize: 12, color: '#64748B', lineHeight: 18 },
+
+  // Marketplace ticker
+  tickerWrap: { paddingHorizontal: 20, marginTop: 14 },
+
+  // Professional registration guide row
+  proGuideRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  proGuideCard: {
+    flex: 1, borderRadius: 14, padding: 12, borderWidth: 1, alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2,
+  },
+  proGuideEmoji:  { fontSize: 24, marginBottom: 6 },
+  proGuideTitle:  { fontSize: 11, fontWeight: '800', textAlign: 'center', marginBottom: 4, color: '#111827' },
+  proGuideDesc:   { fontSize: 10, color: '#6B7280', textAlign: 'center', lineHeight: 14, marginBottom: 8 },
+  proGuideLink:   { fontSize: 11, fontWeight: '700' },
+
+  // Referral nudge card
+  referralCard: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#FFF8F0', borderWidth: 1, borderColor: '#FED7AA',
+    borderRadius: 16, marginHorizontal: 20, marginTop: 16, padding: 16, gap: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2,
+  },
+  referralCardEmoji: { fontSize: 28 },
+  referralCardText:  { flex: 1 },
+  referralCardTitle: { fontSize: 14, fontWeight: '700', color: '#92400E', marginBottom: 3 },
+  referralCardSub:   { fontSize: 12, color: '#B45309', lineHeight: 16 },
+  referralCardArrow: { fontSize: 22, color: '#D97706', fontWeight: '300' },
 
   // Feature card
   featureCard: {
