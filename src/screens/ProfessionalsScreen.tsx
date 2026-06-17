@@ -18,6 +18,7 @@ import {
 import { showAlert } from '../utils/alert';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
+import SkeletonList from '../components/SkeletonLoader';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiFetch } from '../api/client';
 import { getSearchHistory, addSearchTerm, clearSearchHistory } from '../utils/searchHistory';
@@ -670,10 +671,11 @@ export default function ProfessionalsScreen({ navigation }: Props) {
         )}
 
         {/* Results */}
-        {loading ? (
+        {loading && results.length === 0 ? (
+          <SkeletonList count={5} />
+        ) : loading ? (
           <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#2563EB" />
-            <Text style={styles.loadingText}>Finding professionals...</Text>
+            <ActivityIndicator size="small" color="#2563EB" />
           </View>
         ) : (
           <FlatList

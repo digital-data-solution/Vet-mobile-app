@@ -20,6 +20,7 @@ import { showAlert } from '../utils/alert';
 import * as Location from 'expo-location';
 import { apiFetch } from '../api/client';
 import { Ionicons } from '@expo/vector-icons';
+import SkeletonList from '../components/SkeletonLoader';
 function goToSubscription(navigation: any) {
   try {
     const parent = navigation.getParent();
@@ -400,10 +401,11 @@ export default function ShopsScreen({ navigation }: Props) {
         )}
 
         {/* Results */}
-        {loading ? (
+        {loading && shops.length === 0 ? (
+          <SkeletonList count={5} />
+        ) : loading ? (
           <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#EA580C" />
-            <Text style={styles.loadingText}>Finding shops...</Text>
+            <ActivityIndicator size="small" color="#EA580C" />
           </View>
         ) : (
           <FlatList

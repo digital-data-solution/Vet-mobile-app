@@ -16,6 +16,7 @@ import * as Location from 'expo-location';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../api/client';
+import SkeletonList from '../components/SkeletonLoader';
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -95,6 +96,8 @@ export default function ServiceScreen({ navigation }: any) {
   const [locationLoading, setLocationLoading] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subChecked, setSubChecked]     = useState(false);
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
+  const [sortBy, setSortBy]             = useState<'default' | 'rating' | 'distance'>('default');
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Subscription check ────────────────────────────────────────────────────
@@ -359,15 +362,52 @@ export default function ServiceScreen({ navigation }: any) {
           </View>
         )}
 
+        {/* Sort + verified filter */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.sortRow}
+        >
+          <TouchableOpacity
+            style={[styles.sortChip, verifiedOnly && styles.sortChipActive]}
+            onPress={() => setVerifiedOnly(v => !v)}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name={verifiedOnly ? 'shield-checkmark' : 'shield-checkmark-outline'}
+              size={13}
+              color={verifiedOnly ? '#fff' : '#059669'}
+            />
+            <Text style={[styles.sortChipText, verifiedOnly && { color: '#fff' }]}>Verified Only</Text>
+          </TouchableOpacity>
+          {([['default', '⊞ Default'], ['rating', '⭐ Top Rated'], ['distance', '📍 Nearest']] as const).map(([key, label]) => (
+            <TouchableOpacity
+              key={key}
+              style={[styles.sortChip, sortBy === key && styles.sortChipActive]}
+              onPress={() => setSortBy(key)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.sortChipText, sortBy === key && { color: '#fff' }]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
         {/* Results */}
-        {loading ? (
+        {loading && !hasLoaded ? (
+          <SkeletonList count={5} />
+        ) : loading ? (
           <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#2563EB" />
-            <Text style={styles.loadingText}>Finding services...</Text>
+            <ActivityIndicator size="small" color="#2563EB" />
           </View>
         ) : (
           <FlatList
-            data={results}
+            data={results
+              .filter(s => !verifiedOnly || s.isVerified)
+              .sort((a, b) => {
+                if (sortBy === 'rating')   return (b.rating ?? 0) - (a.rating ?? 0);
+                if (sortBy === 'distance') return (a.distance ?? 9999) - (b.distance ?? 9999);
+                return 0;
+              })}
             keyExtractor={(item) => item._id}
             renderItem={renderItem}
             contentContainerStyle={styles.list}
@@ -542,6 +582,16 @@ const styles = StyleSheet.create({
   address:       { fontSize: 12, color: '#64748B', flex: 1 },
   distance:      { fontSize: 12, fontWeight: '600', marginTop: 3 },
   rating:        { fontSize: 12, color: '#64748B', marginTop: 2 },
+
+  sortRow: { paddingHorizontal: 16, paddingBottom: 8, gap: 8, flexDirection: 'row' },
+  sortChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: '#F1F5F9', borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 7,
+    borderWidth: 1, borderColor: '#E2E8F0',
+  },
+  sortChipActive: { backgroundColor: '#2563EB', borderColor: '#2563EB' },
+  sortChipText: { fontSize: 12, color: '#475569', fontWeight: '600' },
 
   emptyState: { alignItems: 'center', paddingTop: 60, paddingHorizontal: 24 },
   emptyEmoji: { fontSize: 52, marginBottom: 16 },

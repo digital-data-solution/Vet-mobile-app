@@ -69,6 +69,55 @@ function goToSubscription(navigation: any) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Professional stats mini-card
+// ─────────────────────────────────────────────────────────────────────────────
+function ProfStats() {
+  const [stats, setStats] = useState<{
+    profileViews: number;
+    contactTaps: { total: number; phone: number; whatsapp: number; email: number };
+    rating: number;
+    reviewCount: number;
+  } | null>(null);
+
+  useEffect(() => {
+    apiFetch('/api/v1/professionals/me/stats', { method: 'GET' })
+      .then(res => { if (res.ok && res.body?.success) setStats(res.body.data); })
+      .catch(() => {});
+  }, []);
+
+  if (!stats) return null;
+
+  const items = [
+    { label: 'Profile Views', value: stats.profileViews, icon: '👁' },
+    { label: 'Contact Taps', value: stats.contactTaps.total, icon: '📞' },
+    { label: 'Avg Rating',   value: stats.rating > 0 ? stats.rating.toFixed(1) : '—', icon: '⭐' },
+    { label: 'Reviews',      value: stats.reviewCount, icon: '💬' },
+  ];
+
+  return (
+    <View style={styles.statsCard}>
+      <Text style={styles.statsTitle}>Your Listing Performance</Text>
+      <View style={styles.statsGrid}>
+        {items.map(({ label, value, icon }) => (
+          <View key={label} style={styles.statItem}>
+            <Text style={styles.statIcon}>{icon}</Text>
+            <Text style={styles.statValue}>{value}</Text>
+            <Text style={styles.statLabel}>{label}</Text>
+          </View>
+        ))}
+      </View>
+      {stats.contactTaps.total > 0 && (
+        <View style={styles.tapBreakdown}>
+          <Text style={styles.tapBreakdownText}>
+            📲 {stats.contactTaps.phone} calls · 💬 {stats.contactTaps.whatsapp} WhatsApp · ✉️ {stats.contactTaps.email} email
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ProfileScreen({ navigation }: Props) {
@@ -478,6 +527,9 @@ export default function ProfileScreen({ navigation }: Props) {
           </Pressable>
         </View>
       )}
+
+      {/* ── Professional stats card ─────────────────────────────────────── */}
+      {isProfessional && <ProfStats />}
 
       {/* ── Account info ────────────────────────────────────────────────── */}
       {user && (
@@ -1096,4 +1148,36 @@ const styles = StyleSheet.create({
     alignItems:      'center',
   },
   shareButtonText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+
+  // ── Professional stats card ─────────────────────────────────────────────────
+  statsCard: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.07,
+    shadowRadius: 4,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  statsTitle: {
+    fontSize: 13, fontWeight: '700', color: '#6B7280',
+    textTransform: 'uppercase', letterSpacing: 0.5,
+    marginBottom: 14,
+  },
+  statsGrid: { flexDirection: 'row', justifyContent: 'space-between' },
+  statItem:  { alignItems: 'center', flex: 1 },
+  statIcon:  { fontSize: 22, marginBottom: 4 },
+  statValue: { fontSize: 20, fontWeight: '800', color: '#111827' },
+  statLabel: { fontSize: 11, color: '#6B7280', marginTop: 2, textAlign: 'center' },
+  tapBreakdown: {
+    marginTop: 12, paddingTop: 12,
+    borderTopWidth: 1, borderTopColor: '#F3F4F6',
+    alignItems: 'center',
+  },
+  tapBreakdownText: { fontSize: 12, color: '#6B7280' },
 });

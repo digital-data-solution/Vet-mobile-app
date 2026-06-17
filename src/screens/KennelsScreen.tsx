@@ -20,6 +20,7 @@ import { showAlert } from '../utils/alert';
 import * as Location from 'expo-location';
 import { apiFetch } from '../api/client';
 import { Ionicons } from '@expo/vector-icons';
+import SkeletonList from '../components/SkeletonLoader';
 function goToSubscription(navigation: any) {
   try {
     const parent = navigation.getParent();
@@ -364,10 +365,11 @@ export default function KennelsScreen({ navigation }: any) {
         )}
 
         {/* Results */}
-        {loading ? (
+        {loading && kennels.length === 0 ? (
+          <SkeletonList count={5} />
+        ) : loading ? (
           <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#2563EB" />
-            <Text style={styles.loadingText}>Finding kennels...</Text>
+            <ActivityIndicator size="small" color="#7C3AED" />
           </View>
         ) : (
           <FlatList
