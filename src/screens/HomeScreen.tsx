@@ -7,6 +7,7 @@ import {
   ScrollView,
   StatusBar,
   Animated,
+  Image,
 } from 'react-native';
 import { useAuth } from '../navigation';
 import { useFocusEffect } from '@react-navigation/native';
@@ -720,7 +721,13 @@ function PetOwnerHome({
                 }}
                 activeOpacity={0.82}
               >
-                <Text style={styles.recentEmoji}>{item.emoji ?? '🐾'}</Text>
+                {item.profileImage ? (
+                  <Image source={{ uri: item.profileImage }} style={styles.recentAvatar} />
+                ) : (
+                  <View style={[styles.recentAvatarPlaceholder, { backgroundColor: (item.color ?? '#2563EB') + '20' }]}>
+                    <Text style={styles.recentEmoji}>{item.emoji ?? '🐾'}</Text>
+                  </View>
+                )}
                 <Text style={styles.recentName} numberOfLines={1}>{item.name}</Text>
                 {item.role ? <Text style={styles.recentRole} numberOfLines={1}>{item.role.replace(/_/g, ' ')}</Text> : null}
               </TouchableOpacity>
@@ -1122,6 +1129,8 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3, alignItems: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2,
   },
+  recentAvatar: { width: 52, height: 52, borderRadius: 26, marginBottom: 6, backgroundColor: '#F1F5F9' },
+  recentAvatarPlaceholder: { width: 52, height: 52, borderRadius: 26, marginBottom: 6, alignItems: 'center', justifyContent: 'center' },
   recentEmoji: { fontSize: 22, marginBottom: 4 },
   recentName: { fontSize: 12, fontWeight: '700', color: '#111827', textAlign: 'center' },
   recentRole: { fontSize: 10, color: '#6B7280', marginTop: 2, textAlign: 'center', textTransform: 'capitalize' },

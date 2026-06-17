@@ -1,12 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface FavoriteItem {
-  id:        string;
-  type:      'professional' | 'kennel' | 'shop';
-  name:      string;
-  role?:     string;
-  address?:  string;
-  savedAt:   number;
+  id:           string;
+  type:         'professional' | 'kennel' | 'shop';
+  name:         string;
+  role?:        string;
+  address?:     string;
+  profileImage?: string;
+  savedAt:      number;
 }
 
 const KEY = 'xv_favorites';

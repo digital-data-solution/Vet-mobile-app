@@ -91,6 +91,7 @@ export default function VetProfileScreen({ route, navigation }: any) {
           role: data.role,
           emoji: data.role === 'vet' ? '👨‍⚕️' : '🐕',
           color: data.role === 'vet' ? '#2563EB' : '#7C3AED',
+          profileImage: data.profileImage || data.userId?.profileImage,
         }).catch(() => {});
         isFavorite(data._id).then(setIsFav).catch(() => {});
       } else {
@@ -178,7 +179,7 @@ export default function VetProfileScreen({ route, navigation }: any) {
   const handleFavorite = async () => {
     if (!vet) return;
     const name = vet.businessName || vet.name || vet.userId?.name || 'Professional';
-    const added = await toggleFavorite({ id: vet._id, type: 'professional', name, role: vet.role, address: vet.address });
+    const added = await toggleFavorite({ id: vet._id, type: 'professional', name, role: vet.role, address: vet.address, profileImage: vet.profileImage || vet.userId?.profileImage });
     setIsFav(added);
     showAlert(added ? 'Saved!' : 'Removed', added ? `${name} added to your favourites.` : `${name} removed from favourites.`);
   };

@@ -81,6 +81,7 @@ export default function ShopProfileScreen({ route, navigation }: any) {
           id: data._id, type: 'shop',
           name: data.shopName || data.businessName || data.name || 'Pet Shop',
           emoji: '🛒', color: '#EA580C',
+          profileImage: data.images?.[0] || data.owner?.profileImage,
         }).catch(() => {});
         isFavorite(data._id).then(setIsFav).catch(() => {});
       } else {
@@ -182,7 +183,7 @@ export default function ShopProfileScreen({ route, navigation }: any) {
   const handleFavorite = async () => {
     if (!shop?._id) return;
     const name = getDisplayName();
-    const added = await toggleFavorite({ id: shop._id, type: 'shop', name, address });
+    const added = await toggleFavorite({ id: shop._id, type: 'shop', name, address, profileImage: shop.images?.[0] || shop.owner?.profileImage });
     setIsFav(added);
     showAlert(added ? 'Saved!' : 'Removed', added ? `${name} added to your favourites.` : `${name} removed from favourites.`);
   };

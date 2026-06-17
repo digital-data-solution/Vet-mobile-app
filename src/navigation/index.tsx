@@ -74,6 +74,8 @@ type AuthContextType = {
   isAuthenticated: boolean;
   signOut:         () => Promise<void>;
   refreshRole:     () => Promise<void>;
+  unreadCount:     number;
+  setUnreadCount:  (n: number) => void;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -85,6 +87,8 @@ export const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   signOut:         async () => {},
   refreshRole:     async () => {},
+  unreadCount:     0,
+  setUnreadCount:  () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -114,7 +118,7 @@ export type RootStackParamList = {
     amount:            number;
     callbackKey:       string;
   };
-  Chat: { otherUserId: string; otherUserName: string };
+  Chat: { otherUserId: string; otherUserName: string; otherUserAvatar?: string };
   PrivacyPolicy: undefined;
   Terms:         undefined;
   Support:       undefined;

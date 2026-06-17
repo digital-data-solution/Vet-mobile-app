@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  ActivityIndicator, RefreshControl,
+  ActivityIndicator, RefreshControl, Image,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -65,9 +65,13 @@ export default function FavoritesScreen({ navigation }: any) {
 
     return (
       <TouchableOpacity style={styles.card} onPress={() => handleNavigate(item)} activeOpacity={0.82}>
-        <View style={[styles.cardIcon, { backgroundColor: meta.bgColor }]}>
-          <Text style={styles.cardEmoji}>{emoji}</Text>
-        </View>
+        {item.profileImage ? (
+          <Image source={{ uri: item.profileImage }} style={styles.cardImage} />
+        ) : (
+          <View style={[styles.cardIcon, { backgroundColor: meta.bgColor }]}>
+            <Text style={styles.cardEmoji}>{emoji}</Text>
+          </View>
+        )}
         <View style={styles.cardBody}>
           <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
           <Text style={[styles.cardRole, { color: meta.color }]}>{roleLabel}</Text>
@@ -134,6 +138,7 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
   },
+  cardImage: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#F1F5F9' },
   cardIcon: { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center' },
   cardEmoji: { fontSize: 22 },
   cardBody: { flex: 1 },

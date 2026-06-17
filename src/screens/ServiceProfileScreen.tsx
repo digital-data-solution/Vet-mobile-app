@@ -106,6 +106,7 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
           id: data._id, type: 'professional',
           name: data.businessName || data.name || 'Professional',
           role: data.role, emoji: roleMeta.emoji, color: roleMeta.color,
+          profileImage: data.profileImage || data.userId?.profileImage,
         }).catch(() => {});
         isFavorite(data._id).then(setIsFav).catch(() => {});
       } else {
@@ -210,7 +211,7 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
   };
 
   const handleFavorite = async () => {
-    const added = await toggleFavorite({ id: prof._id, type: 'professional', name: displayName, role: prof.role, address: prof.address });
+    const added = await toggleFavorite({ id: prof._id, type: 'professional', name: displayName, role: prof.role, address: prof.address, profileImage: prof.profileImage || prof.userId?.profileImage });
     setIsFav(added);
     showAlert(added ? 'Saved!' : 'Removed', added ? `${displayName} added to your favourites.` : `${displayName} removed from favourites.`);
   };

@@ -79,6 +79,7 @@ export default function KennelProfileScreen({ route, navigation }: any) {
           id: data._id, type: 'kennel',
           name: data.businessName || data.name || 'Kennel',
           emoji: '🐕', color: '#7C3AED',
+          profileImage: data.profileImage || data.userId?.profileImage,
         }).catch(() => {});
         isFavorite(data._id).then(setIsFav).catch(() => {});
       } else {
@@ -169,7 +170,7 @@ export default function KennelProfileScreen({ route, navigation }: any) {
 
   const handleFavorite = async () => {
     if (!kennel?._id) return;
-    const added = await toggleFavorite({ id: kennel._id, type: 'kennel', name: displayName, address: kennel.address });
+    const added = await toggleFavorite({ id: kennel._id, type: 'kennel', name: displayName, address: kennel.address, profileImage: kennel.profileImage || kennel.userId?.profileImage });
     setIsFav(added);
     showAlert(added ? 'Saved!' : 'Removed', added ? `${displayName} added to your favourites.` : `${displayName} removed from favourites.`);
   };

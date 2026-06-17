@@ -1,13 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface RecentItem {
-  id:       string;
-  type:     'professional' | 'kennel' | 'shop';
-  name:     string;
-  role?:    string;
-  emoji?:   string;
-  color?:   string;
-  viewedAt: number;
+  id:           string;
+  type:         'professional' | 'kennel' | 'shop';
+  name:         string;
+  role?:        string;
+  emoji?:       string;
+  color?:       string;
+  profileImage?: string;
+  viewedAt:     number;
 }
 
 const KEY     = 'xv_recently_viewed';

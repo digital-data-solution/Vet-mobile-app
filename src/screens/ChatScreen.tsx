@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -36,19 +37,38 @@ interface Message {
   read_status: boolean;
 }
 
+const QUICK_REPLIES = [
+  'Hello! Is this available?',
+  'What are your charges?',
+  'What are your hours?',
+  'Can I schedule an appointment?',
+  'Please send more details.',
+  'Thank you!',
+];
+
 function formatBubbleTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 export default function ChatScreen({ route }: Props) {
-  const { otherUserId, otherUserName } = route.params;
+  const { otherUserId, otherUserName, otherUserAvatar } = route.params;
   const { session } = useAuth();
   const currentUserId = session?.user?.id ?? '';
 
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [text, setText]         = useState('');
-  const [sending, setSending]   = useState(false);
+  const [messages, setMessages]           = useState<Message[]>([]);
+  const [loading, setLoading]             = useState(true);
+  const [text, setText]                   = useState('');
+  const [sending, setSending]             = useState(false);
+  const [showQuickReplies, setShowQuickReplies] = useState(false);
+  const [myAvatar, setMyAvatar]           = useState<string | null>(null);
+
+  // Fetch own profile image once
+  useEffect(() => {
+    apiFetch('/api/auth/me').then((res) => {
+      const img = res.body?.user?.profileImage || res.body?.user?.user_metadata?.profileImage;
+      if (img) setMyAvatar(img);
+    }).catch(() => {});
+  }, []);
   const channelRef = useRef<RealtimeChannel | null>(null);
 
   // Load history and mark received messages as read on focus
@@ -155,8 +175,21 @@ export default function ChatScreen({ route }: Props) {
         keyboardShouldPersistTaps="handled"
         renderItem={({ item }) => {
           const isMine = item.from_user_id === currentUserId;
+          const avatarUri = isMine ? myAvatar : (otherUserAvatar ?? null);
+          const initials = isMine
+            ? (session?.user?.user_metadata?.name?.[0] ?? '?').toUpperCase()
+            : otherUserName.charAt(0).toUpperCase();
           return (
             <View style={[styles.bubbleRow, isMine && styles.bubbleRowMine]}>
+              {!isMine && (
+                <View style={styles.chatAvatar}>
+                  {avatarUri ? (
+                    <Image source={{ uri: avatarUri }} style={styles.chatAvatarImg} />
+                  ) : (
+                    <Text style={styles.chatAvatarInitial}>{initials}</Text>
+                  )}
+                </View>
+              )}
               <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
                 <Text style={[styles.bubbleText, isMine && styles.bubbleTextMine]}>
                   {item.message_text}
@@ -165,6 +198,15 @@ export default function ChatScreen({ route }: Props) {
                   {formatBubbleTime(item.created_at)}
                 </Text>
               </View>
+              {isMine && (
+                <View style={styles.chatAvatar}>
+                  {avatarUri ? (
+                    <Image source={{ uri: avatarUri }} style={styles.chatAvatarImg} />
+                  ) : (
+                    <Text style={styles.chatAvatarInitial}>{initials}</Text>
+                  )}
+                </View>
+              )}
             </View>
           );
         }}
@@ -177,7 +219,24 @@ export default function ChatScreen({ route }: Props) {
         }
       />
 
+      {showQuickReplies && (
+        <View style={styles.quickReplyBar}>
+          {QUICK_REPLIES.map((reply) => (
+            <TouchableOpacity
+              key={reply}
+              style={styles.quickReplyChip}
+              onPress={() => { setText(reply); setShowQuickReplies(false); }}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.quickReplyText}>{reply}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
       <View style={styles.inputBar}>
+        <TouchableOpacity style={styles.quickReplyToggle} onPress={() => setShowQuickReplies((v) => !v)} activeOpacity={0.7}>
+          <Ionicons name={showQuickReplies ? 'chevron-down' : 'flash-outline'} size={20} color={showQuickReplies ? '#E8610A' : '#8E8E93'} />
+        </TouchableOpacity>
         <TextInput
           style={styles.input}
           placeholder="Message..."
@@ -222,12 +281,22 @@ const styles = StyleSheet.create({
 
   bubbleRow: {
     flexDirection:  'row',
-    marginBottom:   6,
+    marginBottom:   8,
     justifyContent: 'flex-start',
+    alignItems:     'flex-end',
+    gap: 6,
   },
   bubbleRowMine: {
     justifyContent: 'flex-end',
   },
+  chatAvatar: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: '#E8610A',
+    alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  },
+  chatAvatarImg: { width: 28, height: 28, borderRadius: 14 },
+  chatAvatarInitial: { color: '#fff', fontSize: 12, fontWeight: '700' },
 
   bubble: {
     maxWidth:          '75%',
@@ -304,5 +373,34 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: '#C7C7CC',
+  },
+  quickReplyToggle: {
+    padding: 8,
+    marginRight: 4,
+    alignSelf: 'flex-end',
+    marginBottom: 2,
+  },
+  quickReplyBar: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  quickReplyChip: {
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  quickReplyText: {
+    fontSize: 13,
+    color: '#C2410C',
+    fontWeight: '600',
   },
 });

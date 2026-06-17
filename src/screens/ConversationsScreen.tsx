@@ -194,8 +194,9 @@ export default function ConversationsScreen() {
               style={styles.row}
               onPress={() =>
                 navigation.navigate('Chat', {
-                  otherUserId:   item.otherUserId,
-                  otherUserName: item.otherUserName,
+                  otherUserId:    item.otherUserId,
+                  otherUserName:  item.otherUserName,
+                  otherUserAvatar: item.otherUserAvatar ?? undefined,
                 })
               }
               activeOpacity={0.7}

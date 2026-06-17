@@ -20,15 +20,24 @@ const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://vet-market-plac
 interface Message {
   _id: string;
   text: string;
-  senderRole: 'user' | 'admin';
+  senderRole: 'user' | 'admin' | 'bot';
   createdAt: string;
 }
 
 interface Thread {
   _id: string;
   status: 'open' | 'resolved';
+  needsHuman: boolean;
   messages: Message[];
 }
+
+const FAQ_SUGGESTIONS = [
+  'How do I subscribe?',
+  'How do I contact a vet?',
+  'How do I reset my password?',
+  'How do I update my profile?',
+  'I want to talk to a person',
+];
 
 async function getToken(): Promise<string | null> {
   const { data } = await supabase.auth.getSession();
@@ -36,12 +45,13 @@ async function getToken(): Promise<string | null> {
 }
 
 export default function SupportScreen({ navigation }: { navigation: any }) {
-  const [thread, setThread]         = useState<Thread | null>(null);
-  const [text, setText]             = useState('');
-  const [loading, setLoading]       = useState(true);
-  const [sending, setSending]       = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError]           = useState('');
+  const [thread, setThread]           = useState<Thread | null>(null);
+  const [text, setText]               = useState('');
+  const [loading, setLoading]         = useState(true);
+  const [sending, setSending]         = useState(false);
+  const [refreshing, setRefreshing]   = useState(false);
+  const [error, setError]             = useState('');
+  const [showFAQs, setShowFAQs]       = useState(false);
   const flatRef = useRef<FlatList>(null);
 
   const fetchThread = useCallback(async () => {
@@ -123,17 +133,24 @@ export default function SupportScreen({ navigation }: { navigation: any }) {
   const messages = thread?.messages ?? [];
 
   const renderMessage = ({ item }: { item: Message }) => {
+    const isBot   = item.senderRole === 'bot';
     const isAdmin = item.senderRole === 'admin';
+    const isSupportSide = isAdmin || isBot;
+
     const time = new Date(item.createdAt).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' });
     const date = new Date(item.createdAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' });
 
     return (
-      <View style={[styles.bubble, isAdmin ? styles.bubbleAdmin : styles.bubbleUser]}>
+      <View style={[
+        styles.bubble,
+        isSupportSide ? (isBot ? styles.bubbleBot : styles.bubbleAdmin) : styles.bubbleUser,
+      ]}>
         {isAdmin && <Text style={styles.senderLabel}>Support Team</Text>}
-        <Text style={[styles.bubbleText, isAdmin ? styles.bubbleTextAdmin : styles.bubbleTextUser]}>
+        {isBot   && <Text style={[styles.senderLabel, styles.senderLabelBot]}>Xpress Bot 🤖</Text>}
+        <Text style={[styles.bubbleText, isSupportSide ? styles.bubbleTextAdmin : styles.bubbleTextUser]}>
           {item.text}
         </Text>
-        <Text style={[styles.bubbleTime, isAdmin ? styles.bubbleTimeAdmin : styles.bubbleTimeUser]}>
+        <Text style={[styles.bubbleTime, isSupportSide ? styles.bubbleTimeAdmin : styles.bubbleTimeUser]}>
           {date}  {time}
         </Text>
       </View>
@@ -157,8 +174,10 @@ export default function SupportScreen({ navigation }: { navigation: any }) {
             <Text style={styles.headerTitle}>Xpress Vet Support</Text>
             <Text style={styles.headerSub}>
               {thread?.status === 'resolved'
-                ? 'Conversation resolved'
-                : 'Typically replies within a few hours'}
+                ? 'Conversation resolved — send a message to reopen'
+                : thread?.needsHuman
+                  ? '🟢 Human agent will reply soon'
+                  : '🤖 Bot active · say "talk to a person" to escalate'}
             </Text>
           </View>
         </View>
@@ -217,7 +236,29 @@ export default function SupportScreen({ navigation }: { navigation: any }) {
               </View>
             )}
 
+            {showFAQs && (
+              <View style={styles.faqBar}>
+                {FAQ_SUGGESTIONS.map((faq) => (
+                  <TouchableOpacity
+                    key={faq}
+                    style={styles.faqChip}
+                    onPress={() => { setText(faq); setShowFAQs(false); }}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={styles.faqChipText}>{faq}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
             <View style={styles.inputRow}>
+              <TouchableOpacity
+                style={styles.faqToggle}
+                onPress={() => setShowFAQs((v) => !v)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.faqToggleIcon, showFAQs && styles.faqToggleIconActive]}>💡</Text>
+              </TouchableOpacity>
               <TextInput
                 style={styles.input}
                 value={text}
@@ -280,11 +321,13 @@ const styles = StyleSheet.create({
   bubble: { maxWidth: '80%', borderRadius: 16, padding: 12, marginBottom: 10 },
   bubbleUser:  { alignSelf: 'flex-end',   backgroundColor: '#1A56DB', borderBottomRightRadius: 4 },
   bubbleAdmin: { alignSelf: 'flex-start', backgroundColor: '#F1F5F9', borderBottomLeftRadius:  4 },
+  bubbleBot:   { alignSelf: 'flex-start', backgroundColor: '#EFF6FF', borderBottomLeftRadius:  4, borderWidth: 1, borderColor: '#BFDBFE' },
 
   senderLabel: {
     fontSize: 11, fontWeight: '700', color: '#64748B',
     marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.3,
   },
+  senderLabelBot: { color: '#1A56DB' },
   bubbleText:      { fontSize: 15, lineHeight: 22 },
   bubbleTextUser:  { color: '#fff' },
   bubbleTextAdmin: { color: '#111827' },
@@ -320,4 +363,18 @@ const styles = StyleSheet.create({
   },
   sendBtnDisabled: { backgroundColor: '#93C5FD' },
   sendBtnText:     { color: '#fff', fontWeight: '700', fontSize: 15 },
+
+  faqToggle: { padding: 8, marginRight: 2, alignSelf: 'flex-end', marginBottom: 4 },
+  faqToggleIcon: { fontSize: 18 },
+  faqToggleIconActive: { opacity: 0.6 },
+  faqBar: {
+    backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 8,
+    flexDirection: 'row', flexWrap: 'wrap', gap: 8,
+    borderTopWidth: 1, borderTopColor: '#F1F5F9',
+  },
+  faqChip: {
+    backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE',
+    borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6,
+  },
+  faqChipText: { fontSize: 13, color: '#1A56DB', fontWeight: '600' },
 });
