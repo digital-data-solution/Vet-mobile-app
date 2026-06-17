@@ -13,12 +13,14 @@ import {
   Modal,
   Image,
   Animated,
+  RefreshControl,
 } from 'react-native';
 import { showAlert } from '../utils/alert';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiFetch } from '../api/client';
+import { getSearchHistory, addSearchTerm, clearSearchHistory } from '../utils/searchHistory';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -128,6 +130,8 @@ function goToSubscription(navigation: any) {
   }
 }
 
+const TRENDING_SEARCHES = ['dog vaccination', 'cat groomer', 'pet boarding', 'vet near me', 'pet transport'];
+
 // ─────────────────────────────────────────────────────────────────────────────
 // COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
@@ -148,6 +152,9 @@ export default function ProfessionalsScreen({ navigation }: Props) {
   const [currentPlan,        setCurrentPlan]        = useState<string | null>(null);
   const [showUpsell,         setShowUpsell]         = useState(false);
   const [verifiedOnly,       setVerifiedOnly]       = useState(false);
+  const [sortBy,             setSortBy]             = useState<'default'|'rating'|'distance'|'newest'>('default');
+  const [searchFocused,      setSearchFocused]      = useState(false);
+  const [searchHistory,      setSearchHistory]      = useState<string[]>([]);
   const [showGalleryNudge,   setShowGalleryNudge]   = useState(false);
   const [referralNudge,      setReferralNudge]      = useState(false);
   const galleryNudgeShownRef = useRef(false);
@@ -165,6 +172,12 @@ export default function ProfessionalsScreen({ navigation }: Props) {
       .then((r) => { if (r.body?.show) setShowUpsell(true); })
       .catch(() => {});
   };
+
+  // ─── Search history ─────────────────────────────────────────────────────────
+
+  useFocusEffect(useCallback(() => {
+    getSearchHistory().then(setSearchHistory).catch(() => {});
+  }, []));
 
   // ─── Subscription gate ──────────────────────────────────────────────────────
 
@@ -198,6 +211,9 @@ export default function ProfessionalsScreen({ navigation }: Props) {
   const fetchAllProfessionals = async (term?: string) => {
     setLoading(true);
     const q = term !== undefined ? term : searchTerm;
+    if (q.trim().length >= 2) {
+      addSearchTerm(q).then(() => getSearchHistory().then(setSearchHistory)).catch(() => {});
+    }
     try {
       const params = new URLSearchParams({
         ...(roleFilter !== 'all' && { role: roleFilter }),
@@ -398,11 +414,17 @@ export default function ProfessionalsScreen({ navigation }: Props) {
 
   // ─── Filtered list ───────────────────────────────────────────────────────────
 
-  const professionals = results.filter((item) => {
-    if (roleFilter !== 'all' && item.role !== roleFilter) return false;
-    if (verifiedOnly && !item.isVerified) return false;
-    return true;
-  });
+  const professionals = results
+    .filter((item) => {
+      if (roleFilter !== 'all' && item.role !== roleFilter) return false;
+      if (verifiedOnly && !item.isVerified) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'rating') return (b.rating ?? 0) - (a.rating ?? 0);
+      if (sortBy === 'distance') return (a.distance ?? 9999) - (b.distance ?? 9999);
+      return 0;
+    });
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
@@ -415,21 +437,59 @@ export default function ProfessionalsScreen({ navigation }: Props) {
       <View style={styles.container}>
 
         {/* Search bar */}
-        <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput
-            value={searchTerm}
-            onChangeText={(v) => {
-              setSearchTerm(v);
-              if (searchDebounce.current) clearTimeout(searchDebounce.current);
-              searchDebounce.current = setTimeout(() => fetchAllProfessionals(v), 350);
-            }}
-            style={styles.searchInput}
-            placeholder="Search by name, specialization..."
-            placeholderTextColor="#9CA3AF"
-            returnKeyType="search"
-            onSubmitEditing={() => fetchAllProfessionals(searchTerm)}
-          />
+        <View>
+          <View style={[styles.searchBar, searchFocused && styles.searchBarFocused]}>
+            <Text style={styles.searchIcon}>🔍</Text>
+            <TextInput
+              value={searchTerm}
+              onChangeText={(v) => {
+                setSearchTerm(v);
+                if (searchDebounce.current) clearTimeout(searchDebounce.current);
+                searchDebounce.current = setTimeout(() => fetchAllProfessionals(v), 350);
+              }}
+              style={styles.searchInput}
+              placeholder="Search by name, specialization..."
+              placeholderTextColor="#9CA3AF"
+              returnKeyType="search"
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+              onSubmitEditing={() => { fetchAllProfessionals(searchTerm); setSearchFocused(false); }}
+            />
+            {searchTerm.length > 0 && (
+              <TouchableOpacity onPress={() => { setSearchTerm(''); fetchAllProfessionals(''); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+              </TouchableOpacity>
+            )}
+          </View>
+          {/* Search suggestions dropdown */}
+          {searchFocused && searchTerm.length === 0 && (
+            <View style={styles.suggestionsDropdown}>
+              {searchHistory.length > 0 && (
+                <>
+                  <View style={styles.suggestRow}>
+                    <Text style={styles.suggestLabel}>Recent</Text>
+                    <TouchableOpacity onPress={async () => { await clearSearchHistory(); setSearchHistory([]); }}>
+                      <Text style={styles.suggestClear}>Clear</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {searchHistory.map((h) => (
+                    <TouchableOpacity key={h} style={styles.suggestItem} onPress={() => { setSearchTerm(h); fetchAllProfessionals(h); setSearchFocused(false); }}>
+                      <Ionicons name="time-outline" size={15} color="#6B7280" style={{ marginRight: 8 }} />
+                      <Text style={styles.suggestItemText}>{h}</Text>
+                    </TouchableOpacity>
+                  ))}
+                  <View style={styles.suggestDivider} />
+                </>
+              )}
+              <Text style={styles.suggestLabel}>Trending 🔥</Text>
+              {TRENDING_SEARCHES.map((t) => (
+                <TouchableOpacity key={t} style={styles.suggestItem} onPress={() => { setSearchTerm(t); fetchAllProfessionals(t); setSearchFocused(false); }}>
+                  <Ionicons name="trending-up-outline" size={15} color="#E8610A" style={{ marginRight: 8 }} />
+                  <Text style={styles.suggestItemText}>{t}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
 
         {/* Role filter */}
@@ -452,17 +512,27 @@ export default function ProfessionalsScreen({ navigation }: Props) {
           ))}
         </ScrollView>
 
-        {/* Verified-only toggle */}
-        <TouchableOpacity
-          style={[styles.verifiedToggle, verifiedOnly && styles.verifiedToggleActive]}
-          onPress={() => setVerifiedOnly((v) => !v)}
-          activeOpacity={0.8}
-        >
-          <Ionicons name={verifiedOnly ? 'shield-checkmark' : 'shield-checkmark-outline'} size={14} color={verifiedOnly ? '#fff' : '#059669'} />
-          <Text style={[styles.verifiedToggleText, verifiedOnly && { color: '#fff' }]}>
-            {verifiedOnly ? '✓ Verified Only (on)' : 'Show Verified Only'}
-          </Text>
-        </TouchableOpacity>
+        {/* Sort + Verified filter row */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sortRow}>
+          <TouchableOpacity
+            style={[styles.sortChip, verifiedOnly && styles.sortChipActive]}
+            onPress={() => setVerifiedOnly((v) => !v)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name={verifiedOnly ? 'shield-checkmark' : 'shield-checkmark-outline'} size={13} color={verifiedOnly ? '#fff' : '#059669'} />
+            <Text style={[styles.sortChipText, verifiedOnly && { color: '#fff' }]}>Verified Only</Text>
+          </TouchableOpacity>
+          {([['default','⊞ Default'],['rating','⭐ Top Rated'],['distance','📍 Nearest']] as const).map(([key, label]) => (
+            <TouchableOpacity
+              key={key}
+              style={[styles.sortChip, sortBy === key && styles.sortChipActive]}
+              onPress={() => setSortBy(key)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.sortChipText, sortBy === key && { color: '#fff' }]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
         {/* Location card */}
         <View style={styles.locationCard}>
@@ -612,6 +682,9 @@ export default function ProfessionalsScreen({ navigation }: Props) {
             renderItem={renderProfessional}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={loading} onRefresh={() => fetchAllProfessionals()} colors={['#2563EB']} tintColor="#2563EB" />
+            }
             ListHeaderComponent={
               hasSearched ? (
                 <>
@@ -732,8 +805,29 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  searchBarFocused: { borderWidth: 1.5, borderColor: '#E8610A' },
   searchIcon: { fontSize: 16, marginRight: 8 },
   searchInput: { flex: 1, paddingVertical: 14, fontSize: 15, color: '#111827' },
+
+  suggestionsDropdown: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    borderRadius: 12,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
+    zIndex: 100,
+    marginTop: 4,
+  },
+  suggestRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 14, paddingTop: 8, paddingBottom: 4 },
+  suggestLabel: { fontSize: 11, fontWeight: '700', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.6 },
+  suggestClear: { fontSize: 12, color: '#E8610A', fontWeight: '600' },
+  suggestDivider: { height: 1, backgroundColor: '#F3F4F6', marginVertical: 8 },
+  suggestItem: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10 },
+  suggestItemText: { fontSize: 14, color: '#374151' },
 
   filterScroll: { marginTop: 12 },
   filterRow: {
@@ -857,14 +951,14 @@ const styles = StyleSheet.create({
   ratingValInline: { fontSize: 12, fontWeight: '700' },
   ratingCntInline: { fontSize: 11, color: '#9CA3AF' },
 
-  verifiedToggle: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    alignSelf: 'flex-start', marginHorizontal: 16, marginBottom: 8,
+  sortRow: { paddingHorizontal: 16, gap: 8, marginBottom: 8, flexDirection: 'row', alignItems: 'center' },
+  sortChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
-    borderWidth: 1.5, borderColor: '#059669', backgroundColor: '#fff',
+    borderWidth: 1.5, borderColor: '#D1D5DB', backgroundColor: '#fff',
   },
-  verifiedToggleActive: { backgroundColor: '#059669' },
-  verifiedToggleText: { fontSize: 13, fontWeight: '600', color: '#059669' },
+  sortChipActive: { backgroundColor: '#2563EB', borderColor: '#2563EB' },
+  sortChipText: { fontSize: 12, fontWeight: '600', color: '#374151' },
 
   emptyState: { alignItems: 'center', paddingTop: 40, paddingBottom: 40 },
   emptyEmoji: { fontSize: 48, marginBottom: 16 },

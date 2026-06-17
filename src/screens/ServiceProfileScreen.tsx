@@ -57,6 +57,10 @@ interface Professional {
   reviewCount?: number;
   profileImage?: string;
   mediaImages?: { url: string; publicId: string }[];
+  businessHours?: string;
+  priceRange?: 'low' | 'mid' | 'high';
+  acceptingClients?: boolean;
+  socialMedia?: { instagram?: string; facebook?: string; twitter?: string; website?: string };
   userId?: {
     _id?: string;
     supabaseId?: string;
@@ -177,6 +181,17 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
 
   const handleLockedContact = () => setShowSubModal(true);
 
+  const copyToClipboard = async (text: string) => {
+    try {
+      if (Platform.OS === 'web') {
+        await (navigator as any).clipboard.writeText(text);
+        showAlert('Copied!', 'Phone number copied to clipboard.');
+      } else {
+        await Share.share({ message: text });
+      }
+    } catch {}
+  };
+
   const shareProfile = async () => {
     const profileUrl = `https://xpressvetmarketplace.com/VetProfile?vetId=${prof._id}`;
     const msg = `Check out ${displayName} on Xpress Vet 🐾\n${prof.address ? prof.address + '\n' : ''}${profileUrl}`;
@@ -226,6 +241,24 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
               <Text style={styles.verifiedPillText}>Verified</Text>
             </View>
           )}
+          <View style={styles.heroBadgeRow}>
+            {prof.acceptingClients === false ? (
+              <View style={[styles.heroBadge, { backgroundColor: '#FEF3C7' }]}>
+                <Text style={{ fontSize: 11, color: '#92400E', fontWeight: '700' }}>Not accepting clients</Text>
+              </View>
+            ) : prof.acceptingClients === true ? (
+              <View style={[styles.heroBadge, { backgroundColor: '#D1FAE5' }]}>
+                <Text style={{ fontSize: 11, color: '#065F46', fontWeight: '700' }}>Accepting clients</Text>
+              </View>
+            ) : null}
+            {prof.priceRange ? (
+              <View style={[styles.heroBadge, { backgroundColor: '#F1F5F9' }]}>
+                <Text style={{ fontSize: 11, color: '#334155', fontWeight: '700' }}>
+                  {prof.priceRange === 'low' ? '₦' : prof.priceRange === 'mid' ? '₦₦' : '₦₦₦'}
+                </Text>
+              </View>
+            ) : null}
+          </View>
         </View>
       </View>
 
@@ -254,12 +287,23 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>About</Text>
         {prof.specialization ? (
-          <InfoRow icon="🏷️" label="Specialization" value={prof.specialization} />
+          <View style={styles.chipSection}>
+            <Text style={styles.chipSectionLabel}>Services</Text>
+            <View style={styles.chipRow}>
+              {prof.specialization.split(/[,;]+/).map((s) => s.trim()).filter(Boolean).map((chip) => (
+                <View key={chip} style={[styles.chip, { backgroundColor: meta.color + '15', borderColor: meta.color + '30' }]}>
+                  <Text style={[styles.chipText, { color: meta.color }]}>{chip}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
         ) : null}
         <InfoRow icon="📍" label="Address" value={prof.address} />
+        {prof.businessHours ? <InfoRow icon="🕐" label="Hours" value={prof.businessHours} /> : null}
 
         {isSubscribed ? (
           <>
+            {phone ? <InfoRow icon="📞" label="Phone" value={phone} onPress={() => Linking.openURL(`tel:${phone}`)} onLongPress={() => copyToClipboard(phone)} /> : null}
             {email ? <InfoRow icon="✉️" label="Email" value={email} onPress={() => Linking.openURL(`mailto:${email}`)} /> : null}
           </>
         ) : (
@@ -306,6 +350,35 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
           );
         })}
       </View>
+
+      {/* Social media */}
+      {(prof.socialMedia?.instagram || prof.socialMedia?.facebook || prof.socialMedia?.twitter || prof.socialMedia?.website) ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Follow Us</Text>
+          <View style={styles.socialRow}>
+            {prof.socialMedia.instagram ? (
+              <TouchableOpacity style={[styles.socialBtn, { backgroundColor: '#E4405F' }]} onPress={() => Linking.openURL(prof.socialMedia!.instagram!).catch(() => {})} activeOpacity={0.8}>
+                <Ionicons name="logo-instagram" size={20} color="#fff" />
+              </TouchableOpacity>
+            ) : null}
+            {prof.socialMedia.facebook ? (
+              <TouchableOpacity style={[styles.socialBtn, { backgroundColor: '#1877F2' }]} onPress={() => Linking.openURL(prof.socialMedia!.facebook!).catch(() => {})} activeOpacity={0.8}>
+                <Ionicons name="logo-facebook" size={20} color="#fff" />
+              </TouchableOpacity>
+            ) : null}
+            {prof.socialMedia.twitter ? (
+              <TouchableOpacity style={[styles.socialBtn, { backgroundColor: '#1DA1F2' }]} onPress={() => Linking.openURL(prof.socialMedia!.twitter!).catch(() => {})} activeOpacity={0.8}>
+                <Ionicons name="logo-twitter" size={20} color="#fff" />
+              </TouchableOpacity>
+            ) : null}
+            {prof.socialMedia.website ? (
+              <TouchableOpacity style={[styles.socialBtn, { backgroundColor: meta.color }]} onPress={() => Linking.openURL(prof.socialMedia!.website!).catch(() => {})} activeOpacity={0.8}>
+                <Ionicons name="globe-outline" size={20} color="#fff" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
 
       {/* Platform disclaimer */}
       <View style={styles.disclaimerCard}>
@@ -404,20 +477,22 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
 }
 
 function InfoRow({
-  icon, label, value, onPress,
-}: { icon: string; label: string; value: string; onPress?: () => void }) {
+  icon, label, value, onPress, onLongPress,
+}: { icon: string; label: string; value: string; onPress?: () => void; onLongPress?: () => void }) {
   return (
     <TouchableOpacity
       style={styles.infoRow}
       onPress={onPress}
-      disabled={!onPress}
-      activeOpacity={onPress ? 0.7 : 1}
+      onLongPress={onLongPress}
+      disabled={!onPress && !onLongPress}
+      activeOpacity={(onPress || onLongPress) ? 0.7 : 1}
     >
       <Text style={styles.infoIcon}>{icon}</Text>
       <View style={styles.infoContent}>
         <Text style={styles.infoLabel}>{label}</Text>
         <Text style={[styles.infoValue, onPress && styles.infoValueLink]}>{value}</Text>
       </View>
+      {onLongPress && !onPress ? <Ionicons name="copy-outline" size={14} color="#9CA3AF" /> : null}
       {onPress && <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />}
     </TouchableOpacity>
   );
@@ -447,6 +522,10 @@ const styles = StyleSheet.create({
   rolePillText: { fontSize: 12, fontWeight: '700', color: '#fff' },
   verifiedPill: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', backgroundColor: '#D1FAE5', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3 },
   verifiedPillText: { fontSize: 11, fontWeight: '700', color: '#059669' },
+  heroBadgeRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 6 },
+  heroBadge: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
+  socialRow: { flexDirection: 'row', gap: 10 },
+  socialBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
 
   heroActions: {
     flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingVertical: 10,
@@ -484,6 +563,11 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 12 },
 
+  chipSection: { paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', marginBottom: 4 },
+  chipSectionLabel: { fontSize: 11, fontWeight: '700', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 16, borderWidth: 1 },
+  chipText: { fontSize: 12, fontWeight: '600' },
   infoRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 9, borderTopWidth: 1, borderTopColor: '#F3F4F6' },
   infoIcon: { fontSize: 18, marginRight: 12, width: 24, textAlign: 'center' },
   infoContent: { flex: 1 },

@@ -41,6 +41,10 @@ interface Professional {
   profileImage?: string;
   mediaImages?: { url: string; publicId: string }[];
   images?: { url: string; publicId: string }[];
+  businessHours?: string;
+  priceRange?: 'low' | 'mid' | 'high';
+  acceptingClients?: boolean;
+  socialMedia?: { instagram?: string; facebook?: string; twitter?: string; website?: string };
   userId?: {
     _id?:        string;
     supabaseId?: string;
@@ -102,6 +106,18 @@ export default function VetProfileScreen({ route, navigation }: any) {
   useEffect(() => {
     fetchVet();
   }, [fetchVet]);
+
+  const copyToClipboard = async (text: string, successMsg: string) => {
+    try {
+      if (Platform.OS === 'web') {
+        await (navigator as any).clipboard.writeText(text);
+      } else {
+        await Share.share({ message: text });
+        return;
+      }
+      showAlert('Copied!', successMsg);
+    } catch {}
+  };
 
   const trackTap = (method: 'phone' | 'whatsapp' | 'email') => {
     if (vet?._id) {
@@ -244,7 +260,13 @@ export default function VetProfileScreen({ route, navigation }: any) {
         </View>
 
         {vet.specialization ? (
-          <Text style={styles.specialization}>{vet.specialization}</Text>
+          <View style={styles.chipRow}>
+            {vet.specialization.split(/[,;]+/).map((s) => s.trim()).filter(Boolean).map((chip) => (
+              <View key={chip} style={[styles.chip, { backgroundColor: accentColor + '15', borderColor: accentColor + '30' }]}>
+                <Text style={[styles.chipText, { color: accentColor }]}>{chip}</Text>
+              </View>
+            ))}
+          </View>
         ) : null}
 
         <View style={styles.badgeRow}>
@@ -258,6 +280,24 @@ export default function VetProfileScreen({ route, navigation }: any) {
             <View style={styles.distanceBadge}>
               <Ionicons name="navigate-outline" size={13} color="#2563EB" />
               <Text style={styles.distanceBadgeText}>{vet.distance.toFixed(1)} km away</Text>
+            </View>
+          )}
+          {vet.acceptingClients === false ? (
+            <View style={styles.notAcceptingBadge}>
+              <Ionicons name="close-circle-outline" size={13} color="#92400E" />
+              <Text style={styles.notAcceptingText}>Not accepting clients</Text>
+            </View>
+          ) : vet.acceptingClients === true ? (
+            <View style={styles.acceptingBadge}>
+              <Ionicons name="checkmark-circle-outline" size={13} color="#065F46" />
+              <Text style={styles.acceptingText}>Accepting clients</Text>
+            </View>
+          ) : null}
+          {vet.priceRange && (
+            <View style={styles.priceBadge}>
+              <Text style={styles.priceBadgeText}>
+                {vet.priceRange === 'low' ? '₦' : vet.priceRange === 'mid' ? '₦₦' : '₦₦₦'}
+              </Text>
             </View>
           )}
         </View>
@@ -366,7 +406,7 @@ export default function VetProfileScreen({ route, navigation }: any) {
         )}
 
         {phone ? (
-          <InfoRow icon="call-outline" label="Phone" value={phone} />
+          <InfoRow icon="call-outline" label="Phone" value={phone} onLongPress={() => copyToClipboard(phone, 'Phone number copied!')} />
         ) : null}
 
         {email ? (
@@ -387,14 +427,53 @@ export default function VetProfileScreen({ route, navigation }: any) {
           />
         ) : null}
 
-        {vet.rating != null && vet.reviewCount != null ? (
-          <InfoRow
-            icon="star-outline"
-            label="Rating"
-            value={`${vet.rating.toFixed(1)} / 5 (${vet.reviewCount} review${vet.reviewCount !== 1 ? 's' : ''})`}
-          />
+        {vet.businessHours ? (
+          <InfoRow icon="time-outline" label="Hours" value={vet.businessHours} />
         ) : null}
+
       </View>
+
+      {/* ── Social media ─────────────────────────────────────────────────────── */}
+      {(vet.socialMedia?.instagram || vet.socialMedia?.facebook || vet.socialMedia?.twitter || vet.socialMedia?.website) ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Follow Us</Text>
+          <View style={styles.socialRow}>
+            {vet.socialMedia.instagram ? (
+              <TouchableOpacity style={[styles.socialBtn, { backgroundColor: '#E4405F' }]} onPress={() => Linking.openURL(vet.socialMedia!.instagram!).catch(() => {})} activeOpacity={0.8}>
+                <Ionicons name="logo-instagram" size={20} color="#fff" />
+              </TouchableOpacity>
+            ) : null}
+            {vet.socialMedia.facebook ? (
+              <TouchableOpacity style={[styles.socialBtn, { backgroundColor: '#1877F2' }]} onPress={() => Linking.openURL(vet.socialMedia!.facebook!).catch(() => {})} activeOpacity={0.8}>
+                <Ionicons name="logo-facebook" size={20} color="#fff" />
+              </TouchableOpacity>
+            ) : null}
+            {vet.socialMedia.twitter ? (
+              <TouchableOpacity style={[styles.socialBtn, { backgroundColor: '#1DA1F2' }]} onPress={() => Linking.openURL(vet.socialMedia!.twitter!).catch(() => {})} activeOpacity={0.8}>
+                <Ionicons name="logo-twitter" size={20} color="#fff" />
+              </TouchableOpacity>
+            ) : null}
+            {vet.socialMedia.website ? (
+              <TouchableOpacity style={[styles.socialBtn, { backgroundColor: accentColor }]} onPress={() => Linking.openURL(vet.socialMedia!.website!).catch(() => {})} activeOpacity={0.8}>
+                <Ionicons name="globe-outline" size={20} color="#fff" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
+
+      {/* ── Rating card ─────────────────────────────────────────────────────── */}
+      {vet.rating != null && (vet.reviewCount ?? 0) > 0 ? (
+        <View style={styles.ratingCard}>
+          <Text style={styles.ratingBigNum}>{vet.rating.toFixed(1)}</Text>
+          <View style={styles.ratingStarRow}>
+            {[1,2,3,4,5].map((s) => (
+              <Ionicons key={s} name={s <= Math.round(vet.rating!) ? 'star' : s - 0.5 <= vet.rating! ? 'star-half' : 'star-outline'} size={20} color="#F59E0B" />
+            ))}
+          </View>
+          <Text style={styles.ratingReviewCount}>{vet.reviewCount} review{vet.reviewCount !== 1 ? 's' : ''}</Text>
+        </View>
+      ) : null}
 
       {/* ── Verification notice ─────────────────────────────────────────────── */}
       {vet.isVerified ? (
@@ -493,13 +572,16 @@ export default function VetProfileScreen({ route, navigation }: any) {
   );
 }
 
-function InfoRow({ icon, label, value }: { icon: any; label: string; value: string }) {
+function InfoRow({ icon, label, value, onLongPress }: { icon: any; label: string; value: string; onLongPress?: () => void }) {
   return (
-    <View style={styles.infoRow}>
+    <TouchableOpacity style={styles.infoRow} onLongPress={onLongPress} activeOpacity={onLongPress ? 0.6 : 1} disabled={!onLongPress}>
       <Ionicons name={icon} size={16} color="#64748B" style={{ width: 22 }} />
       <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue} numberOfLines={2}>{value}</Text>
-    </View>
+      <View style={{ flex: 1.3, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+        <Text style={styles.infoValue} numberOfLines={2}>{value}</Text>
+        {onLongPress ? <Ionicons name="copy-outline" size={13} color="#94A3B8" /> : null}
+      </View>
+    </TouchableOpacity>
   );
 }
 
@@ -593,6 +675,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#EFF6FF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8,
   },
   distanceBadgeText: { fontSize: 12, color: '#2563EB', fontWeight: '600' },
+  acceptingBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#D1FAE5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8,
+  },
+  acceptingText: { fontSize: 12, color: '#065F46', fontWeight: '600' },
+  notAcceptingBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#FEF3C7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8,
+  },
+  notAcceptingText: { fontSize: 12, color: '#92400E', fontWeight: '600' },
+  priceBadge: {
+    backgroundColor: '#F1F5F9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8,
+  },
+  priceBadgeText: { fontSize: 12, color: '#334155', fontWeight: '700' },
+  socialRow: { flexDirection: 'row', gap: 10 },
+  socialBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
 
   contactRow: {
     flexDirection: 'row', marginHorizontal: 16,
@@ -651,6 +749,15 @@ const styles = StyleSheet.create({
   infoLabel: { fontSize: 13, color: '#64748B', flex: 0.7, marginLeft: 4 },
   infoValue: { fontSize: 13, color: '#0F172A', fontWeight: '600', flex: 1.3, textAlign: 'right' },
 
+  ratingCard: {
+    alignItems: 'center', backgroundColor: '#FFFBEB',
+    marginHorizontal: 16, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 16,
+    borderWidth: 1, borderColor: '#FDE68A', marginBottom: 14,
+  },
+  ratingBigNum: { fontSize: 36, fontWeight: '800', color: '#92400E', lineHeight: 42 },
+  ratingStarRow: { flexDirection: 'row', gap: 4, marginVertical: 4 },
+  ratingReviewCount: { fontSize: 13, color: '#92400E', fontWeight: '600' },
+
   verifiedCard: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 12,
     backgroundColor: '#ECFDF5', marginHorizontal: 16, borderRadius: 14,
@@ -677,6 +784,10 @@ const styles = StyleSheet.create({
     width: 100, height: 100, borderRadius: 12,
     backgroundColor: '#F1F5F9',
   },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 12 },
+  chip: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 16, borderWidth: 1 },
+  chipText: { fontSize: 12, fontWeight: '600' },
+
   writeReviewBtn: {
     flexDirection:     'row',
     alignItems:        'center',

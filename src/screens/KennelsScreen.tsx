@@ -13,6 +13,7 @@ import {
   Modal,
   Image,
   Animated,
+  RefreshControl,
 } from 'react-native';
 import { showAlert } from '../utils/alert';
 import * as Location from 'expo-location';
@@ -347,6 +348,7 @@ export default function KennelsScreen({ navigation }: any) {
             renderItem={renderKennel}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchKennels} colors={['#7C3AED']} tintColor="#7C3AED" />}
             ListHeaderComponent={
               <>
                 <Text style={styles.resultCount}>

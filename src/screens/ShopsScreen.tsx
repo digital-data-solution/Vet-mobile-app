@@ -13,6 +13,7 @@ import {
   Modal,
   Image,
   Animated,
+  RefreshControl,
 } from 'react-native';
 import { showAlert } from '../utils/alert';
 import * as Location from 'expo-location';
@@ -379,6 +380,7 @@ export default function ShopsScreen({ navigation }: Props) {
             renderItem={renderShop}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchAllShops} colors={['#EA580C']} tintColor="#EA580C" />}
             ListHeaderComponent={
               hasSearched ? (
                 <>

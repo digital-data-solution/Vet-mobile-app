@@ -22,6 +22,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { supabase } from '../api/supabase';
+import { useOnlineStatus } from '../utils/useOnlineStatus';
 
 import HomeScreen                   from '../screens/HomeScreen';
 import AuthScreen                   from '../screens/AuthScreen';
@@ -50,6 +51,7 @@ import ChatScreen                   from '../screens/ChatScreen';
 import PrivacyPolicyScreen          from '../screens/PrivacyPolicyScreen';
 import TermsScreen                  from '../screens/TermsScreen';
 import SupportScreen                from '../screens/SupportScreen';
+import FavoritesScreen              from '../screens/FavoritesScreen';
 
 const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://vet-market-place-jsj5.onrender.com';
 
@@ -231,6 +233,17 @@ function LoadingScreen() {
     <View style={styles.centered}>
       <Text style={styles.appName}>Xpress Vet</Text>
       <ActivityIndicator size="large" color="#E8610A" style={{ marginTop: 24 }} />
+    </View>
+  );
+}
+
+function OfflineBanner() {
+  const isOnline = useOnlineStatus();
+  if (isOnline) return null;
+  return (
+    <View style={styles.offlineBanner}>
+      <Ionicons name="cloud-offline-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
+      <Text style={styles.offlineBannerText}>No internet connection</Text>
     </View>
   );
 }
@@ -504,6 +517,8 @@ export default function AppNavigator() {
   return (
     <AuthContext.Provider value={{ session, userRole, isAuthenticated, signOut, refreshRole }}>
       <NavigationErrorBoundary>
+        <View style={{ flex: 1 }}>
+          <OfflineBanner />
         <NavigationContainer linking={linking}>
           <RootStack.Navigator
             screenOptions={{ headerShown: false }}
@@ -554,6 +569,11 @@ export default function AppNavigator() {
                   name="ServiceProfile"
                   component={ServiceProfileScreen}
                   options={{ headerShown: true, title: 'Profile' }}
+                />
+                <RootStack.Screen
+                  name="Favorites"
+                  component={FavoritesScreen}
+                  options={{ headerShown: true, title: 'My Favourites' }}
                 />
                 <RootStack.Screen
                   name="ExploreOptions"
@@ -610,6 +630,7 @@ export default function AppNavigator() {
             )}
           </RootStack.Navigator>
         </NavigationContainer>
+        </View>
       </NavigationErrorBoundary>
     </AuthContext.Provider>
   );
@@ -654,6 +675,20 @@ const styles = StyleSheet.create({
   retryText: {
     color:      '#fff',
     fontSize:   16,
+    fontWeight: '600',
+  },
+  offlineBanner: {
+    backgroundColor: '#1F2937',
+    flexDirection:   'row',
+    alignItems:      'center',
+    justifyContent:  'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    zIndex: 999,
+  },
+  offlineBannerText: {
+    color:      '#fff',
+    fontSize:   13,
     fontWeight: '600',
   },
 });

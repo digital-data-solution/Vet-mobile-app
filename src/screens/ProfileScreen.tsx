@@ -8,6 +8,8 @@ import {
   ScrollView,
   Platform,
   Share,
+  TextInput,
+  TouchableOpacity,
 } from 'react-native';
 import { showAlert } from '../utils/alert';
 import { getCurrentUser } from '../api/supabase';
@@ -81,6 +83,11 @@ export default function ProfileScreen({ navigation }: Props) {
   const [referralRewards,      setReferralRewards]      = useState(0);
   const [shareMessage,         setShareMessage]         = useState('');
   const [referralLoading,      setReferralLoading]      = useState(false);
+  const [editMode,             setEditMode]             = useState(false);
+  const [editName,             setEditName]             = useState('');
+  const [editPhone,            setEditPhone]            = useState('');
+  const [editBio,              setEditBio]              = useState('');
+  const [saving,               setSaving]               = useState(false);
 
   const fetchUser = useCallback(async () => {
     setLoading(true);
@@ -160,6 +167,37 @@ export default function ProfileScreen({ navigation }: Props) {
   const handleImageUploadSuccess = useCallback((newUrl: string) => {
     setUser((prev: any) => prev ? { ...prev, profileImage: newUrl } : prev);
   }, []);
+
+  const openEditMode = useCallback(() => {
+    setEditName(getUserDisplayName() === 'Anonymous User' ? '' : getUserDisplayName());
+    setEditPhone(user?.phone ?? user?.user_metadata?.phone ?? '');
+    setEditBio(user?.bio ?? '');
+    setEditMode(true);
+  }, [user]);
+
+  const saveProfile = useCallback(async () => {
+    setSaving(true);
+    try {
+      const body: Record<string, string> = {};
+      const currentName = getUserDisplayName() === 'Anonymous User' ? '' : getUserDisplayName();
+      if (editName.trim() && editName.trim() !== currentName) body.name = editName.trim();
+      if (editPhone.trim() !== (user?.phone ?? user?.user_metadata?.phone ?? '')) body.phone = editPhone.trim();
+      if (editBio.trim() !== (user?.bio ?? '')) body.bio = editBio.trim();
+      if (Object.keys(body).length === 0) { setEditMode(false); return; }
+      const res = await apiFetch('/api/auth/update-profile', { method: 'PUT', body: JSON.stringify(body) });
+      if (res.ok) {
+        setUser((prev: any) => prev ? { ...prev, ...body } : prev);
+        setEditMode(false);
+        showAlert('Saved!', 'Your profile has been updated.');
+      } else {
+        showAlert('Error', res.body?.message || 'Failed to save profile.');
+      }
+    } catch {
+      showAlert('Error', 'Network error. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  }, [editName, editPhone, editBio, user]);
 
   const handleCopyLink = useCallback(async () => {
     const toCopy = referralLink || referralCode || '';
@@ -444,11 +482,65 @@ export default function ProfileScreen({ navigation }: Props) {
       {/* ── Account info ────────────────────────────────────────────────── */}
       {user && (
         <View style={styles.infoCard}>
-          <Text style={styles.cardTitle}>Account Information</Text>
-          <InfoRow icon="📞" label="Phone"   value={getUserPhone()} />
-          <InfoRow icon="✉️" label="Email"   value={getUserEmail()} />
-          <InfoRow icon="👤" label="Role"    value={roleLabel} />
-          <InfoRow icon="🆔" label="User ID" value={`${user.id?.slice(0, 16)}...`} />
+          <View style={styles.infoCardHeader}>
+            <Text style={[styles.cardTitle, { marginBottom: 0 }]}>Account Information</Text>
+            {!editMode && (
+              <TouchableOpacity style={styles.editProfileBtn} onPress={openEditMode} activeOpacity={0.8}>
+                <Text style={styles.editProfileBtnText}>✏️ Edit</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {editMode ? (
+            <>
+              <Text style={styles.editFieldLabel}>Full Name</Text>
+              <TextInput
+                style={styles.editFieldInput}
+                value={editName}
+                onChangeText={setEditName}
+                placeholder="Your full name"
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="words"
+              />
+              <Text style={styles.editFieldLabel}>Phone Number</Text>
+              <TextInput
+                style={styles.editFieldInput}
+                value={editPhone}
+                onChangeText={setEditPhone}
+                placeholder="e.g. 08012345678"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="phone-pad"
+              />
+              <Text style={styles.editFieldLabel}>Bio <Text style={styles.editFieldHint}>(optional, max 500 chars)</Text></Text>
+              <TextInput
+                style={[styles.editFieldInput, styles.editFieldTextArea]}
+                value={editBio}
+                onChangeText={setEditBio}
+                placeholder="Tell pet owners a bit about yourself..."
+                placeholderTextColor="#9CA3AF"
+                multiline
+                numberOfLines={3}
+                maxLength={500}
+              />
+              <View style={styles.editActionsRow}>
+                <TouchableOpacity style={styles.editCancelBtn} onPress={() => setEditMode(false)} activeOpacity={0.8}>
+                  <Text style={styles.editCancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.editSaveBtn} onPress={saveProfile} activeOpacity={0.85} disabled={saving}>
+                  {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.editSaveBtnText}>Save Changes</Text>}
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : (
+            <>
+              <InfoRow icon="👤" label="Name"    value={getUserDisplayName()} />
+              <InfoRow icon="📞" label="Phone"   value={getUserPhone()} />
+              <InfoRow icon="✉️" label="Email"   value={getUserEmail()} />
+              {user?.bio ? <InfoRow icon="📝" label="Bio" value={user.bio} /> : null}
+              <InfoRow icon="🏷️" label="Role"   value={roleLabel} />
+              <InfoRow icon="🆔" label="User ID" value={`${(user.id ?? user._id ?? '').slice(0, 16)}…`} />
+            </>
+          )}
         </View>
       )}
 
@@ -497,6 +589,26 @@ export default function ProfileScreen({ navigation }: Props) {
           ) : null}
         </View>
       )}
+
+      {/* ── Quick links ─────────────────────────────────────────────────── */}
+      <View style={styles.quickLinksCard}>
+        <Text style={styles.cardTitle}>Quick Links</Text>
+        <TouchableOpacity style={styles.quickLinkRow} onPress={() => navigation.getParent()?.navigate('Favorites') ?? navigation.navigate('Favorites')} activeOpacity={0.8}>
+          <Text style={styles.quickLinkIcon}>❤️</Text>
+          <Text style={styles.quickLinkText}>My Saved Favourites</Text>
+          <Text style={styles.quickLinkArrow}>›</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.quickLinkRow} onPress={() => navigation.navigate('Professionals')} activeOpacity={0.8}>
+          <Text style={styles.quickLinkIcon}>👨‍⚕️</Text>
+          <Text style={styles.quickLinkText}>Browse Professionals</Text>
+          <Text style={styles.quickLinkArrow}>›</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.quickLinkRow} onPress={() => navigation.getParent()?.navigate('Support') ?? navigation.navigate('Support')} activeOpacity={0.8}>
+          <Text style={styles.quickLinkIcon}>💬</Text>
+          <Text style={styles.quickLinkText}>Contact Support</Text>
+          <Text style={styles.quickLinkArrow}>›</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* ── Professional tools ──────────────────────────────────────────── */}
       {isProfessional && (
@@ -825,6 +937,22 @@ const styles = StyleSheet.create({
     shadowRadius:     4,
     elevation:        2,
   },
+  infoCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  editProfileBtn: { backgroundColor: '#F0FDF4', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 10, borderWidth: 1, borderColor: '#BBF7D0' },
+  editProfileBtnText: { fontSize: 13, fontWeight: '700', color: '#065F46' },
+  editFieldLabel: { fontSize: 12, fontWeight: '700', color: '#374151', marginTop: 10, marginBottom: 4 },
+  editFieldHint: { fontWeight: '400', color: '#9CA3AF' },
+  editFieldInput: {
+    borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 10,
+    fontSize: 15, color: '#111827', backgroundColor: '#F9FAFB',
+  },
+  editFieldTextArea: { minHeight: 72, textAlignVertical: 'top' },
+  editActionsRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  editCancelBtn: { flex: 1, paddingVertical: 11, borderRadius: 10, borderWidth: 1.5, borderColor: '#E5E7EB', alignItems: 'center' },
+  editCancelBtnText: { fontWeight: '600', color: '#6B7280', fontSize: 14 },
+  editSaveBtn: { flex: 1, paddingVertical: 11, borderRadius: 10, backgroundColor: '#E8610A', alignItems: 'center' },
+  editSaveBtnText: { fontWeight: '700', color: '#fff', fontSize: 14 },
   cardTitle: {
     fontSize:        13,
     fontWeight:      '700',
@@ -843,6 +971,16 @@ const styles = StyleSheet.create({
   infoIcon:  { fontSize: 16, marginRight: 10, width: 22 },
   infoLabel: { fontSize: 14, color: '#6B7280', flex: 0.8 },
   infoValue: { fontSize: 14, color: '#111827', fontWeight: '500', flex: 1.2, textAlign: 'right' },
+
+  quickLinksCard: {
+    backgroundColor: '#fff', marginHorizontal: 16, borderRadius: 14,
+    padding: 16, marginBottom: 14,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
+  },
+  quickLinkRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  quickLinkIcon: { fontSize: 18, marginRight: 10 },
+  quickLinkText: { flex: 1, fontSize: 14, fontWeight: '600', color: '#111827' },
+  quickLinkArrow: { fontSize: 18, color: '#9CA3AF', fontWeight: '700' },
 
   actionsCard: {
     backgroundColor:  '#fff',

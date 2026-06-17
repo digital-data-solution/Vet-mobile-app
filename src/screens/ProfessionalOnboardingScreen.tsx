@@ -192,6 +192,15 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
   const [cacNumber,    setCacNumber]    = useState('');
   const [profCertNum,  setProfCertNum]  = useState('');
 
+  // Optional enhancement fields
+  const [businessHours,     setBusinessHours]     = useState('');
+  const [priceRange,        setPriceRange]        = useState<'low'|'mid'|'high'|''>('');
+  const [acceptingClients,  setAcceptingClients]  = useState(true);
+  const [instagram,         setInstagram]         = useState('');
+  const [facebook,          setFacebook]          = useState('');
+  const [twitter,           setTwitter]           = useState('');
+  const [website,           setWebsite]           = useState('');
+
   useFocusEffect(
     React.useCallback(() => {
       let isActive = true;
@@ -216,6 +225,13 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
             setEmail(p.email ?? '');
             setGalleryImages(p.mediaImages ?? []);
             setProfileViews(p.profileViews ?? 0);
+            setBusinessHours(p.businessHours ?? '');
+            setPriceRange(p.priceRange ?? '');
+            setAcceptingClients(p.acceptingClients !== false);
+            setInstagram(p.socialMedia?.instagram ?? '');
+            setFacebook(p.socialMedia?.facebook ?? '');
+            setTwitter(p.socialMedia?.twitter ?? '');
+            setWebsite(p.socialMedia?.website ?? '');
           }
         } catch {
           // 404 = no profile yet
@@ -282,6 +298,15 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
           businessName: businessName.trim() || undefined,
         }),
         ...(Object.keys(verificationDocuments).length > 0 && { verificationDocuments }),
+        acceptingClients,
+        ...(businessHours.trim() && { businessHours: businessHours.trim() }),
+        ...(priceRange && { priceRange }),
+        socialMedia: {
+          ...(instagram.trim() && { instagram: instagram.trim() }),
+          ...(facebook.trim()  && { facebook:  facebook.trim() }),
+          ...(twitter.trim()   && { twitter:   twitter.trim() }),
+          ...(website.trim()   && { website:   website.trim() }),
+        },
       };
 
       let res;
@@ -616,6 +641,55 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
           </View>
         )}
 
+        {/* Optional enhancements */}
+        <View style={styles.formCard}>
+          <Text style={styles.sectionTitle}>Optional Enhancements</Text>
+
+          {/* Accepting clients toggle */}
+          <View style={styles.toggleRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.toggleLabel}>Accepting new clients?</Text>
+              <Text style={styles.toggleHint}>Clients see this on your profile</Text>
+            </View>
+            <Pressable
+              style={[styles.toggleChip, { backgroundColor: acceptingClients ? '#10B981' : '#9CA3AF' }]}
+              onPress={() => setAcceptingClients(!acceptingClients)}
+            >
+              <Text style={styles.toggleChipText}>{acceptingClients ? 'Yes' : 'No'}</Text>
+            </Pressable>
+          </View>
+
+          {/* Price range */}
+          <View style={fieldStyles.wrapper}>
+            <Text style={fieldStyles.label}>Price Range</Text>
+            <View style={styles.priceRow}>
+              {([['low', '₦ Budget-friendly'], ['mid', '₦₦ Mid-range'], ['high', '₦₦₦ Premium']] as const).map(([val, label]) => (
+                <Pressable
+                  key={val}
+                  style={[styles.priceChip, priceRange === val && styles.priceChipActive]}
+                  onPress={() => setPriceRange(val === priceRange ? '' : val)}
+                >
+                  <Text style={[styles.priceChipText, priceRange === val && styles.priceChipTextActive]}>{label}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          <FormField
+            label="Business Hours"
+            value={businessHours}
+            onChangeText={setBusinessHours}
+            placeholder="e.g. Mon–Fri 8am–6pm, Sat 9am–2pm"
+            autoCapitalize="none"
+          />
+
+          <Text style={[styles.sectionTitle, { marginTop: 4, marginBottom: 12 }]}>Social Media (optional)</Text>
+          <FormField label="Instagram URL" value={instagram} onChangeText={setInstagram} placeholder="https://instagram.com/yourhandle" autoCapitalize="none" />
+          <FormField label="Facebook URL"  value={facebook}  onChangeText={setFacebook}  placeholder="https://facebook.com/yourpage"   autoCapitalize="none" />
+          <FormField label="Twitter / X URL" value={twitter} onChangeText={setTwitter}   placeholder="https://twitter.com/yourhandle" autoCapitalize="none" />
+          <FormField label="Website"        value={website}  onChangeText={setWebsite}   placeholder="https://yourwebsite.com"         autoCapitalize="none" />
+        </View>
+
         {/* Info box */}
         <View style={styles.infoBox}>
           <Text style={styles.infoIcon}>ℹ️</Text>
@@ -828,6 +902,17 @@ const styles = StyleSheet.create({
   idTypeChipActive: { backgroundColor: '#D97706', borderColor: '#D97706' },
   idTypeText:       { fontSize: 12, fontWeight: '600', color: '#374151' },
   idTypeTextActive: { color: '#fff' },
+
+  toggleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', marginBottom: 16 },
+  toggleLabel: { fontSize: 14, fontWeight: '600', color: '#374151' },
+  toggleHint: { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
+  toggleChip: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20 },
+  toggleChipText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  priceRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  priceChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' },
+  priceChipActive: { backgroundColor: '#E8610A', borderColor: '#E8610A' },
+  priceChipText: { fontSize: 13, color: '#374151', fontWeight: '600' },
+  priceChipTextActive: { color: '#fff' },
 
   infoBox: {
     flexDirection: 'row',
