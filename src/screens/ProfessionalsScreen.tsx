@@ -514,7 +514,12 @@ export default function ProfessionalsScreen({ navigation }: Props) {
         </ScrollView>
 
         {/* Sort + Verified filter row */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sortRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.sortScroll}
+          contentContainerStyle={styles.sortRow}
+        >
           <TouchableOpacity
             style={[styles.sortChip, verifiedOnly && styles.sortChipActive]}
             onPress={() => setVerifiedOnly((v) => !v)}
@@ -831,7 +836,10 @@ const styles = StyleSheet.create({
   suggestItem: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10 },
   suggestItemText: { fontSize: 14, color: '#374151' },
 
-  filterScroll: { marginTop: 12 },
+  // FIX: explicit height so this horizontal ScrollView reliably reserves its
+  // own vertical space on web (react-native-web) instead of collapsing and
+  // letting the sort row below render on top of it.
+  filterScroll: { marginTop: 12, height: 44, flexGrow: 0, flexShrink: 0 },
   filterRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -953,6 +961,11 @@ const styles = StyleSheet.create({
   ratingValInline: { fontSize: 12, fontWeight: '700' },
   ratingCntInline: { fontSize: 11, color: '#9CA3AF' },
 
+  // FIX: this ScrollView previously had no `style` prop at all — only
+  // contentContainerStyle — so it had no defined height on web and could
+  // render in the same vertical slot as the role filter row above it.
+  // Giving it an explicit height + marginTop fixes the overlap.
+  sortScroll: { marginTop: 10, height: 40, flexGrow: 0, flexShrink: 0 },
   sortRow: { paddingHorizontal: 16, gap: 8, marginBottom: 8, flexDirection: 'row', alignItems: 'center' },
   sortChip: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
