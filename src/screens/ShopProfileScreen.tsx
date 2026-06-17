@@ -38,13 +38,17 @@ interface Shop {
   reviewCount?: number;
   distance?: number;
   isVerified?: boolean;
-  images?: string[];           // Shop.images is string[] (URLs), not {url,publicId}[]
+  images?: string[];
+  mediaImages?: { url: string; publicId: string }[];
+  profileImage?: string;
   owner?: {
-    _id?:        string;
-    supabaseId?: string;
-    name?:       string;
-    phone?:      string;
-    email?:      string;
+    _id?:          string;
+    supabaseId?:   string;
+    name?:         string;
+    phone?:        string;
+    email?:        string;
+    profileImage?: string;
+    mediaImages?:  { url: string; publicId: string }[];
   };
 }
 
@@ -81,7 +85,7 @@ export default function ShopProfileScreen({ route, navigation }: any) {
           id: data._id, type: 'shop',
           name: data.shopName || data.businessName || data.name || 'Pet Shop',
           emoji: '🛒', color: '#EA580C',
-          profileImage: data.images?.[0] || data.owner?.profileImage,
+          profileImage: data.profileImage || data.mediaImages?.[0]?.url || data.images?.[0] || data.owner?.profileImage,
         }).catch(() => {});
         isFavorite(data._id).then(setIsFav).catch(() => {});
       } else {
@@ -271,26 +275,33 @@ export default function ShopProfileScreen({ route, navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      {/* ── Gallery ──────────────────────────────────────────────────────── */}
-      {shop.images && shop.images.length > 0 ? (
-        <View style={styles.gallerySection}>
-          <Text style={styles.sectionTitle}>Gallery</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryRow}>
-            {shop.images.map((url, i) => (
-              <TouchableOpacity key={String(i)} onPress={() => setViewerIndex(i)} activeOpacity={0.85}>
-                <Image source={{ uri: url }} style={styles.galleryImage} />
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      ) : null}
-
-      <GalleryViewer
-        visible={viewerIndex !== null}
-        images={(shop.images ?? []).map((url) => ({ url }))}
-        initialIndex={viewerIndex ?? 0}
-        onClose={() => setViewerIndex(null)}
-      />
+      {/* ── Gallery — prefers uploaded mediaImages, falls back to legacy images[] ── */}
+      {(() => {
+        const galleryUrls: string[] = (shop.mediaImages && shop.mediaImages.length > 0)
+          ? shop.mediaImages.map(m => m.url)
+          : (shop.images ?? []);
+        if (galleryUrls.length === 0) return null;
+        return (
+          <>
+            <View style={styles.gallerySection}>
+              <Text style={styles.sectionTitle}>Gallery</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryRow}>
+                {galleryUrls.map((url, i) => (
+                  <TouchableOpacity key={String(i)} onPress={() => setViewerIndex(i)} activeOpacity={0.85}>
+                    <Image source={{ uri: url }} style={styles.galleryImage} />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+            <GalleryViewer
+              visible={viewerIndex !== null}
+              images={galleryUrls.map((url) => ({ url }))}
+              initialIndex={viewerIndex ?? 0}
+              onClose={() => setViewerIndex(null)}
+            />
+          </>
+        );
+      })()}
 
       {/* Subscription hint */}
       {isPreview && (

@@ -330,6 +330,7 @@ function TabIcon(name: keyof typeof Ionicons.glyphMap) {
 // TAB NAVIGATORS
 // ─────────────────────────────────────────────────────────────────────────────
 function UserTabs() {
+  const { unreadCount } = useAuth();
   return (
     <Tab.Navigator screenOptions={tabScreenOptions}>
       <Tab.Screen name="Home"          component={HomeScreen}          options={{ tabBarIcon: TabIcon('home'),               headerShown: false }} />
@@ -337,7 +338,7 @@ function UserTabs() {
       <Tab.Screen name="Kennels"       component={KennelsScreen}       options={{ tabBarIcon: TabIcon('paw'),                headerShown: false }} />
       <Tab.Screen name="Shops"         component={ShopsScreen}         options={{ title: 'Pet Shops', tabBarLabel: 'Shops', tabBarIcon: TabIcon('basket'),            headerShown: false }} />
       <Tab.Screen name="Services"      component={ServiceScreen}       options={{ title: 'Pet Services', tabBarLabel: 'Services', tabBarIcon: TabIcon('grid-outline'), headerShown: false }} />
-      <Tab.Screen name="Messages"      component={ConversationsScreen} options={{ title: 'Messages',     tabBarIcon: TabIcon('chatbubbles-outline'),                   headerShown: false }} />
+      <Tab.Screen name="Messages"      component={ConversationsScreen} options={{ title: 'Messages', tabBarIcon: TabIcon('chatbubbles-outline'), tabBarBadge: unreadCount > 0 ? unreadCount : undefined, headerShown: false }} />
       <Tab.Screen name="Subscription"  component={SubscriptionScreen}  options={{ title: 'Subscription', tabBarLabel: 'Plans', tabBarIcon: TabIcon('star'),           headerShown: false }} />
       <Tab.Screen name="Profile"       component={ProfileScreen}       options={{ tabBarIcon: TabIcon('person'),              headerShown: false }} />
     </Tab.Navigator>
@@ -345,6 +346,7 @@ function UserTabs() {
 }
 
 function ProfessionalTabs() {
+  const { unreadCount } = useAuth();
   return (
     <Tab.Navigator screenOptions={tabScreenOptions}>
       <Tab.Screen name="Home"            component={HomeScreen}            options={{ tabBarIcon: TabIcon('home'),                headerShown: false }} />
@@ -354,7 +356,7 @@ function ProfessionalTabs() {
       <Tab.Screen name="Services"        component={ServiceScreen}         options={{ title: 'Pet Services', tabBarLabel: 'Services', tabBarIcon: TabIcon('grid-outline'), headerShown: false }} />
       <Tab.Screen name="Shops"           component={ShopsScreen}           options={{ title: 'Pet Shops', tabBarLabel: 'Shops',   tabBarIcon: TabIcon('basket'),          headerShown: false }} />
       <Tab.Screen name="Subscription"    component={SubscriptionScreen}    options={{ title: 'Subscription', tabBarIcon: TabIcon('star'),                                  headerShown: false }} />
-      <Tab.Screen name="Messages"        component={ConversationsScreen}   options={{ title: 'Messages',     tabBarIcon: TabIcon('chatbubbles-outline'),                   headerShown: false }} />
+      <Tab.Screen name="Messages"        component={ConversationsScreen}   options={{ title: 'Messages', tabBarIcon: TabIcon('chatbubbles-outline'), tabBarBadge: unreadCount > 0 ? unreadCount : undefined, headerShown: false }} />
       <Tab.Screen name="VetVerification" component={VetVerificationScreen} options={{ title: 'Get Verified', tabBarLabel: 'Verify', tabBarIcon: TabIcon('checkmark-circle'), headerShown: false }} />
       <Tab.Screen name="Profile"         component={ProfileScreen}         options={{ tabBarIcon: TabIcon('person'),              headerShown: false }} />
     </Tab.Navigator>
@@ -362,6 +364,7 @@ function ProfessionalTabs() {
 }
 
 function KennelOwnerTabs() {
+  const { unreadCount } = useAuth();
   return (
     <Tab.Navigator screenOptions={tabScreenOptions}>
       <Tab.Screen name="Home"          component={HomeScreen}          options={{ tabBarIcon: TabIcon('home'),  headerShown: false }} />
@@ -369,14 +372,15 @@ function KennelOwnerTabs() {
       <Tab.Screen name="Professionals" component={ProfessionalsScreen} options={{ tabBarButton: () => null,     headerShown: false }} />
       <Tab.Screen name="Services"      component={ServiceScreen}       options={{ tabBarButton: () => null,     headerShown: false }} />
       <Tab.Screen name="Shops"         component={ShopsScreen}         options={{ tabBarButton: () => null,     headerShown: false }} />
-      <Tab.Screen name="Messages"      component={ConversationsScreen} options={{ title: 'Messages', tabBarIcon: TabIcon('chatbubbles-outline'), headerShown: false }} />
-      <Tab.Screen name="Subscription" component={SubscriptionScreen} options={{ title: 'Subscription', tabBarIcon: TabIcon('star'), headerShown: false }} />
+      <Tab.Screen name="Messages"      component={ConversationsScreen} options={{ title: 'Messages', tabBarIcon: TabIcon('chatbubbles-outline'), tabBarBadge: unreadCount > 0 ? unreadCount : undefined, headerShown: false }} />
+      <Tab.Screen name="Subscription"  component={SubscriptionScreen}  options={{ title: 'Subscription', tabBarIcon: TabIcon('star'), headerShown: false }} />
       <Tab.Screen name="Profile"       component={ProfileScreen}       options={{ tabBarIcon: TabIcon('person'), headerShown: false }} />
     </Tab.Navigator>
   );
 }
 
 function ShopOwnerTabs() {
+  const { unreadCount } = useAuth();
   return (
     <Tab.Navigator screenOptions={tabScreenOptions}>
       <Tab.Screen name="Home"          component={HomeScreen}          options={{ tabBarIcon: TabIcon('home'),   headerShown: false }} />
@@ -384,7 +388,7 @@ function ShopOwnerTabs() {
       <Tab.Screen name="Professionals" component={ProfessionalsScreen} options={{ tabBarButton: () => null,     headerShown: false }} />
       <Tab.Screen name="Kennels"       component={KennelsScreen}       options={{ tabBarButton: () => null,     headerShown: false }} />
       <Tab.Screen name="Services"      component={ServiceScreen}       options={{ tabBarButton: () => null,     headerShown: false }} />
-      <Tab.Screen name="Messages"      component={ConversationsScreen} options={{ title: 'Messages', tabBarIcon: TabIcon('chatbubbles-outline'), headerShown: false }} />
+      <Tab.Screen name="Messages"      component={ConversationsScreen} options={{ title: 'Messages', tabBarIcon: TabIcon('chatbubbles-outline'), tabBarBadge: unreadCount > 0 ? unreadCount : undefined, headerShown: false }} />
       <Tab.Screen name="Subscription"  component={SubscriptionScreen}  options={{ title: 'Subscription', tabBarIcon: TabIcon('star'), headerShown: false }} />
       <Tab.Screen name="Profile"       component={ProfileScreen}       options={{ tabBarIcon: TabIcon('person'), headerShown: false }} />
     </Tab.Navigator>

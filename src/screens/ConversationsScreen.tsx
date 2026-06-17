@@ -54,7 +54,7 @@ function formatTime(iso: string): string {
 
 export default function ConversationsScreen() {
   const navigation = useNavigation<NavProp>();
-  const { session } = useAuth();
+  const { session, setUnreadCount } = useAuth();
   const currentUserId = session?.user?.id ?? '';
 
   const [subscriptionChecked, setSubscriptionChecked] = useState(false);
@@ -120,18 +120,20 @@ export default function ConversationsScreen() {
       );
 
       setConversations(convos);
+      setUnreadCount(convos.filter((c) => c.hasUnread).length);
     } finally {
       setLoading(false);
     }
-  }, [currentUserId]);
+  }, [currentUserId, setUnreadCount]);
 
-  // Fetch on tab focus (also fires when subscriptionChecked/isSubscribed change while focused)
+  // Fetch on tab focus; clear badge when user opens the tab
   useFocusEffect(
     useCallback(() => {
+      setUnreadCount(0);
       if (!subscriptionChecked || !isSubscribed || !currentUserId) return;
       setLoading(true);
       fetchConversations();
-    }, [subscriptionChecked, isSubscribed, currentUserId, fetchConversations])
+    }, [subscriptionChecked, isSubscribed, currentUserId, fetchConversations, setUnreadCount])
   );
 
   // Realtime: refresh list on any new message in current user's conversations

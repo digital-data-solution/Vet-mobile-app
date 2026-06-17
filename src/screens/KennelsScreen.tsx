@@ -4,6 +4,7 @@ import {
   View,
   Text,
   FlatList,
+  ScrollView,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
@@ -51,6 +52,8 @@ export default function KennelsScreen({ navigation }: any) {
   const [currentPlan,         setCurrentPlan]         = useState<string | null>(null);
   const [showUpsell,         setShowUpsell]         = useState(false);
   const [showGalleryNudge,   setShowGalleryNudge]   = useState(false);
+  const [verifiedOnly,       setVerifiedOnly]        = useState(false);
+  const [sortBy,             setSortBy]              = useState<'default' | 'rating' | 'distance'>('default');
   const galleryNudgeShownRef = useRef(false);
   const nudgeOpacity         = useRef(new Animated.Value(0)).current;
 
@@ -171,15 +174,18 @@ export default function KennelsScreen({ navigation }: any) {
     }
   };
 
-  const filtered = kennels.filter(
-    (k) =>
-      !searchTerm.trim() ||
-      [k.name, k.businessName, k.address, k.specialization]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()),
-  );
+  const filtered = kennels
+    .filter((k) => {
+      if (verifiedOnly && !k.isVerified) return false;
+      if (!searchTerm.trim()) return true;
+      return [k.name, k.businessName, k.address, k.specialization]
+        .filter(Boolean).join(' ').toLowerCase().includes(searchTerm.toLowerCase());
+    })
+    .sort((a, b) => {
+      if (sortBy === 'rating')   return (b.rating ?? 0) - (a.rating ?? 0);
+      if (sortBy === 'distance') return (a.distance ?? 9999) - (b.distance ?? 9999);
+      return 0;
+    });
 
   const renderKennel = ({ item }: { item: Kennel }) => (
     <TouchableOpacity
@@ -230,8 +236,8 @@ export default function KennelsScreen({ navigation }: any) {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={90}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <View style={styles.root}>
         {/* Search bar */}
@@ -259,6 +265,28 @@ export default function KennelsScreen({ navigation }: any) {
             )}
           </View>
         </View>
+
+        {/* Sort + filter chips */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sortRow}>
+          <TouchableOpacity
+            style={[styles.sortChip, verifiedOnly && styles.sortChipActive]}
+            onPress={() => setVerifiedOnly((v) => !v)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name={verifiedOnly ? 'shield-checkmark' : 'shield-checkmark-outline'} size={13} color={verifiedOnly ? '#fff' : '#059669'} />
+            <Text style={[styles.sortChipText, verifiedOnly && { color: '#fff' }]}>Verified Only</Text>
+          </TouchableOpacity>
+          {([['default', '⊞ Default'], ['rating', '⭐ Top Rated'], ['distance', '📍 Nearest']] as const).map(([key, label]) => (
+            <TouchableOpacity
+              key={key}
+              style={[styles.sortChip, sortBy === key && styles.sortChipActive]}
+              onPress={() => setSortBy(key)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.sortChipText, sortBy === key && { color: '#fff' }]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
         {/* Action buttons */}
         <View style={styles.actionRow}>
@@ -365,9 +393,16 @@ export default function KennelsScreen({ navigation }: any) {
               <View style={styles.emptyState}>
                 <Text style={styles.emptyEmoji}>🐕</Text>
                 <Text style={styles.emptyTitle}>No kennels found</Text>
-                <Text style={styles.emptyText}>
-                  Try a different location or tap "Show All"
-                </Text>
+                <Text style={styles.emptyText}>Try a different location or tap "Show All"</Text>
+                <TouchableOpacity
+                  style={styles.emptyRegisterBtn}
+                  onPress={() => {
+                    try { navigation.getParent()?.navigate('KennelOnboarding') ?? navigation.navigate('KennelOnboarding'); } catch { navigation.navigate('KennelOnboarding'); }
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.emptyRegisterBtnText}>Register Your Kennel — It's Free</Text>
+                </TouchableOpacity>
               </View>
             }
           />
@@ -519,10 +554,21 @@ const styles = StyleSheet.create({
   cardFooter: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   address: { fontSize: 12, color: '#64748B', flex: 1 },
   distance: { fontSize: 12, color: '#2563EB', fontWeight: '600', marginTop: 3 },
-  emptyState: { alignItems: 'center', paddingTop: 60 },
+  emptyState: { alignItems: 'center', paddingTop: 60, paddingHorizontal: 24 },
   emptyEmoji: { fontSize: 52, marginBottom: 16 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: '#0F172A', marginBottom: 8 },
-  emptyText: { fontSize: 14, color: '#64748B', textAlign: 'center' },
+  emptyText: { fontSize: 14, color: '#64748B', textAlign: 'center', marginBottom: 20 },
+  emptyRegisterBtn: { backgroundColor: '#7C3AED', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
+  emptyRegisterBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  sortRow: { paddingHorizontal: 16, paddingBottom: 8, gap: 8, flexDirection: 'row' },
+  sortChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: '#F1F5F9', borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 7,
+    borderWidth: 1, borderColor: '#E2E8F0',
+  },
+  sortChipActive: { backgroundColor: '#7C3AED', borderColor: '#7C3AED' },
+  sortChipText: { fontSize: 12, color: '#475569', fontWeight: '600' },
   teaserBanner: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -4,6 +4,7 @@ import {
   View,
   Text,
   FlatList,
+  ScrollView,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
@@ -60,6 +61,8 @@ export default function ShopsScreen({ navigation }: Props) {
   const [subscriptionChecked, setSubscriptionChecked] = useState(false);
   const [showUpsell,         setShowUpsell]         = useState(false);
   const [showGalleryNudge,   setShowGalleryNudge]   = useState(false);
+  const [verifiedOnly,       setVerifiedOnly]       = useState(false);
+  const [sortBy,             setSortBy]             = useState<'default' | 'rating' | 'distance'>('default');
   const galleryNudgeShownRef = useRef(false);
   const nudgeOpacity         = useRef(new Animated.Value(0)).current;
 
@@ -201,13 +204,18 @@ export default function ShopsScreen({ navigation }: Props) {
     return shop.address?.full ?? shop.address?.city ?? shop.address?.town ?? '';
   };
 
-  const filtered = shops.filter(
-    (s) =>
-      !searchTerm.trim() ||
-      (getDisplayName(s) + getAddress(s) + (s.description ?? ''))
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()),
-  );
+  const filtered = shops
+    .filter((s) => {
+      if (verifiedOnly && !(s as any).isVerified) return false;
+      if (!searchTerm.trim()) return true;
+      return (getDisplayName(s) + getAddress(s) + (s.description ?? ''))
+        .toLowerCase().includes(searchTerm.toLowerCase());
+    })
+    .sort((a, b) => {
+      if (sortBy === 'rating')   return ((b as any).rating ?? 0) - ((a as any).rating ?? 0);
+      if (sortBy === 'distance') return ((a as any).distance ?? 9999) - ((b as any).distance ?? 9999);
+      return 0;
+    });
 
   const renderShop = ({ item }: { item: Shop }) => {
     const avatarUri = item.images?.[0] || item.profileImage;
@@ -253,8 +261,8 @@ export default function ShopsScreen({ navigation }: Props) {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={90}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <View style={styles.root}>
         {/* Search */}
@@ -277,6 +285,28 @@ export default function ShopsScreen({ navigation }: Props) {
             )}
           </View>
         </View>
+
+        {/* Sort + verified filter */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sortRow}>
+          <TouchableOpacity
+            style={[styles.sortChip, verifiedOnly && styles.sortChipActive]}
+            onPress={() => setVerifiedOnly((v) => !v)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name={verifiedOnly ? 'shield-checkmark' : 'shield-checkmark-outline'} size={13} color={verifiedOnly ? '#fff' : '#059669'} />
+            <Text style={[styles.sortChipText, verifiedOnly && { color: '#fff' }]}>Verified Only</Text>
+          </TouchableOpacity>
+          {([['default', '⊞ Default'], ['rating', '⭐ Top Rated'], ['distance', '📍 Nearest']] as const).map(([key, label]) => (
+            <TouchableOpacity
+              key={key}
+              style={[styles.sortChip, sortBy === key && styles.sortChipActive]}
+              onPress={() => setSortBy(key)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.sortChipText, sortBy === key && { color: '#fff' }]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
         {/* Location & actions */}
         <View style={styles.actionsRow}>
@@ -400,9 +430,16 @@ export default function ShopsScreen({ navigation }: Props) {
                 <View style={styles.emptyState}>
                   <Text style={styles.emptyEmoji}>🛒</Text>
                   <Text style={styles.emptyTitle}>No shops found</Text>
-                  <Text style={styles.emptyText}>
-                    Try expanding your search area or browse all shops.
-                  </Text>
+                  <Text style={styles.emptyText}>Try expanding your search area or browse all shops.</Text>
+                  <TouchableOpacity
+                    style={styles.emptyRegisterBtn}
+                    onPress={() => {
+                      try { navigation.getParent()?.navigate('ShopOnboarding') ?? navigation.navigate('ShopOnboarding'); } catch { navigation.navigate('ShopOnboarding'); }
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.emptyRegisterBtnText}>Register Your Pet Shop — It's Free</Text>
+                  </TouchableOpacity>
                 </View>
               ) : null
             }
@@ -560,10 +597,21 @@ const styles = StyleSheet.create({
   addressRow:  { flexDirection: 'row', alignItems: 'center', gap: 3 },
   addressText: { fontSize: 12, color: '#64748B', flex: 1 },
   distanceText:{ fontSize: 12, color: '#EA580C', fontWeight: '600', marginTop: 3 },
-  emptyState:  { alignItems: 'center', paddingTop: 60 },
+  emptyState:  { alignItems: 'center', paddingTop: 60, paddingHorizontal: 24 },
   emptyEmoji:  { fontSize: 52, marginBottom: 16 },
   emptyTitle:  { fontSize: 18, fontWeight: '700', color: '#0F172A', marginBottom: 8 },
-  emptyText:   { fontSize: 14, color: '#64748B', textAlign: 'center' },
+  emptyText:   { fontSize: 14, color: '#64748B', textAlign: 'center', marginBottom: 20 },
+  emptyRegisterBtn: { backgroundColor: '#EA580C', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
+  emptyRegisterBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  sortRow: { paddingHorizontal: 16, paddingBottom: 8, gap: 8, flexDirection: 'row' },
+  sortChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: '#F1F5F9', borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 7,
+    borderWidth: 1, borderColor: '#E2E8F0',
+  },
+  sortChipActive: { backgroundColor: '#EA580C', borderColor: '#EA580C' },
+  sortChipText: { fontSize: 12, color: '#475569', fontWeight: '600' },
   teaserBanner: {
     flexDirection: 'row',
     alignItems: 'center',
