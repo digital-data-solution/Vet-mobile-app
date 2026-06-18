@@ -271,15 +271,55 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
     const cfg = ROLE_CONFIG[role];
     const newErrors: FormErrors = {};
 
-    if (!name.trim()) newErrors.name = 'Full name is required';
-    if (!address.trim()) newErrors.address = 'Address is required';
-    if (cfg.requiresVCN && !vcnNumber.trim()) newErrors.vcnNumber = 'VCN number is required';
+    // Name — required, min 3 chars, no digits
+    if (!name.trim()) {
+      newErrors.name = 'Full name is required';
+    } else if (name.trim().length < 3) {
+      newErrors.name = 'Name must be at least 3 characters';
+    } else if (/\d/.test(name.trim())) {
+      newErrors.name = 'Name should not contain numbers';
+    }
+
+    // VCN — vets only
+    if (cfg.requiresVCN && !vcnNumber.trim())
+      newErrors.vcnNumber = 'VCN number is required';
+
+    // Business name — required roles
     if (cfg.requiresBusinessName && !businessName.trim())
       newErrors.businessName = `${cfg.businessNameLabel.replace(' *', '')} is required`;
-    if (phone && !/^[\d\s\+\-\(\)]+$/.test(phone))
-      newErrors.phone = 'Please enter a valid phone number';
-    if (email && !/^\S+@\S+\.\S+$/.test(email))
+
+    // Address — required, must look like a real Nigerian address
+    const badAddressPattern = /^(mobile|ambulatory|home service|online|n\/a|nil|none|everywhere|anywhere|i come to you|delivery)/i;
+    if (!address.trim()) {
+      newErrors.address = 'Address is required';
+    } else if (address.trim().length < 10) {
+      newErrors.address = 'Please enter a complete address (too short)';
+    } else if (!address.includes(',')) {
+      newErrors.address = 'Separate your street, area and city with commas — e.g. "5 Adeola St, Ikeja, Lagos"';
+    } else if (badAddressPattern.test(address.trim())) {
+      newErrors.address = 'Enter your physical address — e.g. "5 Adeola St, Ikeja, Lagos". Clients need this to find you.';
+    }
+
+    // Phone — required, Nigerian format (10–13 digits)
+    if (!phone.trim()) {
+      newErrors.phone = 'Phone number is required — clients need a way to reach you';
+    } else {
+      const digits = phone.replace(/\D/g, '');
+      const valid =
+        (digits.length === 11 && /^0[7-9]/.test(digits)) || // 080…, 090…, 070…
+        (digits.length === 13 && digits.startsWith('234'))  || // +234…
+        (digits.length === 10 && /^[7-9]/.test(digits));       // without leading 0
+      if (!valid) {
+        newErrors.phone = 'Enter a valid Nigerian number — e.g. 08012345678 or +234 801 234 5678';
+      }
+    }
+
+    // Email — required
+    if (!email.trim()) {
+      newErrors.email = 'Email address is required — used for notifications and client contact';
+    } else if (!/^\S+@\S+\.\S+$/.test(email)) {
       newErrors.email = 'Please enter a valid email address';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -507,11 +547,12 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
           )}
 
           <FormField
-            label="Address * (will be geocoded)"
+            label="Business Address *"
             value={address}
             onChangeText={(v) => { setAddress(v); setErrors((e) => ({ ...e, address: undefined })); }}
             placeholder="e.g. 12 Adeola Odeku St, Victoria Island, Lagos"
             error={errors.address}
+            hint="Include street, area and city separated by commas. This is how clients find you in nearby search."
             multiline
           />
           <TouchableOpacity style={styles.locateBtn} onPress={detectLocation} disabled={locating} activeOpacity={0.75}>
@@ -564,18 +605,18 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
           )}
 
           <FormField
-            label="Phone Number"
+            label="Phone Number *"
             value={phone}
             onChangeText={(v) => { setPhone(v); setErrors((e) => ({ ...e, phone: undefined })); }}
-            placeholder="e.g. +234 801 234 5678"
+            placeholder="e.g. 08012345678 or +234 801 234 5678"
             error={errors.phone}
             keyboardType="phone-pad"
           />
           <FormField
-            label="Email Address"
+            label="Email Address *"
             value={email}
             onChangeText={(v) => { setEmail(v); setErrors((e) => ({ ...e, email: undefined })); }}
-            placeholder="e.g. contact@example.ng"
+            placeholder="e.g. contact@yourname.com"
             error={errors.email}
             keyboardType="email-address"
             autoCapitalize="none"
@@ -752,7 +793,7 @@ export default function ProfessionalOnboardingScreen({ navigation, route }: Prop
 }
 
 function FormField({
-  label, value, onChangeText, placeholder, error,
+  label, value, onChangeText, placeholder, error, hint,
   autoCapitalize, keyboardType, multiline,
 }: {
   label: string;
@@ -760,6 +801,7 @@ function FormField({
   onChangeText: (v: string) => void;
   placeholder: string;
   error?: string;
+  hint?: string;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   keyboardType?: 'default' | 'email-address' | 'phone-pad';
   multiline?: boolean;
@@ -779,6 +821,7 @@ function FormField({
         numberOfLines={multiline ? 3 : 1}
       />
       {error ? <Text style={fieldStyles.errorText}>{error}</Text> : null}
+      {!error && hint ? <Text style={fieldStyles.hintText}>{hint}</Text> : null}
     </View>
   );
 }
@@ -799,6 +842,7 @@ const fieldStyles = StyleSheet.create({
   inputError:     { borderColor: '#EF4444' },
   inputMultiline: { minHeight: 80, textAlignVertical: 'top' },
   errorText:      { color: '#EF4444', fontSize: 12, marginTop: 4 },
+  hintText:       { color: '#6B7280', fontSize: 12, marginTop: 4, lineHeight: 16 },
 });
 
 const styles = StyleSheet.create({
