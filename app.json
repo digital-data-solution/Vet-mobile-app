@@ -16,7 +16,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.xpressvet.marketplace"
+      "bundleIdentifier": "com.xpressvet.marketplace",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "We need your location to find nearby vets and pet services."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -25,7 +28,8 @@
       },
       "package": "com.xpressvet.marketplace",
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["ACCESS_FINE_LOCATION"]
     },
     "web": {
       "bundler": "metro",

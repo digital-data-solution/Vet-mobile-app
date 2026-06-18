@@ -415,9 +415,10 @@ function MainTabs() {
 // ROOT NAVIGATOR
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AppNavigator() {
-  const [session,  setSession]  = useState<Session | null>(null);
-  const [userRole, setUserRole] = useState<UserRole>(null);
-  const [loading,  setLoading]  = useState(true);
+  const [session,      setSession]      = useState<Session | null>(null);
+  const [userRole,     setUserRole]     = useState<UserRole>(null);
+  const [loading,      setLoading]      = useState(true);
+  const [unreadCount,  setUnreadCount]  = useState(0);
 
   const isAuthenticated = !!session;
 
@@ -523,7 +524,7 @@ export default function AppNavigator() {
   if (loading) return <LoadingScreen />;
 
   return (
-    <AuthContext.Provider value={{ session, userRole, isAuthenticated, signOut, refreshRole }}>
+    <AuthContext.Provider value={{ session, userRole, isAuthenticated, signOut, refreshRole, unreadCount, setUnreadCount }}>
       <NavigationErrorBoundary>
         <View style={{ flex: 1 }}>
           <OfflineBanner />

@@ -17,7 +17,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { showAlert } from '../utils/alert';
-import * as Location from 'expo-location';
+import { getUserLocation, forwardGeocode } from '../utils/location';
 import { apiFetch } from '../api/client';
 import { Ionicons } from '@expo/vector-icons';
 import SkeletonList from '../components/SkeletonLoader';
@@ -58,7 +58,8 @@ export default function ShopsScreen({ navigation }: Props) {
   const [searchTerm,      setSearchTerm]      = useState('');
   const [locationLoading, setLocationLoading] = useState(false);
   const [coords,          setCoords]          = useState({ lat: '6.5244', lng: '3.3792' });
-  const [distance,           setDistance]           = useState('10');
+  const [addressInput,    setAddressInput]    = useState('');
+  const [distance,        setDistance]        = useState('10');
   const [hasSearched,        setHasSearched]        = useState(false);
   const [isSubscribed,       setIsSubscribed]       = useState(false);
   const [subscriptionChecked, setSubscriptionChecked] = useState(false);
@@ -137,24 +138,31 @@ export default function ShopsScreen({ navigation }: Props) {
     }
   };
 
+  const geocodeAddress = async () => {
+    if (!addressInput.trim()) {
+      showAlert('Error', 'Please enter an address first.');
+      return;
+    }
+    setLocationLoading(true);
+    try {
+      const result = await forwardGeocode(addressInput.trim());
+      setCoords({ lat: result.lat.toString(), lng: result.lon.toString() });
+      showAlert('Location Set', `Location updated to: ${addressInput}`);
+    } catch {
+      showAlert('Not Found', 'Could not find that address. Try a more specific one.');
+    } finally {
+      setLocationLoading(false);
+    }
+  };
+
   const useMyLocation = async () => {
     setLocationLoading(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        showAlert('Permission Denied', 'Location access needed to find nearby shops.');
-        return;
-      }
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      setCoords({
-        lat: loc.coords.latitude.toString(),
-        lng: loc.coords.longitude.toString(),
-      });
+      const loc = await getUserLocation();
+      setCoords({ lat: loc.latitude.toString(), lng: loc.longitude.toString() });
       showAlert('Location Set', 'Tap "Nearby" to find shops near you.');
-    } catch {
-      showAlert('Error', 'Failed to get location.');
+    } catch (err) {
+      showAlert('Permission Denied', (err as Error).message || 'Failed to get location.');
     } finally {
       setLocationLoading(false);
     }
@@ -311,35 +319,63 @@ export default function ShopsScreen({ navigation }: Props) {
           ))}
         </ScrollView>
 
-        {/* Location & actions */}
+        {/* Location card */}
+        <View style={styles.locationCard}>
+          <Text style={styles.locationTitle}>📍 Find Nearby Shops</Text>
+          <TextInput
+            value={addressInput}
+            onChangeText={setAddressInput}
+            style={styles.locationInput}
+            placeholder="e.g. Ikeja, Lagos"
+            placeholderTextColor="#9CA3AF"
+            returnKeyType="search"
+            onSubmitEditing={geocodeAddress}
+          />
+          <View style={styles.locationButtons}>
+            <TouchableOpacity
+              style={[styles.locationActionBtn, styles.locationActionBtnSecondary]}
+              onPress={geocodeAddress}
+              disabled={locationLoading}
+            >
+              <Text style={styles.locationActionBtnSecondaryText}>Use Address</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.locationActionBtn, styles.locationActionBtnPrimary]}
+              onPress={useMyLocation}
+              disabled={locationLoading}
+            >
+              {locationLoading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.locationActionBtnPrimaryText}>📡 My Location</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+          <View style={styles.distanceRow}>
+            <Text style={styles.distanceLabel}>Radius:</Text>
+            {(['5', '10', '25', '50'] as const).map((d) => (
+              <TouchableOpacity
+                key={d}
+                style={[styles.distanceChip, distance === d && styles.distanceChipActive]}
+                onPress={() => setDistance(d)}
+              >
+                <Text style={[styles.distanceChipText, distance === d && styles.distanceChipTextActive]}>
+                  {d} km
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Action row */}
         <View style={styles.actionsRow}>
           <TouchableOpacity
-            style={styles.locationBtn}
-            onPress={useMyLocation}
-            disabled={locationLoading}
+            style={styles.allShopsBtn}
+            onPress={fetchAllShops}
+            disabled={loading}
           >
-            {locationLoading ? (
-              <ActivityIndicator size="small" color="#EA580C" />
-            ) : (
-              <>
-                <Ionicons name="navigate-outline" size={14} color="#EA580C" />
-                <Text style={styles.locationBtnText}>My Location</Text>
-              </>
-            )}
+            <Text style={styles.allShopsBtnText}>Show All</Text>
           </TouchableOpacity>
-
-          {['5', '10', '25'].map((d) => (
-            <TouchableOpacity
-              key={d}
-              style={[styles.distanceChip, distance === d && styles.distanceChipActive]}
-              onPress={() => setDistance(d)}
-            >
-              <Text style={[styles.distanceChipText, distance === d && styles.distanceChipTextActive]}>
-                {d}km
-              </Text>
-            </TouchableOpacity>
-          ))}
-
           <TouchableOpacity
             style={styles.searchNearbyBtn}
             onPress={() => {
@@ -357,18 +393,10 @@ export default function ShopsScreen({ navigation }: Props) {
               searchNearby();
             }}
           >
-            <Text style={styles.searchNearbyText}>Nearby</Text>
+            <Ionicons name="search-outline" size={14} color="#fff" style={{ marginRight: 4 }} />
+            <Text style={styles.searchNearbyText}>Search Nearby</Text>
           </TouchableOpacity>
         </View>
-
-        {/* All shops button */}
-        <TouchableOpacity
-          style={styles.allShopsBtn}
-          onPress={fetchAllShops}
-          disabled={loading}
-        >
-          <Text style={styles.allShopsBtnText}>Show All Pet Shops</Text>
-        </TouchableOpacity>
 
         {/* Gallery nudge */}
         {showGalleryNudge && (
@@ -515,53 +543,68 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   searchInput: { flex: 1, paddingVertical: 12, fontSize: 15, color: '#0F172A' },
-  actionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
+  locationCard: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
     marginBottom: 8,
-    gap: 6,
+    borderRadius: 14,
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  locationBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF7ED',
+  locationTitle: { fontSize: 13, fontWeight: '700', color: '#374151', marginBottom: 10 },
+  locationInput: {
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
     borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    gap: 4,
-    borderWidth: 1,
-    borderColor: '#FED7AA',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#111827',
+    backgroundColor: '#F9FAFB',
+    marginBottom: 10,
   },
-  locationBtnText: { fontSize: 12, color: '#EA580C', fontWeight: '600' },
-  distanceChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    borderRadius: 10,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  distanceChipActive:     { backgroundColor: '#FFF7ED', borderColor: '#FED7AA' },
-  distanceChipText:       { fontSize: 12, color: '#64748B', fontWeight: '600' },
-  distanceChipTextActive: { color: '#EA580C', fontWeight: '700' },
+  locationButtons: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  locationActionBtn: { flex: 1, borderRadius: 9, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
+  locationActionBtnSecondary: { borderWidth: 1.5, borderColor: '#EA580C', backgroundColor: '#fff' },
+  locationActionBtnSecondaryText: { fontSize: 13, color: '#EA580C', fontWeight: '700' },
+  locationActionBtnPrimary: { backgroundColor: '#EA580C' },
+  locationActionBtnPrimaryText: { fontSize: 13, color: '#fff', fontWeight: '700' },
+  distanceRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  distanceLabel: { fontSize: 12, color: '#6B7280', fontWeight: '500' },
+  actionsRow: { flexDirection: 'row', paddingHorizontal: 16, marginBottom: 10, gap: 8 },
+  distanceChip: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' },
+  distanceChipActive:     { backgroundColor: '#EA580C', borderColor: '#EA580C' },
+  distanceChipText:       { fontSize: 12, color: '#374151', fontWeight: '600' },
+  distanceChipTextActive: { color: '#fff' },
   searchNearbyBtn: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
     backgroundColor: '#EA580C',
     borderRadius: 10,
-    paddingVertical: 9,
+    paddingVertical: 11,
+    shadowColor: '#EA580C',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
   },
   searchNearbyText: { fontSize: 13, color: '#fff', fontWeight: '700' },
   allShopsBtn: {
-    marginHorizontal: 16,
-    marginBottom: 10,
+    flex: 1,
     paddingVertical: 11,
     borderRadius: 10,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
     backgroundColor: '#fff',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   allShopsBtnText: { fontSize: 13, color: '#475569', fontWeight: '600' },
   loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60 },

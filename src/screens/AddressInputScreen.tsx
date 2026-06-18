@@ -10,9 +10,12 @@ import {
   Platform,
   Modal,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { showAlert } from '../utils/alert';
 import { apiFetch } from '../api/client';
+import { getUserLocation, reverseGeocode } from '../utils/location';
 
 const NIGERIAN_STATES = [
   'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue',
@@ -56,6 +59,38 @@ export default function AddressInputScreen({ navigation, route, onSave }: Props)
   const [zipCode, setZipCode] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
   const [statePickerVisible, setStatePickerVisible] = useState(false);
+  const [detectingLocation, setDetectingLocation] = useState(false);
+  const [autoFillSuccess,   setAutoFillSuccess]   = useState(false);
+
+  const matchNigerianState = (locationiqState?: string): string => {
+    if (!locationiqState) return '';
+    const s = locationiqState.toLowerCase().trim();
+    if (s.includes('federal capital') || s.includes('abuja')) return 'FCT';
+    for (const ns of NIGERIAN_STATES) {
+      if (ns === 'FCT') continue;
+      if (s.includes(ns.toLowerCase())) return ns;
+    }
+    return '';
+  };
+
+  const detectLocation = async () => {
+    setDetectingLocation(true);
+    try {
+      const coords = await getUserLocation();
+      const place = await reverseGeocode(coords.latitude, coords.longitude);
+      const detectedState = matchNigerianState(place.state);
+      if (detectedState) { setState(detectedState); clearError('state'); }
+      if (place.county) { setLga(place.county);   clearError('lga'); }
+      if (place.city)   { setCity(place.city);     clearError('city'); }
+      if (place.road)   { setStreet(place.road);   clearError('street'); }
+      setAutoFillSuccess(true);
+      setTimeout(() => setAutoFillSuccess(false), 4000);
+    } catch (err) {
+      showAlert('Location Error', (err as Error).message || 'Could not detect your location. Please enter it manually.');
+    } finally {
+      setDetectingLocation(false);
+    }
+  };
 
   const clearError = (field: keyof FormErrors) =>
     setErrors((prev) => ({ ...prev, [field]: undefined }));
@@ -131,6 +166,39 @@ export default function AddressInputScreen({ navigation, route, onSave }: Props)
 
         {/* Form */}
         <View style={styles.formCard}>
+          {/* Detect location button */}
+          <TouchableOpacity
+            style={styles.detectBtn}
+            onPress={detectLocation}
+            disabled={detectingLocation}
+            activeOpacity={0.82}
+          >
+            {detectingLocation ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons name="navigate" size={18} color="#fff" />
+            )}
+            <Text style={styles.detectBtnText}>
+              {detectingLocation ? 'Detecting location...' : 'Detect My Location'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Auto-fill success banner */}
+          {autoFillSuccess && (
+            <View style={styles.successBanner}>
+              <Ionicons name="checkmark-circle" size={16} color="#059669" />
+              <Text style={styles.successBannerText}>
+                Location detected — please verify your details and add your house number.
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.orDivider}>
+            <View style={styles.orLine} />
+            <Text style={styles.orText}>or enter manually</Text>
+            <View style={styles.orLine} />
+          </View>
+
           {/* State picker */}
           <View style={styles.fieldWrapper}>
             <Text style={styles.fieldLabel}>State *</Text>
@@ -272,6 +340,37 @@ function FormField({
 }
 
 const styles = StyleSheet.create({
+  detectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#2563EB',
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginBottom: 16,
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  detectBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  successBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#ECFDF5',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  successBannerText: { flex: 1, fontSize: 13, color: '#065F46', lineHeight: 18 },
+  orDivider: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+  orLine: { flex: 1, height: 1, backgroundColor: '#E5E7EB' },
+  orText: { fontSize: 12, color: '#9CA3AF', fontWeight: '500' },
   scroll: { flex: 1, backgroundColor: '#F3F4F6' },
   container: { paddingBottom: 40 },
   header: {

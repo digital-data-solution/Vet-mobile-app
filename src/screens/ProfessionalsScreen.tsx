@@ -16,7 +16,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { showAlert } from '../utils/alert';
-import * as Location from 'expo-location';
+import { getUserLocation, forwardGeocode } from '../utils/location';
 import { Ionicons } from '@expo/vector-icons';
 import SkeletonList from '../components/SkeletonLoader';
 import { useFocusEffect } from '@react-navigation/native';
@@ -259,19 +259,11 @@ export default function ProfessionalsScreen({ navigation }: Props) {
   const getCurrentLocation = async () => {
     setLocationLoading(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        showAlert('Permission Denied', 'Location permission is required to find nearby professionals.');
-        return;
-      }
-      const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      setCoords({
-        lat: location.coords.latitude.toString(),
-        lng: location.coords.longitude.toString(),
-      });
+      const loc = await getUserLocation();
+      setCoords({ lat: loc.latitude.toString(), lng: loc.longitude.toString() });
       showAlert('Location Updated', 'Now showing results near your current location.');
-    } catch {
-      showAlert('Error', 'Failed to get current location. Please try again.');
+    } catch (err) {
+      showAlert('Permission Denied', (err as Error).message || 'Failed to get current location.');
     } finally {
       setLocationLoading(false);
     }
@@ -284,18 +276,11 @@ export default function ProfessionalsScreen({ navigation }: Props) {
     }
     setLocationLoading(true);
     try {
-      const geocoded = await Location.geocodeAsync(addressInput.trim());
-      if (geocoded.length > 0) {
-        setCoords({
-          lat: geocoded[0].latitude.toString(),
-          lng: geocoded[0].longitude.toString(),
-        });
-        showAlert('Location Set', `Location updated to: ${addressInput}`);
-      } else {
-        showAlert('Not Found', 'Could not find that address. Try a more specific one.');
-      }
+      const result = await forwardGeocode(addressInput.trim());
+      setCoords({ lat: result.lat.toString(), lng: result.lon.toString() });
+      showAlert('Location Set', `Location updated to: ${addressInput}`);
     } catch {
-      showAlert('Error', 'Failed to look up that address.');
+      showAlert('Not Found', 'Could not find that address. Try a more specific one.');
     } finally {
       setLocationLoading(false);
     }

@@ -17,7 +17,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { showAlert } from '../utils/alert';
-import * as Location from 'expo-location';
+import { getUserLocation, forwardGeocode } from '../utils/location';
 import { apiFetch } from '../api/client';
 import { Ionicons } from '@expo/vector-icons';
 import SkeletonList from '../components/SkeletonLoader';
@@ -40,6 +40,8 @@ interface Kennel {
   distance?: number;
   isVerified?: boolean;
   profileImage?: string;
+  rating?: number;
+  reviewCount?: number;
 }
 
 export default function KennelsScreen({ navigation }: any) {
@@ -48,6 +50,8 @@ export default function KennelsScreen({ navigation }: any) {
   const [searchTerm, setSearchTerm] = useState('');
   const [locationLoading, setLocationLoading] = useState(false);
   const [coords, setCoords] = useState({ lat: '6.5244', lng: '3.3792' });
+  const [addressInput,    setAddressInput]    = useState('');
+  const [distance,        setDistance]        = useState('15');
   const [isSubscribed,        setIsSubscribed]        = useState(false);
   const [subscriptionChecked, setSubscriptionChecked] = useState(false);
   const [currentPlan,         setCurrentPlan]         = useState<string | null>(null);
@@ -126,13 +130,30 @@ export default function KennelsScreen({ navigation }: any) {
     }
   };
 
+  const geocodeAddress = async () => {
+    if (!addressInput.trim()) {
+      showAlert('Error', 'Please enter an address first.');
+      return;
+    }
+    setLocationLoading(true);
+    try {
+      const result = await forwardGeocode(addressInput.trim());
+      setCoords({ lat: result.lat.toString(), lng: result.lon.toString() });
+      showAlert('Location Set', `Location updated to: ${addressInput}`);
+    } catch {
+      showAlert('Not Found', 'Could not find that address. Try a more specific one.');
+    } finally {
+      setLocationLoading(false);
+    }
+  };
+
   const searchNearby = async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
         lng: coords.lng,
         lat: coords.lat,
-        distance: '15',
+        distance,
         ...(searchTerm.trim() && { search: searchTerm.trim() }),
       });
       const res = await apiFetch(`/api/v1/kennels/nearby?${params}`, { method: 'GET' });
@@ -155,21 +176,11 @@ export default function KennelsScreen({ navigation }: any) {
   const useMyLocation = async () => {
     setLocationLoading(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        showAlert('Permission Denied', 'Location access is needed to find nearby kennels.');
-        return;
-      }
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      setCoords({
-        lat: loc.coords.latitude.toString(),
-        lng: loc.coords.longitude.toString(),
-      });
+      const loc = await getUserLocation();
+      setCoords({ lat: loc.latitude.toString(), lng: loc.longitude.toString() });
       showAlert('Location Updated', 'Tap "Search Nearby" to find kennels near you.');
-    } catch {
-      showAlert('Error', 'Failed to get location.');
+    } catch (err) {
+      showAlert('Permission Denied', (err as Error).message || 'Failed to get location.');
     } finally {
       setLocationLoading(false);
     }
@@ -289,24 +300,65 @@ export default function KennelsScreen({ navigation }: any) {
           ))}
         </ScrollView>
 
+        {/* Location card */}
+        <View style={styles.locationCard}>
+          <Text style={styles.locationTitle}>📍 Find Nearby Kennels</Text>
+          <TextInput
+            value={addressInput}
+            onChangeText={setAddressInput}
+            style={styles.locationInput}
+            placeholder="e.g. Ikeja, Lagos"
+            placeholderTextColor="#9CA3AF"
+            returnKeyType="search"
+            onSubmitEditing={geocodeAddress}
+          />
+          <View style={styles.locationButtons}>
+            <TouchableOpacity
+              style={[styles.locationActionBtn, styles.locationActionBtnSecondary]}
+              onPress={geocodeAddress}
+              disabled={locationLoading}
+            >
+              <Text style={styles.locationActionBtnSecondaryText}>Use Address</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.locationActionBtn, styles.locationActionBtnPrimary]}
+              onPress={useMyLocation}
+              disabled={locationLoading}
+            >
+              {locationLoading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.locationActionBtnPrimaryText}>📡 My Location</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+          <View style={styles.distanceRow}>
+            <Text style={styles.distanceLabel}>Radius:</Text>
+            {(['5', '10', '25', '50'] as const).map((d) => (
+              <TouchableOpacity
+                key={d}
+                style={[styles.distanceChip, distance === d && styles.distanceChipActive]}
+                onPress={() => setDistance(d)}
+              >
+                <Text style={[styles.distanceChipText, distance === d && styles.distanceChipTextActive]}>
+                  {d} km
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
         {/* Action buttons */}
         <View style={styles.actionRow}>
           <TouchableOpacity
-            style={styles.locationBtn}
-            onPress={useMyLocation}
-            disabled={locationLoading}
+            style={[styles.actionBtn, styles.actionBtnOutline]}
+            onPress={fetchKennels}
+            disabled={loading}
           >
-            {locationLoading ? (
-              <ActivityIndicator size="small" color="#2563EB" />
-            ) : (
-              <>
-                <Ionicons name="navigate-outline" size={15} color="#2563EB" />
-                <Text style={styles.locationBtnText}>My Location</Text>
-              </>
-            )}
+            <Text style={styles.actionBtnOutlineText}>Show All</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.searchNearbyBtn}
+            style={[styles.actionBtn, styles.actionBtnFill]}
             onPress={() => {
               if (!isSubscribed) {
                 showAlert(
@@ -321,12 +373,10 @@ export default function KennelsScreen({ navigation }: any) {
               }
               searchNearby();
             }}
+            disabled={loading}
           >
-            <Ionicons name="search-outline" size={15} color="#fff" />
-            <Text style={styles.searchNearbyText}>Search Nearby</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.allBtn} onPress={fetchKennels}>
-            <Text style={styles.allBtnText}>Show All</Text>
+            <Ionicons name="search-outline" size={15} color="#fff" style={{ marginRight: 4 }} />
+            <Text style={styles.actionBtnFillText}>Search Nearby</Text>
           </TouchableOpacity>
         </View>
 
@@ -460,42 +510,48 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   searchInput: { flex: 1, paddingVertical: 12, fontSize: 15, color: '#0F172A' },
-  actionRow: { flexDirection: 'row', paddingHorizontal: 16, marginBottom: 12, gap: 8 },
-  locationBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EFF6FF',
+  locationCard: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 14,
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  locationTitle: { fontSize: 13, fontWeight: '700', color: '#374151', marginBottom: 10 },
+  locationInput: {
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    gap: 5,
-    borderWidth: 1,
-    borderColor: '#DBEAFE',
+    fontSize: 14,
+    color: '#111827',
+    backgroundColor: '#F9FAFB',
+    marginBottom: 10,
   },
-  locationBtnText: { fontSize: 13, color: '#2563EB', fontWeight: '600' },
-  searchNearbyBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2563EB',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    gap: 5,
-    flex: 1,
-    justifyContent: 'center',
-  },
-  searchNearbyText: { fontSize: 13, color: '#fff', fontWeight: '700' },
-  allBtn: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#fff',
-  },
-  allBtnText: { fontSize: 13, color: '#475569', fontWeight: '600' },
+  locationButtons: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  locationActionBtn: { flex: 1, borderRadius: 9, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
+  locationActionBtnSecondary: { borderWidth: 1.5, borderColor: '#7C3AED', backgroundColor: '#fff' },
+  locationActionBtnSecondaryText: { fontSize: 13, color: '#7C3AED', fontWeight: '700' },
+  locationActionBtnPrimary: { backgroundColor: '#7C3AED' },
+  locationActionBtnPrimaryText: { fontSize: 13, color: '#fff', fontWeight: '700' },
+  distanceRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  distanceLabel: { fontSize: 12, color: '#6B7280', fontWeight: '500' },
+  distanceChip: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' },
+  distanceChipActive: { backgroundColor: '#7C3AED', borderColor: '#7C3AED' },
+  distanceChipText: { fontSize: 12, color: '#374151', fontWeight: '600' },
+  distanceChipTextActive: { color: '#fff' },
+  actionRow: { flexDirection: 'row', paddingHorizontal: 16, marginBottom: 12, gap: 8 },
+  actionBtn: { flex: 1, borderRadius: 10, paddingVertical: 11, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4 },
+  actionBtnOutline: { borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#fff' },
+  actionBtnOutlineText: { fontSize: 13, color: '#475569', fontWeight: '600' },
+  actionBtnFill: { backgroundColor: '#7C3AED', shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 3 },
+  actionBtnFillText: { fontSize: 13, color: '#fff', fontWeight: '700' },
   loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60 },
   loadingText: { marginTop: 12, color: '#64748B', fontSize: 15 },
   list: { paddingHorizontal: 16, paddingBottom: 30 },

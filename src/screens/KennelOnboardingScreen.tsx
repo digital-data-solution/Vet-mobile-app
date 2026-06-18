@@ -11,8 +11,10 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { showAlert } from '../utils/alert';
 import { apiFetch } from '../api/client';
+import { getUserLocation, reverseGeocode } from '../utils/location';
 import MediaUploader from '../components/Mediauploader';
 
 interface Props {
@@ -36,8 +38,9 @@ export default function KennelOnboardingScreen({ navigation }: Props) {
   const [services, setServices] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [loading,  setLoading]  = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [errors,   setErrors]   = useState<FormErrors>({});
   const [galleryImages, setGalleryImages] = useState<MediaImage[]>([]);
 
   // Subscription check on focus
@@ -64,6 +67,21 @@ export default function KennelOnboardingScreen({ navigation }: Props) {
       return () => { isActive = false; };
     }, [navigation])
   );
+
+  const detectLocation = async () => {
+    setLocating(true);
+    try {
+      const coords = await getUserLocation();
+      const place  = await reverseGeocode(coords.latitude, coords.longitude);
+      const parts  = [place.road, place.city || place.county, place.state].filter(Boolean);
+      setAddress(parts.join(', '));
+      setErrors((e) => ({ ...e, address: undefined }));
+    } catch (err) {
+      showAlert('Location Error', (err as Error).message || 'Could not detect your location.');
+    } finally {
+      setLocating(false);
+    }
+  };
 
   const validate = (): boolean => {
     const newErrors: FormErrors = {};
@@ -220,6 +238,12 @@ export default function KennelOnboardingScreen({ navigation }: Props) {
             multiline
             helpText="Your address will be geocoded for map-based search"
           />
+          <TouchableOpacity style={styles.locateBtn} onPress={detectLocation} disabled={locating} activeOpacity={0.75}>
+            {locating
+              ? <ActivityIndicator size="small" color="#7C3AED" />
+              : <Ionicons name="navigate-outline" size={14} color="#7C3AED" />}
+            <Text style={styles.locateBtnText}>{locating ? 'Detecting...' : 'Use Current Location'}</Text>
+          </TouchableOpacity>
 
           <FormField
             label="Services Offered"
@@ -419,6 +443,18 @@ const fieldStyles = StyleSheet.create({
 // ============================================================================
 
 const styles = StyleSheet.create({
+  locateBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: '#F5F3FF',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  locateBtnText: { fontSize: 13, color: '#7C3AED', fontWeight: '600' },
   scroll: { flex: 1, backgroundColor: '#F3F4F6' },
   container: { paddingBottom: 40 },
 
