@@ -68,7 +68,28 @@ const PET_OWNER_PLANS = [
       { text: 'Unlimited search results',                included: true },
     ],
   },
+  {
+    id:       'user_plus',
+    name:     'Premium Plus',
+    price:    3500,
+    tagline:  'Everything in Premium, plus exclusive benefits',
+    color:    '#7C3AED',
+    bgColor:  '#F5F3FF',
+    badge:    'Best Value',
+    features: [
+      { text: 'All Premium features included',           included: true },
+      { text: 'Full contact details + GPS search',       included: true },
+      { text: 'WhatsApp & in-app messaging',             included: true },
+      { text: 'Verified Pet Parent badge on profile',    included: true },
+      { text: 'Priority customer support',               included: true },
+      { text: 'Early access to new platform features',   included: true },
+    ],
+  },
 ] as const;
+
+const USER_PLAN_TIER: Record<string, number> = {
+  free: 0, user_monthly: 1, user_premium: 1, user_plus: 2,
+};
 
 const PROFESSIONAL_PLANS = [
   {
@@ -252,7 +273,12 @@ export default function SubscriptionScreen({ navigation }: any) {
     setSelectedPlan(planId);
     try {
       const isProfessionalPlan = ['starter', 'pro', 'basic'].includes(planId);
-      const endpoint = isProfessionalPlan ? '/api/subscriptions/professional' : '/api/subscriptions/user';
+      const isUpgrade          = !isProfessionalPlan && currentSub?.isActive === true;
+      const endpoint = isProfessionalPlan
+        ? '/api/subscriptions/professional'
+        : isUpgrade
+        ? '/api/subscriptions/upgrade'
+        : '/api/subscriptions/user';
 
       const res = await apiFetch(endpoint, {
         method:  'POST',
@@ -381,7 +407,29 @@ export default function SubscriptionScreen({ navigation }: any) {
       ) : null}
 
       {/* ── Plan cards ──────────────────────────────────────────────────────── */}
-      {!currentSub?.isActive && !isPending && (
+      {currentSub?.isActive && userType === 'pet_owner' ? (
+        (() => {
+          const currentTier     = USER_PLAN_TIER[currentSub.plan] ?? 0;
+          const upgradeablePlans = PET_OWNER_PLANS.filter(
+            (p) => p.id !== 'free' && (USER_PLAN_TIER[p.id] ?? 0) > currentTier,
+          );
+          return upgradeablePlans.length > 0 ? (
+            <>
+              <Text style={styles.choosePlanLabel}>Upgrade your plan</Text>
+              {upgradeablePlans.map((plan) => (
+                <PlanCard
+                  key={plan.id}
+                  plan={plan}
+                  onSubscribe={subscribe}
+                  loading={subscribing && selectedPlan === plan.id}
+                  disabled={subscribing}
+                  isUpgrade
+                />
+              ))}
+            </>
+          ) : null;
+        })()
+      ) : !currentSub?.isActive && !isPending ? (
         <>
           <Text style={styles.choosePlanLabel}>Choose a plan</Text>
           {plans.map((plan) => (
@@ -394,7 +442,7 @@ export default function SubscriptionScreen({ navigation }: any) {
             />
           ))}
         </>
-      )}
+      ) : null}
 
       {/* ── Trust badges ────────────────────────────────────────────────────── */}
       <View style={styles.trustRow}>
@@ -409,6 +457,10 @@ export default function SubscriptionScreen({ navigation }: any) {
         <FaqItem
           q="When does my subscription start?"
           a="Immediately after payment confirmation. Card payments confirm instantly; bank transfers may take a few minutes."
+        />
+        <FaqItem
+          q="Can I upgrade without cancelling my current plan?"
+          a="Yes! Tap Upgrade and pay — your current plan stays fully active until the upgrade payment confirms. You then get 30 fresh days on the new plan. No cancellation needed."
         />
         <FaqItem
           q="How do I cancel?"
@@ -436,11 +488,13 @@ function PlanCard({
   onSubscribe,
   loading,
   disabled,
+  isUpgrade = false,
 }: {
   plan: typeof PET_OWNER_PLANS[number] | typeof PROFESSIONAL_PLANS[number];
   onSubscribe: (planId: string) => void;
-  loading:  boolean;
-  disabled: boolean;
+  loading:    boolean;
+  disabled:   boolean;
+  isUpgrade?: boolean;
 }) {
   const isFree = plan.id === 'free';
 
@@ -502,7 +556,9 @@ function PlanCard({
             <ActivityIndicator size="small" color="#fff" />
           ) : (
             <Text style={styles.subscribeBtnText}>
-              Subscribe — ₦{plan.price.toLocaleString()}/mo
+              {isUpgrade
+                ? `Upgrade — ₦${plan.price.toLocaleString()}/mo`
+                : `Subscribe — ₦${plan.price.toLocaleString()}/mo`}
             </Text>
           )}
         </Pressable>

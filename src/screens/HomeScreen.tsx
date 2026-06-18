@@ -609,6 +609,81 @@ function GuestHome({ navigation, stats }: { navigation: any; stats: any }) {
 // Pet owner home
 // ─────────────────────────────────────────────────────────────────────────────
 
+interface HomeSub {
+  plan: string;
+  isActive: boolean;
+  daysRemaining: number;
+}
+
+function SubStatusBanner({
+  subscription,
+  onPress,
+}: {
+  subscription: HomeSub | null;
+  onPress: () => void;
+}) {
+  const isPlus    = subscription?.isActive && subscription.plan === 'user_plus';
+  const isPremium = subscription?.isActive &&
+    (subscription.plan === 'user_premium' || subscription.plan === 'user_monthly');
+
+  if (isPlus) {
+    return (
+      <View style={styles.subActivePlusBanner}>
+        <View style={styles.subBannerRow}>
+          <Text style={styles.subBannerIcon}>💎</Text>
+          <View style={styles.subBannerBody}>
+            <Text style={styles.subPlusBannerTitle}>Premium Plus Active</Text>
+            <Text style={styles.subBannerSub}>
+              Full access to all professionals and exclusive Premium Plus benefits
+            </Text>
+          </View>
+          <View style={styles.subActivePill}>
+            <Text style={styles.subActivePillText}>✓ Active</Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  if (isPremium) {
+    return (
+      <TouchableOpacity style={styles.subUpgradeBanner} onPress={onPress} activeOpacity={0.88}>
+        <View style={styles.subBannerRow}>
+          <Text style={styles.subBannerIcon}>⭐</Text>
+          <View style={styles.subBannerBody}>
+            <Text style={styles.subPremiumBannerTitle}>Premium Active</Text>
+            <Text style={styles.subBannerSub}>Tap to upgrade to Premium Plus</Text>
+          </View>
+          <View style={styles.subActivePill}>
+            <Text style={styles.subActivePillText}>✓ Active</Text>
+          </View>
+        </View>
+        <View style={styles.subUpgradeFeatures}>
+          <Text style={styles.subUpgradeFeat}>💎 Verified Pet Parent badge</Text>
+          <Text style={styles.subUpgradeFeat}>🎯 Priority customer support</Text>
+          <Text style={styles.subUpgradeFeat}>🚀 Early access to new features</Text>
+        </View>
+        <View style={styles.subUpgradeCta}>
+          <Text style={styles.subUpgradeCtaText}>Upgrade to Premium Plus — ₦3,500/mo →</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <TouchableOpacity style={styles.upsellBanner} onPress={onPress} activeOpacity={0.88}>
+      <Text style={styles.upsellEmoji}>⭐</Text>
+      <View style={styles.upsellText}>
+        <Text style={styles.upsellTitle}>Unlock Premium — from ₦1,500/mo</Text>
+        <Text style={styles.upsellSub}>
+          Call, WhatsApp or message any vet, shop, kennel or farm directly
+        </Text>
+      </View>
+      <Text style={styles.upsellArrow}>›</Text>
+    </TouchableOpacity>
+  );
+}
+
 function PetOwnerHome({
   navigation,
   dashboardCfg,
@@ -621,10 +696,14 @@ function PetOwnerHome({
   stats: any;
 }) {
   const [recentlyViewed, setRecentlyViewed] = useState<RecentItem[]>([]);
+  const [homeSub, setHomeSub]               = useState<HomeSub | null>(null);
 
   useFocusEffect(
     React.useCallback(() => {
       getRecentlyViewed().then(setRecentlyViewed).catch(() => {});
+      apiFetch('/api/subscriptions/me')
+        .then(r => { if (r.ok && r.body?.data) setHomeSub(r.body.data as HomeSub); })
+        .catch(() => {});
     }, []),
   );
 
@@ -764,20 +843,10 @@ function PetOwnerHome({
         </View>
       )}
 
-      <TouchableOpacity
-        style={styles.upsellBanner}
+      <SubStatusBanner
+        subscription={homeSub}
         onPress={() => navigation.navigate('Subscription')}
-        activeOpacity={0.88}
-      >
-        <Text style={styles.upsellEmoji}>⭐</Text>
-        <View style={styles.upsellText}>
-          <Text style={styles.upsellTitle}>Unlock Premium — from ₦1,500/mo</Text>
-          <Text style={styles.upsellSub}>
-            Call, WhatsApp or message any vet, shop, kennel or farm directly
-          </Text>
-        </View>
-        <Text style={styles.upsellArrow}>›</Text>
-      </TouchableOpacity>
+      />
 
       {/* Referral nudge */}
       <TouchableOpacity
@@ -1054,6 +1123,33 @@ const styles = StyleSheet.create({
   upsellTitle: { fontSize: 16, fontWeight: '700', color: '#fff', marginBottom: 3 },
   upsellSub:   { fontSize: 12, color: '#BFDBFE', lineHeight: 17 },
   upsellArrow: { fontSize: 28, color: '#fff', fontWeight: '300' },
+
+  // Subscription-aware banners
+  subActivePlusBanner: {
+    borderRadius: 16, marginHorizontal: 20, marginTop: 20, padding: 16,
+    backgroundColor: '#F5F3FF', borderWidth: 1.5, borderColor: '#C4B5FD',
+  },
+  subUpgradeBanner: {
+    borderRadius: 16, marginHorizontal: 20, marginTop: 20, padding: 16,
+    backgroundColor: '#ECFDF5', borderWidth: 1.5, borderColor: '#6EE7B7',
+  },
+  subBannerRow:  { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  subBannerIcon: { fontSize: 28 },
+  subBannerBody: { flex: 1 },
+  subPlusBannerTitle:    { fontSize: 15, fontWeight: '700', color: '#4C1D95', marginBottom: 2 },
+  subPremiumBannerTitle: { fontSize: 15, fontWeight: '700', color: '#065F46', marginBottom: 2 },
+  subBannerSub: { fontSize: 12, color: '#6B7280', lineHeight: 16 },
+  subActivePill: {
+    backgroundColor: '#10B981', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
+  },
+  subActivePillText: { fontSize: 10, fontWeight: '800', color: '#fff' },
+  subUpgradeFeatures: { marginTop: 12, gap: 4 },
+  subUpgradeFeat:     { fontSize: 12, color: '#047857' },
+  subUpgradeCta: {
+    marginTop: 12, backgroundColor: '#1A56DB', borderRadius: 10,
+    paddingVertical: 10, alignItems: 'center',
+  },
+  subUpgradeCtaText: { fontSize: 13, fontWeight: '700', color: '#fff' },
 
   // Register banner
   registerBanner: {
