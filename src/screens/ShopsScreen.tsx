@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -81,6 +81,14 @@ export default function ShopsScreen({ navigation }: Props) {
       .then((r) => { if (r.body?.show) setShowUpsell(true); })
       .catch(() => {});
   };
+
+  // ── Auto-detect GPS on mount ─────────────────────────────────────────────
+  useEffect(() => {
+    getUserLocation()
+      .then((loc) => setCoords({ lat: loc.latitude.toString(), lng: loc.longitude.toString() }))
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── On every focus: check subscription then load shops ──────────────────
   useFocusEffect(

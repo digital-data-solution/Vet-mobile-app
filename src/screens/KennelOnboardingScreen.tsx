@@ -94,16 +94,28 @@ export default function KennelOnboardingScreen({ navigation }: Props) {
       newErrors.businessName = 'Kennel name is required';
     }
 
-    if (!address.trim()) {
+    const addrTrimmed = address.trim();
+    const BAD_ADDRESS = /^(mobile|ambulatory|home service|online|n\/a|nil|none|everywhere|anywhere|i come to you|delivery)/i;
+    if (!addrTrimmed) {
       newErrors.address = 'Address is required';
+    } else if (addrTrimmed.length < 10) {
+      newErrors.address = 'Please enter a more complete address';
+    } else if (!addrTrimmed.includes(',')) {
+      newErrors.address = 'Include street, area and city (e.g. 45 Admiralty Way, Lekki, Lagos)';
+    } else if (BAD_ADDRESS.test(addrTrimmed)) {
+      newErrors.address = 'Please enter a real physical address';
     }
 
-    // Optional but validate format if provided
-    if (phone && !/^[\d\s\+\-\(\)]+$/.test(phone)) {
-      newErrors.phone = 'Please enter a valid phone number';
+    const phoneTrimmed = phone.trim().replace(/\s+/g, '');
+    if (!phoneTrimmed) {
+      newErrors.phone = 'Phone number is required';
+    } else if (!/^(0[7-9]\d{9}|234[7-9]\d{9}|\+234[7-9]\d{9}|[7-9]\d{9})$/.test(phoneTrimmed)) {
+      newErrors.phone = 'Enter a valid Nigerian phone number (e.g. 08012345678)';
     }
 
-    if (email && !/^\S+@\S+\.\S+$/.test(email)) {
+    if (!email.trim()) {
+      newErrors.email = 'Email address is required';
+    } else if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
       newErrors.email = 'Please enter a valid email address';
     }
 
@@ -227,7 +239,7 @@ export default function KennelOnboardingScreen({ navigation }: Props) {
           />
 
           <FormField
-            label="Full Address *"
+            label="Business Address *"
             value={address}
             onChangeText={(v) => {
               setAddress(v);
@@ -236,7 +248,7 @@ export default function KennelOnboardingScreen({ navigation }: Props) {
             placeholder="e.g. 45 Admiralty Way, Lekki Phase 1, Lagos"
             error={errors.address}
             multiline
-            helpText="Your address will be geocoded for map-based search"
+            helpText="Include street, area and city separated by commas"
           />
           <TouchableOpacity style={styles.locateBtn} onPress={detectLocation} disabled={locating} activeOpacity={0.75}>
             {locating
@@ -254,19 +266,19 @@ export default function KennelOnboardingScreen({ navigation }: Props) {
           />
 
           <FormField
-            label="Contact Phone"
+            label="Contact Phone *"
             value={phone}
             onChangeText={(v) => {
               setPhone(v);
               setErrors((e) => ({ ...e, phone: undefined }));
             }}
-            placeholder="e.g. +234 801 234 5678"
+            placeholder="e.g. 08012345678"
             error={errors.phone}
             keyboardType="phone-pad"
           />
 
           <FormField
-            label="Contact Email"
+            label="Contact Email *"
             value={email}
             onChangeText={(v) => {
               setEmail(v);

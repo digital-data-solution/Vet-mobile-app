@@ -98,6 +98,13 @@ export default function KennelsScreen({ navigation }: any) {
     fetchKennels();
   }, []);
 
+  useEffect(() => {
+    getUserLocation()
+      .then((loc) => setCoords({ lat: loc.latitude.toString(), lng: loc.longitude.toString() }))
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const fetchKennels = async () => {
     setLoading(true);
     try {

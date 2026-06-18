@@ -199,6 +199,15 @@ export default function ProfessionalsScreen({ navigation }: Props) {
     }, []),
   );
 
+  // ─── Auto-detect GPS on mount ────────────────────────────────────────────────
+
+  useEffect(() => {
+    getUserLocation()
+      .then((loc) => setCoords({ lat: loc.latitude.toString(), lng: loc.longitude.toString() }))
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ─── Initial fetch + role filter change ─────────────────────────────────────
 
   useEffect(() => {
@@ -211,7 +220,7 @@ export default function ProfessionalsScreen({ navigation }: Props) {
   const fetchAllProfessionals = async (term?: string) => {
     setLoading(true);
     const q = term !== undefined ? term : searchTerm;
-    if (q.trim().length >= 2) {
+    if (q.trim().length >= 4) {
       addSearchTerm(q).then(() => getSearchHistory().then(setSearchHistory)).catch(() => {});
     }
     try {

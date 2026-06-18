@@ -102,6 +102,15 @@ export default function ServiceScreen({ navigation }: any) {
   const [sortBy, setSortBy]             = useState<'default' | 'rating' | 'distance'>('default');
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── Auto-detect GPS on mount ─────────────────────────────────────────────
+
+  useEffect(() => {
+    getUserLocation()
+      .then((loc) => setCoords({ lat: loc.latitude.toString(), lng: loc.longitude.toString() }))
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Subscription check ────────────────────────────────────────────────────
 
   useFocusEffect(

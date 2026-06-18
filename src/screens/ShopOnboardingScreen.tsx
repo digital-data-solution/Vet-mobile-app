@@ -151,14 +151,34 @@ export default function ShopOnboardingScreen({ navigation }: Props) {
   // ── Validation ────────────────────────────────────────────────────────────
   const validate = (): boolean => {
     const newErrors: FormErrors = {};
+
     if (!shopName.trim()) newErrors.shopName = 'Shop name is required';
-    if (!address.trim())  newErrors.address  = 'Address is required';
-    if (phone && !/^[\d\s\+\-\(\)]+$/.test(phone)) {
-      newErrors.phone = 'Please enter a valid phone number';
+
+    const addrTrimmed = address.trim();
+    const BAD_ADDRESS = /^(mobile|ambulatory|home service|online|n\/a|nil|none|everywhere|anywhere|i come to you|delivery)/i;
+    if (!addrTrimmed) {
+      newErrors.address = 'Address is required';
+    } else if (addrTrimmed.length < 10) {
+      newErrors.address = 'Please enter a more complete address';
+    } else if (!addrTrimmed.includes(',')) {
+      newErrors.address = 'Include street, area and city (e.g. 12 Allen Ave, Ikeja, Lagos)';
+    } else if (BAD_ADDRESS.test(addrTrimmed)) {
+      newErrors.address = 'Please enter a real physical address';
     }
-    if (email && !/^\S+@\S+\.\S+$/.test(email)) {
+
+    const phoneTrimmed = phone.trim().replace(/\s+/g, '');
+    if (!phoneTrimmed) {
+      newErrors.phone = 'Phone number is required';
+    } else if (!/^(0[7-9]\d{9}|234[7-9]\d{9}|\+234[7-9]\d{9}|[7-9]\d{9})$/.test(phoneTrimmed)) {
+      newErrors.phone = 'Enter a valid Nigerian phone number (e.g. 08012345678)';
+    }
+
+    if (!email.trim()) {
+      newErrors.email = 'Email address is required';
+    } else if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
       newErrors.email = 'Please enter a valid email address';
     }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
