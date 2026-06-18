@@ -15,20 +15,11 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 
 import { useAuth } from '../navigation';
 import type { RootStackParamList } from '../navigation';
-import { supabase, listenMessages, unsubscribeFromChannel } from '../api/supabase';
+import { listenMessages, unsubscribeFromChannel } from '../api/supabase';
 import { apiFetch } from '../api/client';
 import SubscriptionPrompt from '../components/SubscriptionPrompt';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
-
-interface Message {
-  id: string;
-  from_user_id: string;
-  to_user_id: string;
-  message_text: string;
-  created_at: string;
-  read_status: boolean;
-}
 
 interface Conversation {
   otherUserId: string;
@@ -79,46 +70,9 @@ export default function ConversationsScreen() {
   const fetchConversations = useCallback(async () => {
     if (!currentUserId) return;
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .or(`from_user_id.eq.${currentUserId},to_user_id.eq.${currentUserId}`)
-        .order('created_at', { ascending: false });
-
-      if (error || !data) return;
-
-      // Group by conversation partner, keeping only the most recent message
-      const seen = new Map<string, Message>();
-      for (const msg of data as Message[]) {
-        const otherId =
-          msg.from_user_id === currentUserId ? msg.to_user_id : msg.from_user_id;
-        if (!seen.has(otherId)) seen.set(otherId, msg);
-      }
-
-      // Fetch name + avatar for each unique partner
-      const convos = await Promise.all(
-        Array.from(seen.entries()).map(async ([otherId, msg]) => {
-          let name: string = 'Unknown User';
-          let avatar: string | null = null;
-          try {
-            const res = await apiFetch(`/api/auth/public-profile/${otherId}`);
-            if (res.ok && res.body?.data) {
-              name   = res.body.data.name         ?? name;
-              avatar = res.body.data.profileImage ?? null;
-            }
-          } catch {}
-
-          return {
-            otherUserId:     otherId,
-            otherUserName:   name,
-            otherUserAvatar: avatar,
-            lastMessage:     msg.message_text,
-            lastMessageAt:   msg.created_at,
-            hasUnread:       msg.to_user_id === currentUserId && !msg.read_status,
-          } satisfies Conversation;
-        })
-      );
-
+      const res = await apiFetch('/api/messages/conversations');
+      if (!res.ok || !res.body?.data) return;
+      const convos: Conversation[] = res.body.data;
       setConversations(convos);
       setUnreadCount(convos.filter((c) => c.hasUnread).length);
     } finally {
@@ -126,7 +80,15 @@ export default function ConversationsScreen() {
     }
   }, [currentUserId, setUnreadCount]);
 
-  // Fetch on tab focus; clear badge when user opens the tab
+  // Trigger first load once subscription check settles — useFocusEffect alone misses this
+  // because the screen is already focused while the async check is still in flight.
+  useEffect(() => {
+    if (!subscriptionChecked || !isSubscribed || !currentUserId) return;
+    setLoading(true);
+    fetchConversations();
+  }, [subscriptionChecked, isSubscribed, currentUserId, fetchConversations]);
+
+  // Refresh on every subsequent tab focus; also clears the badge
   useFocusEffect(
     useCallback(() => {
       setUnreadCount(0);
