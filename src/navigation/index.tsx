@@ -21,8 +21,10 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import * as Notifications from 'expo-notifications';
 import { supabase } from '../api/supabase';
 import { useOnlineStatus } from '../utils/useOnlineStatus';
+import { registerForPushNotificationsAsync } from '../utils/notifications';
 
 import HomeScreen                   from '../screens/HomeScreen';
 import AuthScreen                   from '../screens/AuthScreen';
@@ -511,6 +513,27 @@ export default function AppNavigator() {
       if (!isPublic) window.history.replaceState({}, '', '/');
     }
   }, [isAuthenticated, loading]);
+
+  // Register for push notifications once logged in; clean up listeners on logout
+  useEffect(() => {
+    if (!isAuthenticated || loading || !session) return;
+
+    registerForPushNotificationsAsync(session.access_token).catch(() => {});
+
+    const foregroundSub = Notifications.addNotificationReceivedListener((notification) => {
+      console.log('[Push] Foreground notification:', notification.request.content);
+    });
+
+    const tapSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data as Record<string, unknown>;
+      console.log('[Push] Notification tapped:', data);
+    });
+
+    return () => {
+      foregroundSub.remove();
+      tapSub.remove();
+    };
+  }, [isAuthenticated, loading, session]);
 
   const signOut = useCallback(async () => {
     if (typeof window !== 'undefined' && window.history) {

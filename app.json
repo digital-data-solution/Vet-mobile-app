@@ -8,7 +8,11 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "platforms": ["ios", "android", "web"],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -18,7 +22,10 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.xpressvet.marketplace",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "We need your location to find nearby vets and pet services."
+        "NSLocationWhenInUseUsageDescription": "We need your location to find nearby vets and pet services.",
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       }
     },
     "android": {
@@ -29,14 +36,36 @@
       "package": "com.xpressvet.marketplace",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "permissions": ["ACCESS_FINE_LOCATION"]
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ],
+      "googleServicesFile": "./google-services.json"
     },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#E8610A",
+          "defaultChannel": "default",
+          "sounds": []
+        }
+      ]
+    ],
     "web": {
       "bundler": "metro",
       "output": "single",
       "title": "Xpress Vet — Nigeria's Pet Care Marketplace",
       "description": "Find trusted vets, kennels, and pet shops near you across Nigeria.",
       "favicon": "./assets/icon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "434617fd-5767-4eee-8920-e739e9894092"
+      }
+    },
+    "owner": "xpressvetmarketplace"
   }
 }
