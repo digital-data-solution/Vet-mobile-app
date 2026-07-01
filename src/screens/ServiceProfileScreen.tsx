@@ -168,15 +168,15 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
   };
 
   const handleMessage = () => {
-    const targetId = prof.userId?._id || prof.userId?.supabaseId;
-    if (!targetId) {
+    const supabaseId = prof.userId?.supabaseId;
+    if (!supabaseId) {
       showAlert('Unavailable', 'This service provider has not enabled in-app messaging yet.');
       return;
     }
     try {
-      navigation.getParent()?.navigate('Chat', { otherUserId: targetId, otherUserName: displayName });
+      navigation.getParent()?.navigate('Chat', { otherUserId: supabaseId, otherUserName: displayName });
     } catch {
-      navigation.navigate('Chat', { otherUserId: targetId, otherUserName: displayName });
+      navigation.navigate('Chat', { otherUserId: supabaseId, otherUserName: displayName });
     }
   };
 
