@@ -247,11 +247,13 @@ export default function WriteReviewModal({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <TouchableOpacity
-        style={s.overlay}
-        onPress={onClose}
-        activeOpacity={1}
-      >
+      <View style={s.overlay}>
+        {/* Backdrop — tapping outside the sheet closes the modal */}
+        <TouchableOpacity
+          style={StyleSheet.absoluteFillObject}
+          onPress={onClose}
+          activeOpacity={1}
+        />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={s.kvView}
@@ -278,7 +280,7 @@ export default function WriteReviewModal({
             {renderBody()}
           </View>
         </KeyboardAvoidingView>
-      </TouchableOpacity>
+      </View>
     </Modal>
   );
 }
@@ -289,9 +291,8 @@ const s = StyleSheet.create({
   overlay: {
     flex:            1,
     backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent:  'flex-end',
   },
-  kvView: { width: '100%' },
+  kvView: { flex: 1, justifyContent: 'flex-end' },
 
   sheet: {
     backgroundColor:   '#fff',
