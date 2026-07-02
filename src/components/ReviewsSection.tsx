@@ -165,8 +165,9 @@ function RespondModal({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={s.modalOverlay} onPress={onClose} activeOpacity={1}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ width: '100%' }}>
+      <View style={s.modalOverlay}>
+        <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={onClose} activeOpacity={1} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'flex-end' }}>
           <View style={s.modalSheet} onStartShouldSetResponder={() => true}>
             <View style={s.modalHandle} />
 
@@ -213,7 +214,7 @@ function RespondModal({
             </View>
           </View>
         </KeyboardAvoidingView>
-      </TouchableOpacity>
+      </View>
     </Modal>
   );
 }
@@ -231,6 +232,7 @@ export default function ReviewsSection({
 }: Props) {
   const [reviews,       setReviews]       = useState<Review[]>([]);
   const [total,         setTotal]         = useState(reviewCount);
+  const [liveAvg,       setLiveAvg]       = useState<number>(avgRating ?? 0);
   const [page,          setPage]          = useState(1);
   const [loading,       setLoading]       = useState(true);
   const [loadingMore,   setLoadingMore]   = useState(false);
@@ -270,6 +272,12 @@ export default function ReviewsSection({
         setTotal(serverTotal);
         setReviews(prev => append ? [...prev, ...incoming] : incoming);
         setHasMore(pageNum * PAGE_SIZE < serverTotal);
+        if (!append && incoming.length > 0) {
+          const sum = incoming.reduce((s, r) => s + r.rating, 0);
+          setLiveAvg(Math.round((sum / incoming.length) * 10) / 10);
+        } else if (!append && incoming.length === 0) {
+          setLiveAvg(0);
+        }
       }
     } catch {
       // non-critical
@@ -323,9 +331,9 @@ export default function ReviewsSection({
         <Text style={s.sectionTitle}>Reviews</Text>
         {total > 0 ? (
           <View style={s.summaryRight}>
-            <Stars rating={avgRating} size={14} />
+            <Stars rating={liveAvg} size={14} />
             <Text style={s.summaryText}>
-              {avgRating.toFixed(1)} ({total} review{total !== 1 ? 's' : ''})
+              {liveAvg.toFixed(1)} ({total} review{total !== 1 ? 's' : ''})
             </Text>
           </View>
         ) : null}
@@ -444,7 +452,7 @@ const s = StyleSheet.create({
 
   // ── Respond modal ─────────────────────────────────────────────────────────
   modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end',
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.45)',
   },
   modalSheet: {
     backgroundColor: '#fff',
