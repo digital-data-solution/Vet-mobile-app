@@ -49,6 +49,10 @@ import AddressInputScreen           from '../screens/AddressInputScreen';
 import PaystackWebView              from '../screens/PaystackWebView';
 import BoostListingScreen           from '../screens/BoostListingScreen';
 import WalletScreen                 from '../screens/WalletScreen';
+import PracticeRecordsScreen        from '../screens/PracticeRecordsScreen';
+import PracticeUpgradeScreen        from '../screens/PracticeUpgradeScreen';
+import ClientDetailScreen           from '../screens/ClientDetailScreen';
+import PatientDetailScreen          from '../screens/PatientDetailScreen';
 import EmailVerifiedScreen          from '../screens/EmailVerifiedScreen';
 import ConversationsScreen          from '../screens/ConversationsScreen';
 import ChatScreen                   from '../screens/ChatScreen';
@@ -115,6 +119,10 @@ export type RootStackParamList = {
   SubscriptionScreen:     undefined;
   BoostListing:           undefined;
   Wallet:                 undefined;
+  PracticeRecords:        undefined;
+  PracticeUpgrade:        undefined;
+  ClientDetail:           { clientId: string; client?: any };
+  PatientDetail:          { patientId: string };
   ProfessionalOnboarding: { role?: string } | undefined;
   KennelOnboarding:       undefined;
   ShopOnboarding:         undefined;
@@ -640,6 +648,26 @@ export default function AppNavigator() {
                   name="Wallet"
                   component={WalletScreen}
                   options={{ headerShown: true, title: 'My Wallet' }}
+                />
+                <RootStack.Screen
+                  name="PracticeRecords"
+                  component={PracticeRecordsScreen}
+                  options={{ headerShown: true, title: 'Practice Records' }}
+                />
+                <RootStack.Screen
+                  name="PracticeUpgrade"
+                  component={PracticeUpgradeScreen}
+                  options={{ headerShown: true, title: 'Practice Records' }}
+                />
+                <RootStack.Screen
+                  name="ClientDetail"
+                  component={ClientDetailScreen}
+                  options={{ headerShown: true, title: 'Client' }}
+                />
+                <RootStack.Screen
+                  name="PatientDetail"
+                  component={PatientDetailScreen}
+                  options={{ headerShown: true, title: 'Patient' }}
                 />
                 <RootStack.Screen
                   name="ProfessionalOnboarding"

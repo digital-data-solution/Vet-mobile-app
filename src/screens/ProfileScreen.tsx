@@ -81,6 +81,19 @@ function goToBoost(navigation: any) {
   }
 }
 
+function goToPracticeRecords(navigation: any) {
+  try {
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.navigate('PracticeRecords');
+    } else {
+      navigation.navigate('PracticeRecords');
+    }
+  } catch {
+    navigation.navigate('PracticeRecords');
+  }
+}
+
 function goToWallet(navigation: any) {
   try {
     const parent = navigation.getParent();
@@ -564,6 +577,19 @@ export default function ProfileScreen({ navigation }: Props) {
             </Text>
           </View>
           <Text style={styles.walletArrow}>›</Text>
+        </Pressable>
+      )}
+
+      {/* ── Practice Records CTA (vets only) ───────────────────────────── */}
+      {isVet && (
+        <Pressable style={styles.practiceCard} onPress={() => goToPracticeRecords(navigation)}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.practiceTitle}>🩺 Practice Records</Text>
+            <Text style={styles.practiceText}>
+              Clients, patients, treatment history and vaccination reminders — your practice, in the app.
+            </Text>
+          </View>
+          <Text style={styles.practiceArrow}>›</Text>
         </Pressable>
       )}
 
@@ -1231,6 +1257,21 @@ const styles = StyleSheet.create({
   walletTitle: { fontSize: 16, fontWeight: '800', color: '#1E40AF', marginBottom: 4 },
   walletText:  { fontSize: 13, color: '#2563EB', lineHeight: 18 },
   walletArrow: { fontSize: 28, color: '#2563EB', fontWeight: '900', marginLeft: 8 },
+
+  practiceCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDFA',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#99F6E4',
+  },
+  practiceTitle: { fontSize: 16, fontWeight: '800', color: '#0F766E', marginBottom: 4 },
+  practiceText:  { fontSize: 13, color: '#0D9488', lineHeight: 18 },
+  practiceArrow: { fontSize: 28, color: '#0D9488', fontWeight: '900', marginLeft: 8 },
 
   statsCard: {
     backgroundColor: '#fff',
