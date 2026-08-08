@@ -11,6 +11,7 @@ import {
   Modal,
   Share,
   Platform,
+  TextInput,
 } from 'react-native';
 import { showAlert } from '../utils/alert';
 import { useFocusEffect } from '@react-navigation/native';
@@ -84,6 +85,11 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
   const [reviewRefreshKey, setReviewRefreshKey] = useState(0);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [isFav, setIsFav] = useState(false);
+
+  const [payOpen, setPayOpen]   = useState(false);
+  const [payAmount, setPayAmount] = useState('');
+  const [payDesc, setPayDesc]   = useState('');
+  const [paying, setPaying]     = useState(false);
 
   const fetchProf = useCallback(async () => {
     if (!professionalId) {
@@ -181,6 +187,30 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
   };
 
   const handleLockedContact = () => setShowSubModal(true);
+
+  const submitPay = async () => {
+    const providerId = prof.userId?._id;
+    const amount = parseInt(payAmount, 10);
+    if (!providerId) { showAlert('Unavailable', 'This provider cannot receive wallet payments yet.'); return; }
+    if (!amount || amount <= 0) { showAlert('Invalid amount', 'Enter a valid amount.'); return; }
+    setPaying(true);
+    try {
+      const res = await apiFetch('/api/v1/wallet/pay', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ providerId, amount, description: payDesc }),
+      });
+      if (res.ok && res.body?.success) {
+        setPayOpen(false); setPayAmount(''); setPayDesc('');
+        showAlert('Payment Held in Escrow', 'Your payment is safely held. Release it from your Wallet once the service is done.');
+      } else {
+        showAlert('Error', res.body?.message || 'Payment failed. Make sure your wallet is funded.');
+      }
+    } catch {
+      showAlert('Error', 'Please check your connection and try again.');
+    } finally {
+      setPaying(false);
+    }
+  };
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -351,6 +381,33 @@ export default function ServiceProfileScreen({ route, navigation }: any) {
           );
         })}
       </View>
+
+      {/* ── Pay securely with wallet escrow ─────────────────────────────────── */}
+      {prof.userId?._id ? (
+        <TouchableOpacity style={styles.payBtn} onPress={() => setPayOpen(true)} activeOpacity={0.85}>
+          <Ionicons name="shield-checkmark-outline" size={18} color="#fff" />
+          <Text style={styles.payBtnText}>Pay with Wallet (Escrow)</Text>
+        </TouchableOpacity>
+      ) : null}
+
+      <Modal visible={payOpen} transparent animationType="slide" onRequestClose={() => setPayOpen(false)}>
+        <View style={styles.payOverlay}>
+          <View style={styles.payCard}>
+            <Text style={styles.payTitle}>Pay {displayName}</Text>
+            <Text style={styles.paySub}>Funds are held safely in escrow and only released to the provider when you confirm the service is done.</Text>
+            <TextInput style={styles.payInput} keyboardType="numeric" placeholder="Amount (₦)" value={payAmount} onChangeText={setPayAmount} />
+            <TextInput style={styles.payInput} placeholder="What is this for? (optional)" value={payDesc} onChangeText={setPayDesc} />
+            <View style={styles.payActions}>
+              <TouchableOpacity style={styles.payCancel} onPress={() => setPayOpen(false)}>
+                <Text style={styles.payCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.payConfirm, { backgroundColor: meta.color }]} disabled={paying} onPress={submitPay}>
+                {paying ? <ActivityIndicator color="#fff" /> : <Text style={styles.payConfirmText}>Pay to Escrow</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Social media */}
       {(prof.socialMedia?.instagram || prof.socialMedia?.facebook || prof.socialMedia?.twitter || prof.socialMedia?.website) ? (
@@ -640,4 +697,17 @@ const styles = StyleSheet.create({
   modalBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   modalCancel: { alignItems: 'center', paddingVertical: 8 },
   modalCancelText: { fontSize: 14, color: '#6B7280' },
+
+  payBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#16A34A', marginHorizontal: 16, marginTop: 4, marginBottom: 14, paddingVertical: 14, borderRadius: 12 },
+  payBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  payOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  payCard: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 },
+  payTitle: { fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 6 },
+  paySub: { fontSize: 13, color: '#6B7280', lineHeight: 19, marginBottom: 14 },
+  payInput: { borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 10, padding: 12, fontSize: 15, marginBottom: 12 },
+  payActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  payCancel: { flex: 1, paddingVertical: 13, borderRadius: 10, alignItems: 'center', backgroundColor: '#F3F4F6' },
+  payCancelText: { color: '#374151', fontWeight: '700' },
+  payConfirm: { flex: 1, paddingVertical: 13, borderRadius: 10, alignItems: 'center', backgroundColor: '#16A34A' },
+  payConfirmText: { color: '#fff', fontWeight: '800' },
 });

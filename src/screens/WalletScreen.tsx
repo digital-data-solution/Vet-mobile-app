@@ -60,6 +60,14 @@ const TYPE_LABEL: Record<string, string> = {
   refund: 'Refund',
 };
 
+const STATUS_LABEL: Record<string, string> = {
+  funded: 'Awaiting release',
+  released: 'Released',
+  refunded: 'Refunded',
+  disputed: 'Under review',
+  cancelled: 'Cancelled',
+};
+
 export default function WalletScreen({ navigation }: Props) {
   const [loading, setLoading]   = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -81,8 +89,16 @@ export default function WalletScreen({ navigation }: Props) {
   const [banks, setBanks]       = useState<Bank[]>([]);
   const [bankPickerOpen, setBankPickerOpen] = useState(false);
   const [bankSearch, setBankSearch] = useState('');
+  const [resolvedName, setResolvedName] = useState<string | null>(null);
+  const [resolving, setResolving]       = useState(false);
+  const [resolveError, setResolveError] = useState<string | null>(null);
 
   const [actioningId, setActioningId] = useState<string | null>(null);
+
+  const [disputeOpen, setDisputeOpen]         = useState(false);
+  const [disputeBookingId, setDisputeBookingId] = useState<string | null>(null);
+  const [disputeReason, setDisputeReason]     = useState('');
+  const [disputing, setDisputing]             = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -149,19 +165,59 @@ export default function WalletScreen({ navigation }: Props) {
     }
   };
 
+  // Verify the account name before money can move — catches a typo'd account
+  // number before it silently sends funds to a stranger.
+  const resolveAccountNow = useCallback(async (bank: Bank | null, account: string) => {
+    setResolvedName(null);
+    setResolveError(null);
+    if (!bank || account.length !== 10) return;
+    setResolving(true);
+    try {
+      const res = await apiFetch(`/api/v1/wallet/resolve-account?bankCode=${bank.code}&accountNumber=${account}`, { method: 'GET' });
+      if (res.ok && res.body?.success) {
+        setResolvedName(res.body.data.accountName);
+      } else {
+        setResolveError(res.body?.message || 'Could not verify this account.');
+      }
+    } catch {
+      setResolveError('Could not verify this account. Check your connection.');
+    } finally {
+      setResolving(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!wdOpen) return;
+    resolveAccountNow(wdBank, wdAccount);
+  }, [wdBank, wdAccount, wdOpen, resolveAccountNow]);
+
   const submitWithdraw = async () => {
     const amount = parseInt(wdAmount, 10);
     if (!amount || amount < 500) { showAlert('Invalid amount', 'Minimum withdrawal is ₦500.'); return; }
     if (!wdBank) { showAlert('Select a bank', 'Please choose your bank.'); return; }
     if (!wdAccount || wdAccount.length < 10) { showAlert('Account number', 'Enter a valid 10-digit account number.'); return; }
+    if (!resolvedName) { showAlert('Verify account', resolveError || 'We could not confirm this account holder. Double-check the details.'); return; }
+
+    showAlert(
+      'Confirm Withdrawal',
+      `Send ₦${amount.toLocaleString()} to ${resolvedName} (${wdBank.name})? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Send', style: 'destructive', onPress: () => doSubmitWithdraw(amount) },
+      ],
+    );
+  };
+
+  const doSubmitWithdraw = async (amount: number) => {
+    if (!wdBank) return;
     setWithdrawing(true);
     try {
       const res = await apiFetch('/api/v1/wallet/withdraw', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount, bankCode: wdBank.code, accountNumber: wdAccount }),
+        body: JSON.stringify({ amount, bankCode: wdBank.code, accountNumber: wdAccount, accountName: resolvedName }),
       });
       if (res.ok && res.body?.success) {
-        setWdOpen(false); setWdAmount(''); setWdAccount(''); setWdBank(null);
+        setWdOpen(false); setWdAmount(''); setWdAccount(''); setWdBank(null); setResolvedName(null);
         await load();
         showAlert('Withdrawal started', res.body.message || 'Funds are on the way.');
       } else {
@@ -189,6 +245,63 @@ export default function WalletScreen({ navigation }: Props) {
       showAlert('Error', 'Please check your connection and try again.');
     } finally {
       setActioningId(null);
+    }
+  };
+
+  // Both actions move real money and can't be undone — confirm first so a
+  // mis-tap can't send/return funds by accident.
+  const confirmRelease = (b: Booking) => {
+    showAlert(
+      'Release Payment?',
+      `${b.provider?.name || 'The provider'} will receive ${naira(b.providerAmount)} (${naira(b.commissionAmount)} platform fee). This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Release', style: 'destructive', onPress: () => act(b._id, 'release') },
+      ],
+    );
+  };
+
+  const confirmRefund = (b: Booking) => {
+    showAlert(
+      'Refund Payment?',
+      `${b.buyer?.name || 'The buyer'} will get their ${naira(b.amount)} back in full. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Refund', style: 'destructive', onPress: () => act(b._id, 'refund') },
+      ],
+    );
+  };
+
+  // ── Dispute (buyer reports a problem instead of releasing) ──────────────────
+  const openDispute = (bookingId: string) => {
+    setDisputeBookingId(bookingId);
+    setDisputeReason('');
+    setDisputeOpen(true);
+  };
+
+  const submitDispute = async () => {
+    if (!disputeBookingId) return;
+    if (disputeReason.trim().length < 10) {
+      showAlert('Tell us more', 'Please describe the issue in at least 10 characters.');
+      return;
+    }
+    setDisputing(true);
+    try {
+      const res = await apiFetch(`/api/v1/wallet/bookings/${disputeBookingId}/dispute`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: disputeReason.trim() }),
+      });
+      if (res.ok && res.body?.success) {
+        setDisputeOpen(false); setDisputeBookingId(null); setDisputeReason('');
+        await load();
+        showAlert('Reported', res.body.message || "We've frozen this payment and will review it.");
+      } else {
+        showAlert('Error', res.body?.message || 'Could not file the dispute.');
+      }
+    } catch {
+      showAlert('Error', 'Please check your connection and try again.');
+    } finally {
+      setDisputing(false);
     }
   };
 
@@ -231,16 +344,31 @@ export default function WalletScreen({ navigation }: Props) {
                 </Text>
                 {b.description ? <Text style={styles.bookingDesc}>{b.description}</Text> : null}
                 <Text style={styles.bookingMeta}>
-                  {naira(b.amount)} · <Text style={statusStyle(b.status)}>{b.status.replace('_', ' ')}</Text>
+                  {naira(b.amount)} · <Text style={statusStyle(b.status)}>{STATUS_LABEL[b.status] || b.status.replace('_', ' ')}</Text>
                 </Text>
+                {b.status === 'funded' && (
+                  <Text style={styles.bookingSplit}>
+                    {b.role === 'buyer'
+                      ? `Provider receives ${naira(b.providerAmount)} on release`
+                      : `You'll receive ${naira(b.providerAmount)} (${naira(b.commissionAmount)} platform fee)`}
+                  </Text>
+                )}
+                {b.status === 'disputed' && (
+                  <Text style={styles.bookingDisputeNote}>Frozen while our team reviews it — you'll be notified once resolved.</Text>
+                )}
               </View>
               {b.status === 'funded' && b.role === 'buyer' && (
-                <TouchableOpacity style={styles.releaseBtn} disabled={actioningId === b._id} onPress={() => act(b._id, 'release')}>
-                  {actioningId === b._id ? <ActivityIndicator color="#fff" /> : <Text style={styles.releaseBtnText}>Release</Text>}
-                </TouchableOpacity>
+                <View style={{ gap: 6, alignItems: 'stretch' }}>
+                  <TouchableOpacity style={styles.releaseBtn} disabled={actioningId === b._id} onPress={() => confirmRelease(b)}>
+                    {actioningId === b._id ? <ActivityIndicator color="#fff" /> : <Text style={styles.releaseBtnText}>Release</Text>}
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.disputeBtn} disabled={actioningId === b._id} onPress={() => openDispute(b._id)}>
+                    <Text style={styles.disputeBtnText}>Report issue</Text>
+                  </TouchableOpacity>
+                </View>
               )}
               {b.status === 'funded' && b.role === 'provider' && (
-                <TouchableOpacity style={styles.refundBtn} disabled={actioningId === b._id} onPress={() => act(b._id, 'refund')}>
+                <TouchableOpacity style={styles.refundBtn} disabled={actioningId === b._id} onPress={() => confirmRefund(b)}>
                   {actioningId === b._id ? <ActivityIndicator color="#B91C1C" /> : <Text style={styles.refundBtnText}>Refund</Text>}
                 </TouchableOpacity>
               )}
@@ -296,12 +424,50 @@ export default function WalletScreen({ navigation }: Props) {
               <Text style={{ color: wdBank ? '#111827' : '#9CA3AF', paddingTop: 2 }}>{wdBank ? wdBank.name : 'Select bank'}</Text>
             </TouchableOpacity>
             <TextInput style={styles.input} keyboardType="numeric" placeholder="Account number" value={wdAccount} onChangeText={setWdAccount} maxLength={10} />
+
+            {resolving ? (
+              <View style={styles.resolveRow}><ActivityIndicator size="small" color="#2563EB" /><Text style={styles.resolveText}>Verifying account…</Text></View>
+            ) : resolvedName ? (
+              <View style={[styles.resolveRow, styles.resolveRowOk]}>
+                <Text style={{ fontSize: 15 }}>✅</Text>
+                <Text style={styles.resolveTextOk}>{resolvedName}</Text>
+              </View>
+            ) : resolveError ? (
+              <View style={[styles.resolveRow, styles.resolveRowErr]}>
+                <Text style={{ fontSize: 15 }}>⚠️</Text>
+                <Text style={styles.resolveTextErr}>{resolveError}</Text>
+              </View>
+            ) : null}
+
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setWdOpen(false)}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => { setWdOpen(false); setResolvedName(null); setResolveError(null); }}>
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmBtn} disabled={withdrawing} onPress={submitWithdraw}>
+              <TouchableOpacity style={[styles.confirmBtn, !resolvedName && { opacity: 0.5 }]} disabled={withdrawing || !resolvedName} onPress={submitWithdraw}>
                 {withdrawing ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmBtnText}>Withdraw</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Dispute modal */}
+      <Modal visible={disputeOpen} transparent animationType="slide" onRequestClose={() => setDisputeOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Report an Issue</Text>
+            <Text style={styles.disputeSub}>Tell us what went wrong. We'll freeze this payment and review it — you won't lose your money while we look into it.</Text>
+            <TextInput
+              style={[styles.input, { minHeight: 90, textAlignVertical: 'top' }]}
+              multiline placeholder="What happened?"
+              value={disputeReason} onChangeText={setDisputeReason}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setDisputeOpen(false)}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.confirmBtn, { backgroundColor: '#B91C1C' }]} disabled={disputing} onPress={submitDispute}>
+                {disputing ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmBtnText}>Submit Report</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -339,6 +505,7 @@ const isCredit = (type: string) => ['deposit', 'payment_release', 'refund'].incl
 const statusStyle = (s: string) =>
   s === 'released' ? { color: '#16A34A', fontWeight: '700' as const }
   : s === 'funded' ? { color: '#D97706', fontWeight: '700' as const }
+  : s === 'disputed' ? { color: '#B91C1C', fontWeight: '700' as const }
   : s === 'refunded' ? { color: '#6B7280', fontWeight: '700' as const }
   : { color: '#6B7280' };
 
@@ -367,6 +534,18 @@ const styles = StyleSheet.create({
   releaseBtnText: { color: '#fff', fontWeight: '800' },
   refundBtn:    { borderWidth: 1, borderColor: '#B91C1C', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, minWidth: 84, alignItems: 'center' },
   refundBtnText: { color: '#B91C1C', fontWeight: '800' },
+  disputeBtn:   { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, minWidth: 84, alignItems: 'center' },
+  disputeBtnText: { color: '#B91C1C', fontWeight: '600', fontSize: 12, textDecorationLine: 'underline' },
+  bookingSplit: { fontSize: 12, color: '#6B7280', marginTop: 4 },
+  bookingDisputeNote: { fontSize: 12, color: '#B91C1C', marginTop: 4, fontStyle: 'italic' },
+  disputeSub: { fontSize: 13, color: '#6B7280', marginBottom: 12, lineHeight: 18 },
+
+  resolveRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, marginBottom: 8 },
+  resolveRowOk: {},
+  resolveRowErr: {},
+  resolveText: { fontSize: 13, color: '#6B7280' },
+  resolveTextOk: { fontSize: 13, color: '#16A34A', fontWeight: '700', flexShrink: 1 },
+  resolveTextErr: { fontSize: 13, color: '#B91C1C', flexShrink: 1 },
 
   txnRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 10, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: '#EEF2F7' },
   txnLabel: { fontSize: 14, fontWeight: '700', color: '#111827' },
