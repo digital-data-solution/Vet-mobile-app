@@ -81,6 +81,19 @@ function goToBoost(navigation: any) {
   }
 }
 
+function goToWallet(navigation: any) {
+  try {
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.navigate('Wallet');
+    } else {
+      navigation.navigate('Wallet');
+    }
+  } catch {
+    navigation.navigate('Wallet');
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Professional stats mini-card
 // ─────────────────────────────────────────────────────────────────────────────
@@ -539,6 +552,19 @@ export default function ProfileScreen({ navigation }: Props) {
             <Text style={styles.subscribeNowText}>View Plans</Text>
           </Pressable>
         </View>
+      )}
+
+      {/* ── Wallet CTA (everyone) ───────────────────────────────────────── */}
+      {user && (
+        <Pressable style={styles.walletCard} onPress={() => goToWallet(navigation)}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.walletTitle}>💰 My Wallet</Text>
+            <Text style={styles.walletText}>
+              Add money, pay providers securely with escrow, and withdraw your earnings.
+            </Text>
+          </View>
+          <Text style={styles.walletArrow}>›</Text>
+        </Pressable>
       )}
 
       {/* ── Professional stats card ─────────────────────────────────────── */}
@@ -1190,6 +1216,21 @@ const styles = StyleSheet.create({
   boostTitle: { fontSize: 16, fontWeight: '800', color: '#92400E', marginBottom: 4 },
   boostText:  { fontSize: 13, color: '#B45309', lineHeight: 18 },
   boostArrow: { fontSize: 28, color: '#F59E0B', fontWeight: '900', marginLeft: 8 },
+
+  walletCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  walletTitle: { fontSize: 16, fontWeight: '800', color: '#1E40AF', marginBottom: 4 },
+  walletText:  { fontSize: 13, color: '#2563EB', lineHeight: 18 },
+  walletArrow: { fontSize: 28, color: '#2563EB', fontWeight: '900', marginLeft: 8 },
 
   statsCard: {
     backgroundColor: '#fff',
