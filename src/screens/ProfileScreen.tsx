@@ -68,6 +68,19 @@ function goToSubscription(navigation: any) {
   }
 }
 
+function goToBoost(navigation: any) {
+  try {
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.navigate('BoostListing');
+    } else {
+      navigation.navigate('BoostListing');
+    }
+  } catch {
+    navigation.navigate('BoostListing');
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Professional stats mini-card
 // ─────────────────────────────────────────────────────────────────────────────
@@ -530,6 +543,19 @@ export default function ProfileScreen({ navigation }: Props) {
 
       {/* ── Professional stats card ─────────────────────────────────────── */}
       {isProfessional && <ProfStats />}
+
+      {/* ── Boost listing CTA (professionals + shop owners) ─────────────── */}
+      {(isProfessional || isShopOwner) && (
+        <Pressable style={styles.boostCard} onPress={() => goToBoost(navigation)}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.boostTitle}>🚀 Boost Your Listing</Text>
+            <Text style={styles.boostText}>
+              Jump to the top of search results and get a Featured badge — from ₦1,500.
+            </Text>
+          </View>
+          <Text style={styles.boostArrow}>›</Text>
+        </Pressable>
+      )}
 
       {/* ── Account info ────────────────────────────────────────────────── */}
       {user && (
@@ -1150,6 +1176,21 @@ const styles = StyleSheet.create({
   shareButtonText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
   // ── Professional stats card ─────────────────────────────────────────────────
+  boostCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFBEB',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+  },
+  boostTitle: { fontSize: 16, fontWeight: '800', color: '#92400E', marginBottom: 4 },
+  boostText:  { fontSize: 13, color: '#B45309', lineHeight: 18 },
+  boostArrow: { fontSize: 28, color: '#F59E0B', fontWeight: '900', marginLeft: 8 },
+
   statsCard: {
     backgroundColor: '#fff',
     marginHorizontal: 16,

@@ -42,6 +42,7 @@ interface Kennel {
   profileImage?: string;
   rating?: number;
   reviewCount?: number;
+  featuredUntil?: string;
 }
 
 export default function KennelsScreen({ navigation }: any) {
@@ -223,6 +224,11 @@ export default function KennelsScreen({ navigation }: any) {
         {item.isVerified && <View style={styles.verifiedDot} />}
       </View>
       <View style={styles.cardBody}>
+        {item.featuredUntil && new Date(item.featuredUntil) > new Date() && (
+          <View style={styles.featuredPill}>
+            <Text style={styles.featuredPillText}>⭐ FEATURED</Text>
+          </View>
+        )}
         <View style={styles.cardTopRow}>
           <Text style={styles.kennelName} numberOfLines={1}>
             {item.businessName || item.name}
@@ -601,6 +607,8 @@ const styles = StyleSheet.create({
   },
   cardBody: { flex: 1, marginRight: 4 },
   cardTopRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 3 },
+  featuredPill:     { alignSelf: 'flex-start', backgroundColor: '#F59E0B', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 5, marginBottom: 4 },
+  featuredPillText: { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
   kennelName: {
     fontSize: 15,
     fontWeight: '700',

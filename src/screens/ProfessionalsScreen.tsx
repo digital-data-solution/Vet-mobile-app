@@ -82,6 +82,7 @@ interface Professional {
   reviewCount?: number;
   profileImage?: string;
   mediaImages?: { url: string; publicId: string }[];
+  featuredUntil?: string;
 }
 
 interface Props {
@@ -353,6 +354,11 @@ export default function ProfessionalsScreen({ navigation }: Props) {
         onPress={() => navigateToProfile(item)}
         activeOpacity={0.8}
       >
+        {item.featuredUntil && new Date(item.featuredUntil) > new Date() && (
+          <View style={styles.featuredRibbon}>
+            <Text style={styles.featuredRibbonText}>⭐ FEATURED</Text>
+          </View>
+        )}
         <View style={styles.cardHeader}>
           <View style={[styles.avatarCircle, { backgroundColor: meta.avatarBg }]}>
             {avatarUri ? (
@@ -918,6 +924,15 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
+  featuredRibbon: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginBottom: 10,
+  },
+  featuredRibbonText: { color: '#fff', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
   cardHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
   avatarCircle: {
     width: 48,

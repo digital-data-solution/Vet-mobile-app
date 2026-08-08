@@ -47,6 +47,7 @@ import ServiceScreen                from '../screens/ServiceScreen';
 import VerifyProfessionalScreen     from '../screens/VerifyProfessionalScreen';
 import AddressInputScreen           from '../screens/AddressInputScreen';
 import PaystackWebView              from '../screens/PaystackWebView';
+import BoostListingScreen           from '../screens/BoostListingScreen';
 import EmailVerifiedScreen          from '../screens/EmailVerifiedScreen';
 import ConversationsScreen          from '../screens/ConversationsScreen';
 import ChatScreen                   from '../screens/ChatScreen';
@@ -111,6 +112,7 @@ export type RootStackParamList = {
   VerifyProfessional:     undefined;
   AddressInput:           { mode?: 'professional' } | undefined;
   SubscriptionScreen:     undefined;
+  BoostListing:           undefined;
   ProfessionalOnboarding: { role?: string } | undefined;
   KennelOnboarding:       undefined;
   ShopOnboarding:         undefined;
@@ -626,6 +628,11 @@ export default function AppNavigator() {
                   name="SubscriptionScreen"
                   component={SubscriptionScreen}
                   options={{ headerShown: true, title: 'Subscription' }}
+                />
+                <RootStack.Screen
+                  name="BoostListing"
+                  component={BoostListingScreen}
+                  options={{ headerShown: true, title: 'Boost Listing' }}
                 />
                 <RootStack.Screen
                   name="ProfessionalOnboarding"

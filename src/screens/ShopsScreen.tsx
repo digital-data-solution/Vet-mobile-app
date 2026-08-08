@@ -45,6 +45,7 @@ interface Shop {
   profileImage?: string;
   isVerified?: boolean;
   rating?: number;
+  featuredUntil?: string;
 }
 
 interface Props {
@@ -252,6 +253,11 @@ export default function ShopsScreen({ navigation }: Props) {
         )}
       </View>
       <View style={styles.cardBody}>
+        {item.featuredUntil && new Date(item.featuredUntil) > new Date() && (
+          <View style={styles.featuredPill}>
+            <Text style={styles.featuredPillText}>⭐ FEATURED</Text>
+          </View>
+        )}
         <Text style={styles.shopName} numberOfLines={1}>
           {getDisplayName(item)}
         </Text>
@@ -647,6 +653,8 @@ const styles = StyleSheet.create({
   avatarImage: { width: 52, height: 52 },
   avatarEmoji: { fontSize: 24 },
   cardBody: { flex: 1, marginRight: 4 },
+  featuredPill:     { alignSelf: 'flex-start', backgroundColor: '#F59E0B', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 5, marginBottom: 4 },
+  featuredPillText: { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
   shopName:    { fontSize: 15, fontWeight: '700', color: '#0F172A', marginBottom: 3 },
   description: { fontSize: 12, color: '#64748B', marginBottom: 4 },
   addressRow:  { flexDirection: 'row', alignItems: 'center', gap: 3 },
