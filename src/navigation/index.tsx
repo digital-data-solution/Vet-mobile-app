@@ -53,6 +53,14 @@ import PracticeRecordsScreen        from '../screens/PracticeRecordsScreen';
 import PracticeUpgradeScreen        from '../screens/PracticeUpgradeScreen';
 import ClientDetailScreen           from '../screens/ClientDetailScreen';
 import PatientDetailScreen          from '../screens/PatientDetailScreen';
+import BusinessScreen               from '../screens/BusinessScreen';
+import InventoryScreen              from '../screens/InventoryScreen';
+import ProductDetailScreen          from '../screens/ProductDetailScreen';
+import RecordSaleScreen             from '../screens/RecordSaleScreen';
+import SalesReportScreen            from '../screens/SalesReportScreen';
+import StaffScreen                  from '../screens/StaffScreen';
+import AuditLogScreen               from '../screens/AuditLogScreen';
+import BusinessUpgradeScreen        from '../screens/BusinessUpgradeScreen';
 import EmailVerifiedScreen          from '../screens/EmailVerifiedScreen';
 import ConversationsScreen          from '../screens/ConversationsScreen';
 import ChatScreen                   from '../screens/ChatScreen';
@@ -123,6 +131,14 @@ export type RootStackParamList = {
   PracticeUpgrade:        undefined;
   ClientDetail:           { clientId: string; client?: any };
   PatientDetail:          { patientId: string };
+  Business:               undefined;
+  Inventory:              undefined;
+  ProductDetail:          { productId: string };
+  RecordSale:             undefined;
+  SalesReport:            undefined;
+  Staff:                  undefined;
+  AuditLog:               undefined;
+  BusinessUpgrade:        undefined;
   ProfessionalOnboarding: { role?: string } | undefined;
   KennelOnboarding:       undefined;
   ShopOnboarding:         undefined;
@@ -658,6 +674,46 @@ export default function AppNavigator() {
                   name="PracticeUpgrade"
                   component={PracticeUpgradeScreen}
                   options={{ headerShown: true, title: 'Practice Records' }}
+                />
+                <RootStack.Screen
+                  name="Business"
+                  component={BusinessScreen}
+                  options={{ headerShown: true, title: 'Business Suite' }}
+                />
+                <RootStack.Screen
+                  name="Inventory"
+                  component={InventoryScreen}
+                  options={{ headerShown: true, title: 'Inventory' }}
+                />
+                <RootStack.Screen
+                  name="ProductDetail"
+                  component={ProductDetailScreen}
+                  options={{ headerShown: true, title: 'Product' }}
+                />
+                <RootStack.Screen
+                  name="RecordSale"
+                  component={RecordSaleScreen}
+                  options={{ headerShown: true, title: 'Record Sale' }}
+                />
+                <RootStack.Screen
+                  name="SalesReport"
+                  component={SalesReportScreen}
+                  options={{ headerShown: true, title: 'Sales & Reports' }}
+                />
+                <RootStack.Screen
+                  name="Staff"
+                  component={StaffScreen}
+                  options={{ headerShown: true, title: 'Sales Reps' }}
+                />
+                <RootStack.Screen
+                  name="AuditLog"
+                  component={AuditLogScreen}
+                  options={{ headerShown: true, title: 'Audit Log' }}
+                />
+                <RootStack.Screen
+                  name="BusinessUpgrade"
+                  component={BusinessUpgradeScreen}
+                  options={{ headerShown: true, title: 'Business Suite' }}
                 />
                 <RootStack.Screen
                   name="ClientDetail"

@@ -94,6 +94,19 @@ function goToPracticeRecords(navigation: any) {
   }
 }
 
+function goToBusiness(navigation: any) {
+  try {
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.navigate('Business');
+    } else {
+      navigation.navigate('Business');
+    }
+  } catch {
+    navigation.navigate('Business');
+  }
+}
+
 function goToWallet(navigation: any) {
   try {
     const parent = navigation.getParent();
@@ -590,6 +603,19 @@ export default function ProfileScreen({ navigation }: Props) {
             </Text>
           </View>
           <Text style={styles.practiceArrow}>›</Text>
+        </Pressable>
+      )}
+
+      {/* ── Business Suite CTA (shops, vets, kennels) ───────────────────── */}
+      {(isShopOwner || isVet || user?.role === 'kennel_owner') && (
+        <Pressable style={styles.businessCard} onPress={() => goToBusiness(navigation)}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.businessTitle}>🏪 Business Suite</Text>
+            <Text style={styles.businessText}>
+              Track stock, record sales, add your reps and see who moved every unit — your shop, in the app.
+            </Text>
+          </View>
+          <Text style={styles.businessArrow}>›</Text>
         </Pressable>
       )}
 
@@ -1272,6 +1298,21 @@ const styles = StyleSheet.create({
   practiceTitle: { fontSize: 16, fontWeight: '800', color: '#0F766E', marginBottom: 4 },
   practiceText:  { fontSize: 13, color: '#0D9488', lineHeight: 18 },
   practiceArrow: { fontSize: 28, color: '#0D9488', fontWeight: '900', marginLeft: 8 },
+
+  businessCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EEF2FF',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  businessTitle: { fontSize: 16, fontWeight: '800', color: '#3730A3', marginBottom: 4 },
+  businessText:  { fontSize: 13, color: '#4338CA', lineHeight: 18 },
+  businessArrow: { fontSize: 28, color: '#4338CA', fontWeight: '900', marginLeft: 8 },
 
   statsCard: {
     backgroundColor: '#fff',
