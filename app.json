@@ -7,7 +7,14 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/434617fd-5767-4eee-8920-e739e9894092",
+      "fallbackToCacheTimeout": 0
+    },
     "platforms": [
       "ios",
       "android",
