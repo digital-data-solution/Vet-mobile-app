@@ -198,6 +198,15 @@ export default function ListingDetailScreen({ navigation, route }: Props) {
             <Text style={styles.disclaimerTxt}>{disclaimer || 'Xpress Vet only connects buyers and sellers. Transact carefully and use Buyer Protection when you can.'}</Text>
           </View>
 
+          {/* Delivery & safety tips */}
+          <View style={styles.tips}>
+            <Text style={styles.tipsTitle}>🛡️  Stay safe when buying</Text>
+            <Text style={styles.tip}>• {listing.kind === 'pet' ? 'Meet in person and inspect the animal (and its health/vaccination papers) before you pay.' : 'Inspect the item before you pay whenever you can.'}</Text>
+            <Text style={styles.tip}>• Prefer Buyer Protection (escrow) — only tap Release after you have received what was described.</Text>
+            <Text style={styles.tip}>• Agree delivery or pickup directly with the seller. Delivery is arranged between you two — Xpress Vet does not deliver.</Text>
+            <Text style={styles.tip}>• Never pay outside the app because of “urgency”, and never share your PIN or password.</Text>
+          </View>
+
           <TouchableOpacity onPress={report} style={styles.reportBtn}>
             <Ionicons name="flag-outline" size={15} color="#DC2626" />
             <Text style={styles.reportTxt}>Report this listing</Text>
@@ -278,6 +287,9 @@ const styles = StyleSheet.create({
   sellerName: { fontSize: 15, fontWeight: '700', color: '#111827' },
   disclaimer: { flexDirection: 'row', gap: 8, backgroundColor: '#FEF3C7', borderRadius: 10, padding: 12, marginTop: 18 },
   disclaimerTxt: { flex: 1, fontSize: 12, color: '#92400E', lineHeight: 18 },
+  tips: { backgroundColor: '#ECFDF3', borderRadius: 10, padding: 12, marginTop: 12 },
+  tipsTitle: { fontSize: 13, fontWeight: '800', color: '#065F46', marginBottom: 6 },
+  tip: { fontSize: 12, color: '#047857', lineHeight: 19, marginBottom: 3 },
   reportBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'center', marginTop: 16 },
   reportTxt: { color: '#DC2626', fontSize: 13, fontWeight: '600' },
 
