@@ -49,6 +49,11 @@ import VerifyProfessionalScreen     from '../screens/VerifyProfessionalScreen';
 import AddressInputScreen           from '../screens/AddressInputScreen';
 import PaystackWebView              from '../screens/PaystackWebView';
 import BoostListingScreen           from '../screens/BoostListingScreen';
+import MarketScreen                  from '../screens/MarketScreen';
+import ListingDetailScreen          from '../screens/ListingDetailScreen';
+import CreateListingScreen          from '../screens/CreateListingScreen';
+import MyListingsScreen             from '../screens/MyListingsScreen';
+import ListingBoostScreen           from '../screens/ListingBoostScreen';
 import WalletScreen                 from '../screens/WalletScreen';
 import PracticeRecordsScreen        from '../screens/PracticeRecordsScreen';
 import PracticeUpgradeScreen        from '../screens/PracticeUpgradeScreen';
@@ -133,6 +138,11 @@ export type RootStackParamList = {
   SubscriptionScreen:     undefined;
   BoostListing:           undefined;
   Wallet:                 undefined;
+  Market:                 { kind?: 'pet' | 'product' } | undefined;
+  ListingDetail:          { id: string; mine?: boolean };
+  CreateListing:          { kind?: 'pet' | 'product'; edit?: any } | undefined;
+  MyListings:             undefined;
+  ListingBoost:           { listingId: string };
   PracticeRecords:        undefined;
   PracticeUpgrade:        undefined;
   ClientDetail:           { clientId: string; client?: any };
@@ -209,6 +219,9 @@ const AUTH_WEB_PATHS = [
   '/ServiceProfile',
   '/ExploreOptions',
   '/VerifyProfessional',
+  '/Market',
+  '/ListingDetail',
+  '/MyListings',
 ];
 
 const linking: LinkingOptions<RootStackParamList> = {
@@ -251,6 +264,9 @@ const linking: LinkingOptions<RootStackParamList> = {
       ServiceProfile: { path: 'ServiceProfile',  parse: { professionalId: String } },
       ExploreOptions: 'ExploreOptions',
       VerifyProfessional: 'VerifyProfessional',
+      Market:         'Market',
+      ListingDetail:  { path: 'ListingDetail', parse: { id: String } },
+      MyListings:     'MyListings',
       MainTabs:      {
         screens: {
           Home:          'home',
@@ -718,6 +734,11 @@ export default function AppNavigator() {
                   component={WalletScreen}
                   options={{ headerShown: true, title: 'My Wallet' }}
                 />
+                <RootStack.Screen name="Market"        component={MarketScreen}        options={{ headerShown: true, title: 'Xpress Market' }} />
+                <RootStack.Screen name="ListingDetail" component={ListingDetailScreen} options={{ headerShown: true, title: 'Listing' }} />
+                <RootStack.Screen name="CreateListing" component={CreateListingScreen} options={{ headerShown: true, title: 'Sell an Item' }} />
+                <RootStack.Screen name="MyListings"    component={MyListingsScreen}    options={{ headerShown: true, title: 'My Listings' }} />
+                <RootStack.Screen name="ListingBoost"  component={ListingBoostScreen}  options={{ headerShown: true, title: 'Boost Listing' }} />
                 <RootStack.Screen
                   name="PracticeRecords"
                   component={PracticeRecordsScreen}

@@ -746,6 +746,20 @@ function PetOwnerHome({
         <Text style={styles.emergencyBtnArrow}>›</Text>
       </TouchableOpacity>
 
+      {/* Xpress Market — buy & sell pets and products */}
+      <TouchableOpacity
+        style={styles.marketBtn}
+        onPress={() => navigation.navigate('Market')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.emergencyBtnIcon}>🛒</Text>
+        <View style={styles.emergencyBtnText}>
+          <Text style={styles.marketBtnTitle}>Xpress Market — Buy & Sell</Text>
+          <Text style={styles.marketBtnSub}>Sell pets & products, or find one near you. Share to WhatsApp.</Text>
+        </View>
+        <Text style={[styles.emergencyBtnArrow, { color: '#0F9D58' }]}>›</Text>
+      </TouchableOpacity>
+
       {dashboardCfg && (
         <TouchableOpacity
           style={[styles.dashboardCard, { backgroundColor: dashboardCfg.bgColor, borderColor: dashboardCfg.color + '44' }]}
@@ -1218,6 +1232,15 @@ const styles = StyleSheet.create({
   emergencyBtnTitle: { fontSize: 15, fontWeight: '800', color: '#991B1B' },
   emergencyBtnSub: { fontSize: 12, color: '#EF4444', marginTop: 2 },
   emergencyBtnArrow: { fontSize: 22, color: '#EF4444', fontWeight: '700' },
+
+  marketBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginHorizontal: 20, marginTop: 10, marginBottom: 4,
+    backgroundColor: '#ECFDF3', borderWidth: 1.5, borderColor: '#86EFAC',
+    borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14,
+  },
+  marketBtnTitle: { fontSize: 15, fontWeight: '800', color: '#065F46' },
+  marketBtnSub: { fontSize: 12, color: '#0F9D58', marginTop: 2 },
 
   // Recently viewed
   recentCard: {
