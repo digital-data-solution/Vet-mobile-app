@@ -54,5 +54,16 @@ const ar = {
     pointProduct: 'وجّه نحو باركود المنتج أو رمز إيصال QR.', notFound: 'لا يوجد منتج مطابق لهذا الرمز.',
   },
   methods: { cash: 'نقدًا', transfer: 'تحويل', card: 'بطاقة', wallet: 'محفظة', credit: 'آجل' },
+  practice: {
+    title: 'سجلات العيادة', unlimited: '✨ مرضى بلا حدود', patients: '{{count}} / {{limit}} مريض',
+    daysRemaining: 'متبقٍ {{count}} يوم', freeLimitReached: 'انتهى الحد المجاني — اضغط للترقية',
+    seePlans: 'اضغط لعرض باقات سجلات العيادة', dueSoon: '{{count}} عنصر مستحق خلال 14 يومًا القادمة',
+    clients: 'العملاء', addClient: '+ إضافة عميل', searchClients: 'بحث عن عملاء…',
+    noClients: 'لا عملاء بعد. أضف أول عميل للبدء.', noContact: 'لا توجد بيانات اتصال',
+    addClientTitle: 'إضافة عميل', clientName: 'اسم العميل', addressOpt: 'العنوان (اختياري)',
+    sendReminders: 'إرسال رسائل تذكير لهذا العميل؟', remindersConsent: 'فقط بموافقتهم — أنت المتحكم، لسنا نحن.',
+    nameRequired: 'أدخل اسم العميل.', emailNeeded: 'أضف بريدًا إلكترونيًا لإرسال التذكيرات لهذا العميل.',
+    followUp: 'متابعة', patient: 'مريض', vetsOnly: 'سجلات العيادة مخصصة للأطباء البيطريين فقط.',
+  },
 };
 export default ar;

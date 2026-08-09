@@ -18,6 +18,7 @@ import { useAuth } from '../navigation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ProfileImageUploader from '../components/ProfileImageUploader';
+import LanguagePicker from '../components/LanguagePicker';
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -897,6 +898,11 @@ export default function ProfileScreen({ navigation }: Props) {
           onPress={() => navigation.navigate('ProfessionalOnboarding', { role: 'farm' })}
           tint="#92400E"
         />
+      </View>
+
+      {/* ── Language ────────────────────────────────────────────────────── */}
+      <View style={styles.actionsCard}>
+        <LanguagePicker />
       </View>
 
       {/* ── Legal & Support ─────────────────────────────────────────────── */}

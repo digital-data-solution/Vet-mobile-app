@@ -54,5 +54,16 @@ const fr = {
     pointProduct: 'Visez un code-barres produit ou un QR de reçu.', notFound: 'Aucun produit ne correspond.',
   },
   methods: { cash: 'espèces', transfer: 'virement', card: 'carte', wallet: 'portefeuille', credit: 'crédit' },
+  practice: {
+    title: 'Dossiers de clinique', unlimited: '✨ Patients illimités', patients: '{{count}} / {{limit}} patients',
+    daysRemaining: '{{count}} jours restants', freeLimitReached: 'Limite gratuite atteinte — appuyez pour améliorer',
+    seePlans: 'Appuyez pour voir les offres', dueSoon: '{{count}} éléments à échéance sous 14 jours',
+    clients: 'Clients', addClient: '+ Ajouter un client', searchClients: 'Rechercher des clients…',
+    noClients: 'Aucun client. Ajoutez votre premier client pour commencer.', noContact: 'Aucune coordonnée',
+    addClientTitle: 'Ajouter un client', clientName: 'Nom du client', addressOpt: 'Adresse (facultatif)',
+    sendReminders: 'Envoyer des rappels par e-mail à ce client ?', remindersConsent: "Uniquement avec leur consentement — c'est vous qui décidez.",
+    nameRequired: 'Saisissez le nom du client.', emailNeeded: 'Ajoutez un e-mail pour envoyer des rappels à ce client.',
+    followUp: 'Suivi', patient: 'Patient', vetsOnly: 'Les Dossiers de clinique sont réservés aux vétérinaires.',
+  },
 };
 export default fr;

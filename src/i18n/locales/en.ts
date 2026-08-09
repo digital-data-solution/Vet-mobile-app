@@ -55,5 +55,16 @@ const en = {
     pointProduct: 'Point at a product barcode or a receipt QR code.', notFound: 'No product matches that code.',
   },
   methods: { cash: 'cash', transfer: 'transfer', card: 'card', wallet: 'wallet', credit: 'credit' },
+  practice: {
+    title: 'Practice Records', unlimited: '✨ Unlimited patients', patients: '{{count}} / {{limit}} patients',
+    daysRemaining: '{{count}} days remaining', freeLimitReached: 'Free limit reached — tap to upgrade',
+    seePlans: 'Tap to see Practice Records plans', dueSoon: '{{count}} items due in the next 14 days',
+    clients: 'Clients', addClient: '+ Add Client', searchClients: 'Search clients…',
+    noClients: 'No clients yet. Add your first client to get started.', noContact: 'No contact info',
+    addClientTitle: 'Add Client', clientName: 'Client name', addressOpt: 'Address (optional)',
+    sendReminders: 'Send this client reminder emails?', remindersConsent: "Only if you have their consent — you're in control, not us.",
+    nameRequired: "Enter the client's name.", emailNeeded: 'Add an email address to send this client reminders.',
+    followUp: 'Follow-up', patient: 'Patient', vetsOnly: 'Practice Records is for veterinarians only.',
+  },
 };
 export default en;

@@ -54,5 +54,16 @@ const zh = {
     pointProduct: '对准商品条码或收据二维码。', notFound: '没有匹配该编码的商品。',
   },
   methods: { cash: '现金', transfer: '转账', card: '刷卡', wallet: '钱包', credit: '赊账' },
+  practice: {
+    title: '诊所记录', unlimited: '✨ 无限患者', patients: '{{count}} / {{limit}} 位患者',
+    daysRemaining: '剩余 {{count}} 天', freeLimitReached: '已达免费上限——点击升级',
+    seePlans: '点击查看诊所记录套餐', dueSoon: '未来14天有 {{count}} 项到期',
+    clients: '客户', addClient: '+ 添加客户', searchClients: '搜索客户…',
+    noClients: '暂无客户。添加第一位客户开始使用。', noContact: '无联系方式',
+    addClientTitle: '添加客户', clientName: '客户姓名', addressOpt: '地址（可选）',
+    sendReminders: '向该客户发送提醒邮件？', remindersConsent: '仅在获得其同意时——由您掌控，而非我们。',
+    nameRequired: '请输入客户姓名。', emailNeeded: '添加邮箱以便向该客户发送提醒。',
+    followUp: '复诊', patient: '患者', vetsOnly: '诊所记录仅面向兽医。',
+  },
 };
 export default zh;

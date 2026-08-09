@@ -54,5 +54,16 @@ const pt = {
     pointProduct: 'Aponte a um código de barras ou QR de recibo.', notFound: 'Nenhum produto corresponde.',
   },
   methods: { cash: 'dinheiro', transfer: 'transferência', card: 'cartão', wallet: 'carteira', credit: 'crédito' },
+  practice: {
+    title: 'Registos de clínica', unlimited: '✨ Pacientes ilimitados', patients: '{{count}} / {{limit}} pacientes',
+    daysRemaining: '{{count}} dias restantes', freeLimitReached: 'Limite gratuito atingido — toque para atualizar',
+    seePlans: 'Toque para ver os planos', dueSoon: '{{count}} itens a vencer nos próximos 14 dias',
+    clients: 'Clientes', addClient: '+ Adicionar cliente', searchClients: 'Pesquisar clientes…',
+    noClients: 'Sem clientes. Adicione o primeiro cliente para começar.', noContact: 'Sem contacto',
+    addClientTitle: 'Adicionar cliente', clientName: 'Nome do cliente', addressOpt: 'Morada (opcional)',
+    sendReminders: 'Enviar lembretes por e-mail a este cliente?', remindersConsent: 'Apenas com consentimento — o controlo é seu, não nosso.',
+    nameRequired: 'Introduza o nome do cliente.', emailNeeded: 'Adicione um e-mail para enviar lembretes a este cliente.',
+    followUp: 'Acompanhamento', patient: 'Paciente', vetsOnly: 'Os Registos de clínica são apenas para veterinários.',
+  },
 };
 export default pt;

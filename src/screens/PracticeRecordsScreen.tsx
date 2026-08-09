@@ -20,6 +20,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { apiFetch } from '../api/client';
 import { showAlert } from '../utils/alert';
 
@@ -38,6 +39,7 @@ interface Props { navigation: any; }
 const TEAL = '#0D9488';
 
 export default function PracticeRecordsScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [status, setStatus]         = useState<Status | null>(null);
@@ -64,7 +66,7 @@ export default function PracticeRecordsScreen({ navigation }: Props) {
       ]);
       if (statusRes.ok && statusRes.body?.data) setStatus(statusRes.body.data);
       else if (statusRes.status === 403) {
-        showAlert('Not Available', statusRes.body?.message || 'Practice Records is for veterinarians only.');
+        showAlert('Not Available', statusRes.body?.message || t('practice.vetsOnly'));
         navigation.goBack();
         return;
       }
@@ -94,9 +96,9 @@ export default function PracticeRecordsScreen({ navigation }: Props) {
   };
 
   const submitAdd = async () => {
-    if (!name.trim()) { showAlert('Name required', 'Enter the client\'s name.'); return; }
+    if (!name.trim()) { showAlert('Name required', t('practice.nameRequired')); return; }
     if (remindersOn && !email.trim()) {
-      showAlert('Email needed', 'Add an email address if you want to send this client reminders.');
+      showAlert('Email needed', t('practice.emailNeeded'));
       return;
     }
     setSaving(true);
@@ -136,12 +138,12 @@ export default function PracticeRecordsScreen({ navigation }: Props) {
           <TouchableOpacity style={styles.statusCard} onPress={() => navigation.navigate('PracticeUpgrade')} activeOpacity={0.85}>
             <View style={{ flex: 1 }}>
               <Text style={styles.statusTitle}>
-                {status?.addonActive ? '✨ Unlimited patients' : `${status?.patientCount ?? 0} / ${status?.freePatientLimit ?? 5} patients`}
+                {status?.addonActive ? t('practice.unlimited') : t('practice.patients', { count: status?.patientCount ?? 0, limit: status?.freePatientLimit ?? 5 })}
               </Text>
               <Text style={styles.statusText}>
                 {status?.addonActive
-                  ? `${status.daysRemaining} day${status.daysRemaining === 1 ? '' : 's'} remaining`
-                  : status?.atLimit ? 'Free limit reached — tap to upgrade' : 'Tap to see Practice Records plans'}
+                  ? t('practice.daysRemaining', { count: status.daysRemaining })
+                  : status?.atLimit ? t('practice.freeLimitReached') : t('practice.seePlans')}
               </Text>
             </View>
             <Text style={styles.statusArrow}>›</Text>
@@ -150,24 +152,24 @@ export default function PracticeRecordsScreen({ navigation }: Props) {
           {/* Due soon */}
           {dueCount > 0 && (
             <View style={styles.dueCard}>
-              <Text style={styles.dueTitle}>📋 {dueCount} item{dueCount === 1 ? '' : 's'} due in the next 14 days</Text>
+              <Text style={styles.dueTitle}>📋 {t('practice.dueSoon', { count: dueCount })}</Text>
               {dueVaccinations.slice(0, 5).map((v, i) => (
-                <Text key={`v${i}`} style={styles.dueRow}>💉 {v.patient?.name || 'Patient'} — {v.vaccineName}</Text>
+                <Text key={`v${i}`} style={styles.dueRow}>💉 {v.patient?.name || t('practice.patient')} — {v.vaccineName}</Text>
               ))}
               {dueFollowUps.slice(0, 5).map((f, i) => (
-                <Text key={`f${i}`} style={styles.dueRow}>🔁 {f.patient?.name || 'Patient'} — {f.reason || 'Follow-up'}</Text>
+                <Text key={`f${i}`} style={styles.dueRow}>🔁 {f.patient?.name || t('practice.patient')} — {f.reason || t('practice.followUp')}</Text>
               ))}
             </View>
           )}
 
           {/* Clients header */}
           <View style={styles.rowBetween}>
-            <Text style={styles.sectionTitle}>Clients</Text>
+            <Text style={styles.sectionTitle}>{t('practice.clients')}</Text>
             <TouchableOpacity style={styles.addBtn} onPress={openAdd}>
-              <Text style={styles.addBtnText}>+ Add Client</Text>
+              <Text style={styles.addBtnText}>{t('practice.addClient')}</Text>
             </TouchableOpacity>
           </View>
-          <TextInput style={styles.search} placeholder="Search clients…" value={search} onChangeText={onSearch} />
+          <TextInput style={styles.search} placeholder={t('practice.searchClients')} value={search} onChangeText={onSearch} />
         </>
       }
       data={clients}
@@ -180,37 +182,37 @@ export default function PracticeRecordsScreen({ navigation }: Props) {
         >
           <View style={{ flex: 1 }}>
             <Text style={styles.clientName}>{item.name}</Text>
-            <Text style={styles.clientMeta}>{item.phone || item.email || 'No contact info'}</Text>
+            <Text style={styles.clientMeta}>{item.phone || item.email || t('practice.noContact')}</Text>
           </View>
           <Text style={styles.clientArrow}>›</Text>
         </TouchableOpacity>
       )}
-      ListEmptyComponent={<Text style={styles.empty}>No clients yet. Add your first client to get started.</Text>}
+      ListEmptyComponent={<Text style={styles.empty}>{t('practice.noClients')}</Text>}
     />
 
     <Modal visible={addOpen} transparent animationType="slide" onRequestClose={() => setAddOpen(false)}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>Add Client</Text>
-          <TextInput style={styles.input} placeholder="Client name" value={name} onChangeText={setName} />
-          <TextInput style={styles.input} placeholder="Phone" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
-          <TextInput style={styles.input} placeholder="Email" keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} />
-          <TextInput style={styles.input} placeholder="Address (optional)" value={address} onChangeText={setAddress} />
+          <Text style={styles.modalTitle}>{t('practice.addClientTitle')}</Text>
+          <TextInput style={styles.input} placeholder={t('practice.clientName')} value={name} onChangeText={setName} />
+          <TextInput style={styles.input} placeholder={t('common.phone')} keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
+          <TextInput style={styles.input} placeholder={t('common.email')} keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} />
+          <TextInput style={styles.input} placeholder={t('practice.addressOpt')} value={address} onChangeText={setAddress} />
 
           <View style={styles.reminderRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.reminderLabel}>Send this client reminder emails?</Text>
-              <Text style={styles.reminderSub}>Only if you have their consent — you're in control, not us.</Text>
+              <Text style={styles.reminderLabel}>{t('practice.sendReminders')}</Text>
+              <Text style={styles.reminderSub}>{t('practice.remindersConsent')}</Text>
             </View>
             <Switch value={remindersOn} onValueChange={setRemindersOn} trackColor={{ true: TEAL }} />
           </View>
 
           <View style={styles.modalActions}>
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setAddOpen(false)}>
-              <Text style={styles.cancelBtnText}>Cancel</Text>
+              <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.confirmBtn} disabled={saving} onPress={submitAdd}>
-              {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmBtnText}>Add Client</Text>}
+              {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmBtnText}>{t('practice.addClientTitle')}</Text>}
             </TouchableOpacity>
           </View>
         </View>
