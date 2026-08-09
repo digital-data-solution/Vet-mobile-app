@@ -1,0 +1,58 @@
+/** French (Français) — mirrors en keys; gaps fall back to English. */
+const fr = {
+  common: {
+    cancel: 'Annuler', save: 'Enregistrer', close: 'Fermer', back: 'Retour', done: 'Terminé',
+    share: 'Partager', print: 'Imprimer', email: 'E-mail', copy: 'Copier', copied: 'Copié',
+    loading: 'Chargement…', error: 'Erreur', success: 'Succès', search: 'Rechercher…',
+    total: 'Total', subtotal: 'Sous-total', discount: 'Remise', payment: 'Paiement',
+    customer: 'Client', phone: 'Téléphone', name: 'Nom', note: 'Note', optional: 'facultatif',
+    today: "Aujourd'hui", thisMonth: 'Ce mois', profit: 'bénéfice', language: 'Langue',
+  },
+  biz: {
+    title: 'Suite Business', recordSale: 'Enregistrer une vente', recordSaleDesc: 'Encaissez — le stock se met à jour',
+    inventory: 'Inventaire', inventoryDesc: 'Produits, niveaux de stock, réappro',
+    reports: 'Ventes & Rapports', reportsDesc: 'Revenus, bénéfices, détail par vendeur',
+    dayClose: 'Clôture & Rapports', dayCloseDesc: 'Équilibrez la caisse, clôturez chaque jour, CSV mensuel',
+    reps: 'Vendeurs', repsDesc: 'Ajoutez du personnel, identifiants & droits',
+    receiptSettings: 'Réglages du reçu', receiptSettingsDesc: 'Votre logo & vos infos sur chaque reçu',
+    auditLog: "Journal d'audit", auditLogDesc: 'Chaque mouvement de stock, par qui, quand',
+    upgrade: 'Améliorer / Renouveler', scan: 'Scanner', scanDesc: 'Scannez un produit ou un QR de reçu',
+    sellingAs: 'Vente en tant que', owner: 'Propriétaire', signedInAs: 'Connecté en tant que', logout: 'Déconnexion', switch: 'Changer',
+    salesToday: '{{count}} vente aujourd’hui', salesToday_other: '{{count}} ventes aujourd’hui',
+    products: '{{count}} produits', low: '{{count}} faible',
+  },
+  receipt: {
+    title: 'Reçu', receiptNo: 'Reçu', servedBy: 'Servi par', thankYou: 'Merci de votre confiance !',
+    printSave: 'Imprimer / PDF', sharePdf: 'Partager', sendToCustomer: 'Envoyer au client', emailInvoice: 'Facture par e-mail',
+    notAvailable: 'Reçu indisponible.', item: 'Article', qty: 'Qté', price: 'Prix',
+  },
+  day: {
+    day: 'Jour', month: 'Mois', closeDay: 'Clôturer le jour', reCloseDay: 'Reclôturer',
+    exportCsv: 'Exporter CSV', exportMonthlyCsv: 'Exporter CSV mensuel',
+    openingFloat: 'Fonds de caisse', cashCounted: 'Espèces comptées', expectedCash: 'Espèces attendues',
+    variance: 'Écart', balanced: 'Équilibré', over: 'Excédent {{amount}}', short: 'Manque {{amount}}',
+    signOffClose: 'Valider & Clôturer', transactions: 'Transactions', byRep: 'Par vendeur', dayByDay: 'Jour par jour',
+    noSales: 'Aucune vente ce jour.', noSalesMonth: 'Aucune vente ce mois.', closedBy: 'Clôturé par {{name}}',
+    open: 'ouvert', closed: 'clôturé', countHint: 'Comptez la caisse et validez. Espèces du jour : {{amount}}.',
+    dayClosedMsg: '{{date}} validé. Net {{amount}}.',
+  },
+  settings: {
+    intro: 'Ceci apparaît sur chaque reçu imprimé ou partagé.',
+    businessName: "Nom de l'entreprise (en-tête)", address: 'Adresse', receiptPrefix: 'Préfixe de numéro de reçu',
+    footerNote: 'Note de bas de page', uploadLogo: 'Téléverser le logo', changeLogo: 'Changer le logo', noLogo: 'Aucun logo',
+    currency: 'Devise', timezone: 'Fuseau horaire', saveSettings: 'Enregistrer les réglages', saved: 'Vos réglages ont été mis à jour.',
+  },
+  sale: {
+    reviewPay: 'Vérifier & Payer →', complete: 'Finaliser la vente', recordSale: 'Enregistrer la vente',
+    paymentMethod: 'Mode de paiement', outOfStock: 'Rupture de stock', onlyLeft: 'Seulement {{count}} de {{name}} restants.',
+    saleRecorded: 'Vente enregistrée', stockUpdated: '{{amount}} — stock mis à jour.', viewPrintReceipt: 'Voir / Imprimer le reçu',
+    fromContacts: 'Depuis les contacts', scanToAdd: 'Scanner', noProducts: 'Aucun produit. Ajoutez du stock d’abord.',
+    items: '{{count}} article', items_other: '{{count}} articles',
+  },
+  scan: {
+    title: 'Scanner', permission: "L'accès à la caméra est nécessaire.", grant: 'Autoriser la caméra',
+    pointProduct: 'Visez un code-barres produit ou un QR de reçu.', notFound: 'Aucun produit ne correspond.',
+  },
+  methods: { cash: 'espèces', transfer: 'virement', card: 'carte', wallet: 'portefeuille', credit: 'crédit' },
+};
+export default fr;

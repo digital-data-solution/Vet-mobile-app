@@ -11,9 +11,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
-import { apiFetch } from '../api/client';
+import { businessFetch } from '../api/client';
 import { showAlert } from '../utils/alert';
-import { ActiveRep, getActiveRep, loadActiveRep, setActiveRep } from '../utils/businessSession';
+import { money, setCurrencySymbol } from '../utils/money';
+import {
+  ActiveRep, getActiveRep, loadActiveRep, setActiveRep,
+  StaffAuth, getStaffSession, loadStaffSession, clearStaffSession,
+} from '../utils/businessSession';
 
 interface Status {
   productCount: number; freeProductLimit: number; atLimit: boolean; lowStockCount: number;
@@ -27,6 +31,7 @@ export default function BusinessScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [status, setStatus]   = useState<Status | null>(null);
   const [rep, setRep]         = useState<ActiveRep | null>(null);
+  const [staffAuth, setStaffAuth] = useState<StaffAuth | null>(null);
 
   const [switchOpen, setSwitchOpen] = useState(false);
   const [staff, setStaff]           = useState<Staff[]>([]);
@@ -36,11 +41,17 @@ export default function BusinessScreen({ navigation }: Props) {
 
   const load = useCallback(async () => {
     try {
+      await loadStaffSession();
+      setStaffAuth(getStaffSession()?.staff ?? null);
       await loadActiveRep();
       setRep(getActiveRep());
-      const res = await apiFetch('/api/v1/business/status', { method: 'GET' });
+      const res = await businessFetch('/api/v1/business/status', { method: 'GET' });
       if (res.ok && res.body?.data) setStatus(res.body.data);
       else if (res.status === 403) showAlert('Not available', res.body?.message || 'The Business Suite is for shops, vets and kennels.');
+      // Hydrate the business's currency so amounts render in ₦ / SAR / $ etc.
+      businessFetch('/api/v1/business/reports/business-profile', { method: 'GET' })
+        .then((r) => { if (r.ok && r.body?.data?.currencySymbol) setCurrencySymbol(r.body.data.currencySymbol); })
+        .catch(() => {});
     } catch {
       showAlert('Error', 'Could not load your business dashboard.');
     } finally {
@@ -52,7 +63,7 @@ export default function BusinessScreen({ navigation }: Props) {
 
   const openSwitch = async () => {
     setSwitchOpen(true);
-    const res = await apiFetch('/api/v1/business/staff', { method: 'GET' });
+    const res = await businessFetch('/api/v1/business/staff', { method: 'GET' });
     if (res.ok && res.body?.data) setStaff(res.body.data.filter((s: any) => s.isActive));
   };
 
@@ -60,7 +71,7 @@ export default function BusinessScreen({ navigation }: Props) {
     if (!selStaff || !pin) return;
     setVerifying(true);
     try {
-      const res = await apiFetch('/api/v1/business/staff/verify-pin', {
+      const res = await businessFetch('/api/v1/business/staff/verify-pin', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ staffId: selStaff._id, pin }),
       });
@@ -78,6 +89,18 @@ export default function BusinessScreen({ navigation }: Props) {
 
   const signOutRep = async () => { await setActiveRep(null); setRep(null); };
 
+  const staffLogout = () => {
+    showAlert('Log out?', 'You will need your username and password to sign back in.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Log out', style: 'destructive', onPress: async () => { await clearStaffSession(); } },
+    ]);
+  };
+
+  // Permission-scoped visibility. In owner mode (no staff session) everything shows.
+  const isStaff = !!staffAuth;
+  const perms   = staffAuth?.permissions;
+  const can = (key: keyof NonNullable<typeof perms>) => !isStaff || !!perms?.[key];
+
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#4338CA" /></View>;
 
   const Tile = ({ icon, title, desc, onPress, badge }: any) => (
@@ -93,20 +116,30 @@ export default function BusinessScreen({ navigation }: Props) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Active rep bar */}
-      <View style={styles.repBar}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.repLabel}>Selling as</Text>
-          <Text style={styles.repName}>{rep ? `👤 ${rep.name}` : '👑 Owner'}</Text>
+      {/* Signed-in bar: staff mode (own device) vs owner mode (shared device + PIN switch) */}
+      {isStaff ? (
+        <View style={styles.repBar}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.repLabel}>Signed in as{staffAuth?.businessName ? ` · ${staffAuth.businessName}` : ''}</Text>
+            <Text style={styles.repName}>👤 {staffAuth?.name}{staffAuth?.role ? ` · ${staffAuth.role}` : ''}</Text>
+          </View>
+          <TouchableOpacity style={styles.repBtnGhost} onPress={staffLogout}><Text style={styles.repBtnGhostText}>Log out</Text></TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.repBtn} onPress={openSwitch}><Text style={styles.repBtnText}>Switch</Text></TouchableOpacity>
-        {rep && <TouchableOpacity style={styles.repBtnGhost} onPress={signOutRep}><Text style={styles.repBtnGhostText}>Owner</Text></TouchableOpacity>}
-      </View>
+      ) : (
+        <View style={styles.repBar}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.repLabel}>Selling as</Text>
+            <Text style={styles.repName}>{rep ? `👤 ${rep.name}` : '👑 Owner'}</Text>
+          </View>
+          <TouchableOpacity style={styles.repBtn} onPress={openSwitch}><Text style={styles.repBtnText}>Switch</Text></TouchableOpacity>
+          {rep && <TouchableOpacity style={styles.repBtnGhost} onPress={signOutRep}><Text style={styles.repBtnGhostText}>Owner</Text></TouchableOpacity>}
+        </View>
+      )}
 
       {/* Today */}
       {status && (
         <View style={styles.statCard}>
-          <Text style={styles.statBig}>₦{status.today.total.toLocaleString()}</Text>
+          <Text style={styles.statBig}>{money(status.today.total)}</Text>
           <Text style={styles.statSub}>{status.today.count} sale{status.today.count === 1 ? '' : 's'} today</Text>
           <View style={styles.statRow}>
             <Text style={styles.statChip}>📦 {status.productCount} products</Text>
@@ -115,7 +148,7 @@ export default function BusinessScreen({ navigation }: Props) {
         </View>
       )}
 
-      {status && !status.addonActive && (
+      {!isStaff && status && !status.addonActive && (
         <Pressable style={styles.upBanner} onPress={() => navigation.navigate('BusinessUpgrade')}>
           <Text style={styles.upBannerText}>
             Free plan: {status.productCount}/{status.freeProductLimit} products. Upgrade for unlimited stock + sales reps →
@@ -123,12 +156,14 @@ export default function BusinessScreen({ navigation }: Props) {
         </Pressable>
       )}
 
-      <Tile icon="🧾" title="Record a Sale" desc="Ring up items — stock updates instantly" onPress={() => navigation.navigate('RecordSale')} />
-      <Tile icon="📦" title="Inventory" desc="Products, stock levels, restock" badge={status?.lowStockCount || 0} onPress={() => navigation.navigate('Inventory')} />
-      <Tile icon="📊" title="Sales & Reports" desc="Revenue, profit, per-rep breakdown" onPress={() => navigation.navigate('SalesReport')} />
-      <Tile icon="👥" title="Sales Reps" desc="Add staff, give each a tracked PIN" onPress={() => navigation.navigate('Staff')} />
-      <Tile icon="🔎" title="Audit Log" desc="Every stock move, who did it, when" onPress={() => navigation.navigate('AuditLog')} />
-      <Tile icon="⭐" title="Upgrade / Renew" desc={status?.addonActive ? `${status.daysRemaining} days left` : 'Unlock unlimited + reps'} onPress={() => navigation.navigate('BusinessUpgrade')} />
+      {can('sell')            && <Tile icon="🧾" title="Record a Sale" desc="Ring up items — stock updates instantly" onPress={() => navigation.navigate('RecordSale')} />}
+      {can('manageInventory') && <Tile icon="📦" title="Inventory" desc="Products, stock levels, restock" badge={status?.lowStockCount || 0} onPress={() => navigation.navigate('Inventory')} />}
+      {can('viewReports')     && <Tile icon="📊" title="Sales & Reports" desc="Revenue, profit, per-rep breakdown" onPress={() => navigation.navigate('SalesReport')} />}
+      {can('viewReports')     && <Tile icon="📅" title="Day Close & Reports" desc="Balance the till, close each day, monthly CSV" onPress={() => navigation.navigate('DayReport')} />}
+      {can('manageStaff')     && <Tile icon="👥" title="Sales Reps" desc="Add staff, set logins & permissions" onPress={() => navigation.navigate('Staff')} />}
+      {!isStaff && <Tile icon="🧾" title="Receipt Settings" desc="Your logo & details on every receipt" onPress={() => navigation.navigate('ReceiptSettings')} />}
+      {(!isStaff || perms?.adjustStock || perms?.manageInventory) && <Tile icon="🔎" title="Audit Log" desc="Every stock move, who did it, when" onPress={() => navigation.navigate('AuditLog')} />}
+      {!isStaff && <Tile icon="⭐" title="Upgrade / Renew" desc={status?.addonActive ? `${status.daysRemaining} days left` : 'Unlock unlimited + reps'} onPress={() => navigation.navigate('BusinessUpgrade')} />}
 
       {/* Rep switch modal */}
       <Modal visible={switchOpen} transparent animationType="slide" onRequestClose={() => setSwitchOpen(false)}>

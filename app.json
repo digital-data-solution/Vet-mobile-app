@@ -30,6 +30,12 @@
       "bundleIdentifier": "com.xpressvet.marketplace",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "We need your location to find nearby vets and pet services.",
+        "NSCameraUsageDescription": "Xpress Vet uses the camera to scan product barcodes and QR codes at your point of sale.",
+        "NSPhotoLibraryUsageDescription": "Xpress Vet needs photo access to add your business logo, listing photos and receipts.",
+        "NSPhotoLibraryAddUsageDescription": "Xpress Vet saves receipts and exported reports to your photo library.",
+        "NSContactsUsageDescription": "Xpress Vet can import your contacts as customers into your CRM.",
+        "NSFaceIDUsageDescription": "Use Face ID to sign in to your business securely.",
+        "NSCalendarsUsageDescription": "Xpress Vet can add appointment and reorder reminders to your calendar.",
         "UIBackgroundModes": [
           "remote-notification"
         ]
@@ -46,7 +52,15 @@
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE"
+        "VIBRATE",
+        "CAMERA",
+        "READ_CONTACTS",
+        "WRITE_CONTACTS",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "READ_CALENDAR",
+        "WRITE_CALENDAR",
+        "READ_MEDIA_IMAGES"
       ],
       "googleServicesFile": "./google-services.json"
     },
@@ -59,7 +73,11 @@
           "defaultChannel": "default",
           "sounds": []
         }
-      ]
+      ],
+      "expo-mail-composer",
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-localization"
     ],
     "web": {
       "bundler": "metro",

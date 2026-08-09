@@ -8,7 +8,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { apiFetch } from '../api/client';
+import { businessFetch } from '../api/client';
 import { showAlert } from '../utils/alert';
 import { storePaystackCallbacks } from '../utils/paystackCallbackStore';
 
@@ -16,22 +16,26 @@ interface Package { days: number; price: number; label: string; }
 interface Status {
   productCount: number; freeProductLimit: number; atLimit: boolean;
   addonActive: boolean; activeUntil: string | null; daysRemaining: number;
+  includedSeats?: number; seatsPaid?: number; staffCount?: number; perSeatPrice?: number;
 }
-interface Props { navigation: any; }
+interface Props { navigation: any; route?: any; }
 
-export default function BusinessUpgradeScreen({ navigation }: Props) {
+export default function BusinessUpgradeScreen({ navigation, route }: Props) {
+  const seatsMode = route?.params?.seats === true;
   const [loading, setLoading]   = useState(true);
   const [paying, setPaying]     = useState<number | null>(null);
   const [packages, setPackages] = useState<Package[]>([]);
   const [benefits, setBenefits] = useState<string[]>([]);
   const [status, setStatus]     = useState<Status | null>(null);
+  const [seatQty, setSeatQty]   = useState(1);
+  const [buyingSeats, setBuyingSeats] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const [priceRes, statusRes] = await Promise.all([
-        apiFetch('/api/v1/business/pricing', { method: 'GET' }),
-        apiFetch('/api/v1/business/status', { method: 'GET' }),
+        businessFetch('/api/v1/business/pricing', { method: 'GET' }),
+        businessFetch('/api/v1/business/status', { method: 'GET' }),
       ]);
       if (priceRes.ok && priceRes.body?.data) {
         setPackages(priceRes.body.data.packages || []);
@@ -64,7 +68,7 @@ export default function BusinessUpgradeScreen({ navigation }: Props) {
   const buy = async (days: number) => {
     setPaying(days);
     try {
-      const res = await apiFetch('/api/v1/business/pay', {
+      const res = await businessFetch('/api/v1/business/pay', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ days }),
       });
@@ -82,7 +86,78 @@ export default function BusinessUpgradeScreen({ navigation }: Props) {
     }
   };
 
+  const buySeats = async () => {
+    setBuyingSeats(true);
+    try {
+      const res = await businessFetch('/api/v1/business/seats/pay', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seats: seatQty, days: 30 }),
+      });
+      if (res.ok && res.body?.success) {
+        const { authorization_url, reference, amount } = res.body.data;
+        setBuyingSeats(false);
+        openPaystackWebView(authorization_url, reference, amount);
+      } else {
+        showAlert('Error', res.body?.message || 'Could not start seat payment.');
+        setBuyingSeats(false);
+      }
+    } catch {
+      showAlert('Error', 'Please check your connection and try again.');
+      setBuyingSeats(false);
+    }
+  };
+
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#4338CA" /></View>;
+
+  // ── Seats purchase mode (from Staff → Add seats) ────────────────────────────
+  if (seatsMode) {
+    const perSeat  = status?.perSeatPrice ?? 0;
+    const included = status?.includedSeats ?? 0;
+    const paid     = status?.seatsPaid ?? 0;
+    const used     = status?.staffCount ?? 0;
+    const estimate = perSeat * seatQty;
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <Text style={styles.hero}>👥 Add staff seats</Text>
+        <Text style={styles.sub}>
+          Each staff member with their own login needs a seat. Buy extra seats to grow your team.
+        </Text>
+
+        {status && (
+          <View style={styles.statusCard}>
+            <Text style={styles.statusTitle}>{used} of {included + paid} seats used</Text>
+            <Text style={styles.statusText}>
+              {included} included{paid > 0 ? ` + ${paid} extra` : ''}. Extra seats are ₦{perSeat.toLocaleString()} each per 30 days.
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.pkgCard}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.pkgLabel}>How many seats?</Text>
+            <Text style={styles.pkgDays}>₦{perSeat.toLocaleString()} per seat / 30 days</Text>
+          </View>
+          <View style={styles.stepper}>
+            <TouchableOpacity style={styles.stepBtn} onPress={() => setSeatQty((q) => Math.max(1, q - 1))}><Text style={styles.stepBtnText}>−</Text></TouchableOpacity>
+            <Text style={styles.stepQty}>{seatQty}</Text>
+            <TouchableOpacity style={styles.stepBtn} onPress={() => setSeatQty((q) => Math.min(50, q + 1))}><Text style={styles.stepBtnText}>＋</Text></TouchableOpacity>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.buyBtn, styles.seatBuyBtn, buyingSeats && styles.buyBtnDisabled]}
+          disabled={buyingSeats}
+          onPress={buySeats}
+        >
+          {buyingSeats ? <ActivityIndicator color="#fff" /> : <Text style={styles.buyBtnText}>Pay ₦{estimate.toLocaleString()} for {seatQty} seat{seatQty === 1 ? '' : 's'}</Text>}
+        </TouchableOpacity>
+
+        <Text style={styles.footNote}>
+          Seats are billed separately per 30 days. Final amount is confirmed at checkout.
+        </Text>
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -152,5 +227,10 @@ const styles = StyleSheet.create({
   buyBtn:         { backgroundColor: '#4338CA', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 10, minWidth: 96, alignItems: 'center' },
   buyBtnDisabled: { opacity: 0.6 },
   buyBtnText:     { color: '#fff', fontWeight: '900', fontSize: 15 },
+  seatBuyBtn:     { paddingVertical: 15, borderRadius: 12, marginTop: 4 },
+  stepper:        { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  stepBtn:        { width: 40, height: 40, borderRadius: 10, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#C7D2FE' },
+  stepBtnText:    { color: '#4338CA', fontSize: 22, fontWeight: '900', marginTop: -2 },
+  stepQty:        { fontSize: 20, fontWeight: '900', color: '#111827', minWidth: 28, textAlign: 'center' },
   footNote: { fontSize: 12, color: '#9CA3AF', marginTop: 12, lineHeight: 18, textAlign: 'center' },
 });

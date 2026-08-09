@@ -8,7 +8,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
-import { apiFetch } from '../api/client';
+import { businessFetch } from '../api/client';
 import { showAlert } from '../utils/alert';
 import { activeStaffId } from '../utils/businessSession';
 
@@ -33,7 +33,7 @@ export default function ProductDetailScreen({ navigation, route }: Props) {
 
   const load = useCallback(async () => {
     try {
-      const res = await apiFetch(`/api/v1/business/products/${productId}`, { method: 'GET' });
+      const res = await businessFetch(`/api/v1/business/products/${productId}`, { method: 'GET' });
       if (res.ok && res.body?.data) {
         setProduct(res.body.data);
         setEdit({
@@ -55,7 +55,7 @@ export default function ProductDetailScreen({ navigation, route }: Props) {
     if (!qty || qty <= 0) return showAlert('Quantity', 'Enter how many you received.');
     setBusy(true);
     try {
-      const res = await apiFetch(`/api/v1/business/products/${productId}/restock`, {
+      const res = await businessFetch(`/api/v1/business/products/${productId}/restock`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ quantity: qty, unitCost: restockCost ? Number(restockCost) : undefined, staffId: activeStaffId() }),
       });
@@ -69,7 +69,7 @@ export default function ProductDetailScreen({ navigation, route }: Props) {
     if (!reason.trim()) return showAlert('Reason required', 'Say why the count is changing (recount, damage, loss…).');
     setBusy(true);
     try {
-      const res = await apiFetch(`/api/v1/business/products/${productId}/adjust`, {
+      const res = await businessFetch(`/api/v1/business/products/${productId}/adjust`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ newQuantity: parseInt(newQty, 10), reason: reason.trim(), staffId: activeStaffId() }),
       });
@@ -81,7 +81,7 @@ export default function ProductDetailScreen({ navigation, route }: Props) {
   const doEdit = async () => {
     setBusy(true);
     try {
-      const res = await apiFetch(`/api/v1/business/products/${productId}`, {
+      const res = await businessFetch(`/api/v1/business/products/${productId}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: edit.name.trim(), sellPrice: Number(edit.sellPrice),
@@ -97,7 +97,7 @@ export default function ProductDetailScreen({ navigation, route }: Props) {
   const archive = () => showAlert('Archive product?', 'It will be hidden from your inventory. Sales history is kept.', [
     { text: 'Cancel', style: 'cancel' },
     { text: 'Archive', style: 'destructive', onPress: async () => {
-      const res = await apiFetch(`/api/v1/business/products/${productId}`, { method: 'DELETE' });
+      const res = await businessFetch(`/api/v1/business/products/${productId}`, { method: 'DELETE' });
       if (res.ok) navigation.goBack();
     } },
   ]);

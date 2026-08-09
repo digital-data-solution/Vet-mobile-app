@@ -332,6 +332,10 @@ export default function AuthScreen({ navigation, route }: { navigation: any; rou
             <Text style={styles.footerLink}> Create one</Text>
           </Pressable>
         </View>
+
+        <Pressable style={styles.staffLink} onPress={() => navigation.navigate('StaffLogin')}>
+          <Text style={styles.staffLinkText}>Staff / team member? Sign in here</Text>
+        </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -422,4 +426,6 @@ const styles = StyleSheet.create({
   footer:             { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
   footerText:         { fontSize: 14, color: '#6B7280' },
   footerLink:         { fontSize: 14, color: '#2563EB', fontWeight: '700' },
+  staffLink:          { alignItems: 'center', marginTop: 18 },
+  staffLinkText:      { fontSize: 14, color: '#4338CA', fontWeight: '700' },
 });

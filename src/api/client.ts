@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { supabase } from './supabase';
+import { getStaffToken, loadStaffSession } from '../utils/businessSession';
 
 const BACKEND_URL = (
   process.env.EXPO_PUBLIC_BACKEND_URL || 'https://vet-market-place-jsj5.onrender.com'
@@ -111,13 +112,19 @@ function xhrRequest(
   });
 }
 
-export async function apiFetch(path: string, options: RequestInit = {}) {
+async function requestJson(
+  path:         string,
+  options:      RequestInit = {},
+  authOverride: string | null | undefined = undefined,
+) {
   const url        = BACKEND_URL + path;
   const method     = (options.method ?? 'GET').toUpperCase();
   const bodyString = options.body as string | undefined;
 
   try {
-    const authHeader = await getAuthHeader();
+    // authOverride === undefined  → fall back to the owner's Supabase token.
+    // authOverride is a string    → use it verbatim (e.g. staff Bearer token).
+    const authHeader = authOverride !== undefined ? authOverride : await getAuthHeader();
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -186,6 +193,27 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
       userMessage: 'No internet connection. Please check your network and try again.',
     };
   }
+}
+
+/**
+ * Standard JSON request — authenticates with the owner's Supabase token.
+ * Behaviour is unchanged for all existing callers.
+ */
+export async function apiFetch(path: string, options: RequestInit = {}) {
+  return requestJson(path, options);
+}
+
+/**
+ * Business Suite request. IF an individual staff member is signed in on this
+ * device (username/password login), send THEIR scoped token as
+ * `Authorization: Bearer <staffToken>` instead of the owner's Supabase token.
+ * With no staff session it behaves exactly like apiFetch (owner mode). Use for
+ * all /api/v1/business/* calls so staff-mode requests carry the staff token.
+ */
+export async function businessFetch(path: string, options: RequestInit = {}) {
+  await loadStaffSession();
+  const token = getStaffToken();
+  return requestJson(path, options, token ? `Bearer ${token}` : undefined);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

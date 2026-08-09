@@ -9,8 +9,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
-import { apiFetch } from '../api/client';
+import { businessFetch } from '../api/client';
 import { showAlert } from '../utils/alert';
+import { money } from '../utils/money';
 import { activeStaffId, getActiveRep } from '../utils/businessSession';
 
 interface Product { _id: string; name: string; sellPrice: number; quantity: number; unit?: string; }
@@ -33,7 +34,7 @@ export default function RecordSaleScreen({ navigation }: Props) {
 
   const load = useCallback(async () => {
     try {
-      const res = await apiFetch('/api/v1/business/products', { method: 'GET' });
+      const res = await businessFetch('/api/v1/business/products', { method: 'GET' });
       if (res.ok && res.body?.data) setProducts(res.body.data);
     } finally { setLoading(false); }
   }, []);
@@ -71,7 +72,7 @@ export default function RecordSaleScreen({ navigation }: Props) {
     if (lines.length === 0) return;
     setSaving(true);
     try {
-      const res = await apiFetch('/api/v1/business/sales', {
+      const res = await businessFetch('/api/v1/business/sales', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: lines.map((l) => ({ productId: l.product._id, quantity: l.quantity })),
@@ -83,9 +84,13 @@ export default function RecordSaleScreen({ navigation }: Props) {
         }),
       });
       if (res.ok && res.body?.success) {
+        const saleId = res.body?.data?._id;
         setCart({}); setDiscount(''); setCustName(''); setCustPhone(''); setCheckout(false);
-        showAlert('Sale recorded', `₦${total.toLocaleString()} — stock updated.`);
         load();
+        showAlert('Sale recorded', `${money(total)} — stock updated.`, [
+          { text: 'Done', style: 'cancel' },
+          ...(saleId ? [{ text: 'View / Print receipt', onPress: () => navigation.navigate('Receipt', { saleId }) }] : []),
+        ]);
       } else {
         showAlert('Error', res.body?.message || 'Could not record sale.');
       }
@@ -102,7 +107,7 @@ export default function RecordSaleScreen({ navigation }: Props) {
       <Pressable style={[styles.pRow, out && { opacity: 0.4 }]} onPress={() => !out && add(item)} disabled={out}>
         <View style={{ flex: 1 }}>
           <Text style={styles.pName}>{item.name}</Text>
-          <Text style={styles.pMeta}>₦{item.sellPrice.toLocaleString()} · {item.quantity} left</Text>
+          <Text style={styles.pMeta}>{money(item.sellPrice)} · {item.quantity} left</Text>
         </View>
         {inCart > 0 ? <View style={styles.inCart}><Text style={styles.inCartText}>{inCart}</Text></View> : <Text style={styles.addPlus}>＋</Text>}
       </Pressable>
@@ -126,7 +131,7 @@ export default function RecordSaleScreen({ navigation }: Props) {
         <View style={styles.cartBar}>
           <View>
             <Text style={styles.cartCount}>{cartCount} item{cartCount === 1 ? '' : 's'}</Text>
-            <Text style={styles.cartTotal}>₦{subtotal.toLocaleString()}</Text>
+            <Text style={styles.cartTotal}>{money(subtotal)}</Text>
           </View>
           <TouchableOpacity style={styles.checkoutBtn} onPress={() => setCheckout(true)}><Text style={styles.checkoutText}>Review & Pay →</Text></TouchableOpacity>
         </View>
@@ -144,7 +149,7 @@ export default function RecordSaleScreen({ navigation }: Props) {
                 <View style={styles.cartLine}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.clName}>{l.product.name}</Text>
-                    <Text style={styles.clPrice}>₦{(l.product.sellPrice * l.quantity).toLocaleString()}</Text>
+                    <Text style={styles.clPrice}>{money(l.product.sellPrice * l.quantity)}</Text>
                   </View>
                   <View style={styles.stepper}>
                     <TouchableOpacity style={styles.step} onPress={() => setQty(l.product._id, l.quantity - 1)}><Text style={styles.stepText}>−</Text></TouchableOpacity>
@@ -177,7 +182,7 @@ export default function RecordSaleScreen({ navigation }: Props) {
               </View>
             </View>
 
-            <View style={styles.totalRow}><Text style={styles.totalLabel}>Total</Text><Text style={styles.totalVal}>₦{total.toLocaleString()}</Text></View>
+            <View style={styles.totalRow}><Text style={styles.totalLabel}>Total</Text><Text style={styles.totalVal}>{money(total)}</Text></View>
 
             <TouchableOpacity style={styles.payBtn} onPress={record} disabled={saving}>
               {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.payText}>Record Sale</Text>}

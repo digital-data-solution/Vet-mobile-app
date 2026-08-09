@@ -57,3 +57,84 @@ export function subscribeActiveRep(l: Listener): () => void {
   listeners.add(l);
   return () => listeners.delete(l);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STAFF AUTH SESSION (hybrid logins)
+//
+// Separate from the shared-device PIN switcher above. This is an individual
+// staff member logging in on THEIR OWN phone with a username + password. When a
+// staff session is present, business API calls carry the scoped staff token
+// (see businessFetch in api/client.ts) INSTEAD of the owner's Supabase token,
+// and the Business UI is scoped to the staff member's permissions.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface StaffPermissions {
+  sell:            boolean;
+  viewReports:     boolean;
+  manageInventory: boolean;
+  adjustStock:     boolean;
+  manageStaff:     boolean;
+  dispense:        boolean;
+}
+
+export interface StaffAuth {
+  id:            string;
+  name:          string;
+  role?:         string;
+  permissions:   StaffPermissions;
+  ownerId?:      string;
+  businessName?: string;
+}
+
+export interface StaffSession {
+  staffToken: string;
+  staff:      StaffAuth;
+}
+
+const STAFF_KEY = 'business_staff_session';
+let staffSession: StaffSession | null = null;
+let staffLoaded = false;
+type StaffListener = (s: StaffSession | null) => void;
+const staffListeners = new Set<StaffListener>();
+
+export async function loadStaffSession(): Promise<StaffSession | null> {
+  if (staffLoaded) return staffSession;
+  try {
+    const raw = await AsyncStorage.getItem(STAFF_KEY);
+    staffSession = raw ? JSON.parse(raw) : null;
+  } catch {
+    staffSession = null;
+  }
+  staffLoaded = true;
+  return staffSession;
+}
+
+export function getStaffSession(): StaffSession | null {
+  return staffSession;
+}
+
+/** The scoped staff token for Authorization: Bearer, or undefined for owner mode. */
+export function getStaffToken(): string | undefined {
+  return staffSession?.staffToken || undefined;
+}
+
+export async function setStaffSession(s: StaffSession | null): Promise<void> {
+  staffSession = s;
+  staffLoaded = true;
+  try {
+    if (s) await AsyncStorage.setItem(STAFF_KEY, JSON.stringify(s));
+    else await AsyncStorage.removeItem(STAFF_KEY);
+  } catch {
+    /* non-fatal */
+  }
+  staffListeners.forEach((l) => l(staffSession));
+}
+
+export async function clearStaffSession(): Promise<void> {
+  await setStaffSession(null);
+}
+
+export function subscribeStaffSession(l: StaffListener): () => void {
+  staffListeners.add(l);
+  return () => staffListeners.delete(l);
+}

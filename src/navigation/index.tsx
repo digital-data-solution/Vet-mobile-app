@@ -25,6 +25,7 @@ import * as Notifications from 'expo-notifications';
 import { supabase } from '../api/supabase';
 import { useOnlineStatus } from '../utils/useOnlineStatus';
 import { registerForPushNotificationsAsync } from '../utils/notifications';
+import { loadStaffSession, getStaffSession, subscribeStaffSession } from '../utils/businessSession';
 
 import HomeScreen                   from '../screens/HomeScreen';
 import AuthScreen                   from '../screens/AuthScreen';
@@ -61,6 +62,10 @@ import SalesReportScreen            from '../screens/SalesReportScreen';
 import StaffScreen                  from '../screens/StaffScreen';
 import AuditLogScreen               from '../screens/AuditLogScreen';
 import BusinessUpgradeScreen        from '../screens/BusinessUpgradeScreen';
+import ReceiptScreen                from '../screens/ReceiptScreen';
+import DayReportScreen              from '../screens/DayReportScreen';
+import ReceiptSettingsScreen        from '../screens/ReceiptSettingsScreen';
+import StaffLoginScreen             from '../screens/StaffLoginScreen';
 import EmailVerifiedScreen          from '../screens/EmailVerifiedScreen';
 import ConversationsScreen          from '../screens/ConversationsScreen';
 import ChatScreen                   from '../screens/ChatScreen';
@@ -121,6 +126,7 @@ export type RootStackParamList = {
   ShopProfile:            { shopId?: string } | undefined;
   KennelProfile:          { kennelId?: string } | undefined;
   ServiceProfile:         { professionalId: string };
+  Favorites:              undefined;
   ExploreOptions:         undefined;
   VerifyProfessional:     undefined;
   AddressInput:           { mode?: 'professional' } | undefined;
@@ -138,7 +144,11 @@ export type RootStackParamList = {
   SalesReport:            undefined;
   Staff:                  undefined;
   AuditLog:               undefined;
-  BusinessUpgrade:        undefined;
+  BusinessUpgrade:        { seats?: boolean } | undefined;
+  Receipt:                { saleId: string };
+  DayReport:              undefined;
+  ReceiptSettings:        undefined;
+  StaffLogin:             undefined;
   ProfessionalOnboarding: { role?: string } | undefined;
   KennelOnboarding:       undefined;
   ShopOnboarding:         undefined;
@@ -449,8 +459,13 @@ export default function AppNavigator() {
   const [userRole,     setUserRole]     = useState<UserRole>(null);
   const [loading,      setLoading]      = useState(true);
   const [unreadCount,  setUnreadCount]  = useState(0);
+  const [hasStaffSession, setHasStaffSession] = useState(false);
 
   const isAuthenticated = !!session;
+  // A staff member signed in on their own phone (no Supabase account). When this
+  // is true and there's no owner session, the navigator runs in staff mode:
+  // only the permission-scoped Business Suite screens are available.
+  const staffMode = !isAuthenticated && hasStaffSession;
 
   const fetchRoleFromBackend = useCallback(async (currentSession: Session | null) => {
     if (!currentSession) {
@@ -512,6 +527,15 @@ export default function AppNavigator() {
       subscription.unsubscribe();
     };
   }, [fetchRoleFromBackend]);
+
+  // Track the individual staff (username/password) session so the navigator can
+  // switch into staff mode. StaffLoginScreen sets it; BusinessScreen clears it.
+  useEffect(() => {
+    let mounted = true;
+    loadStaffSession().then(() => { if (mounted) setHasStaffSession(!!getStaffSession()); });
+    const unsub = subscribeStaffSession((s) => { if (mounted) setHasStaffSession(!!s); });
+    return () => { mounted = false; unsub(); };
+  }, []);
 
   // After login, redirect to the URL the user was trying to reach before auth.
   // Use history.replaceState instead of window.location.href to avoid full reload loop.
@@ -581,8 +605,9 @@ export default function AppNavigator() {
           <OfflineBanner />
         <NavigationContainer linking={linking}>
           <RootStack.Navigator
+            key={isAuthenticated ? 'owner' : staffMode ? 'staff' : 'public'}
             screenOptions={{ headerShown: false }}
-            initialRouteName={isAuthenticated ? 'MainTabs' : 'Auth'}
+            initialRouteName={isAuthenticated ? 'MainTabs' : staffMode ? 'Business' : 'Auth'}
           >
             <RootStack.Screen name="Auth"     component={AuthScreen} />
             <RootStack.Screen name="Register" component={RegisterScreen} />
@@ -606,6 +631,30 @@ export default function AppNavigator() {
               component={SupportScreen}
               options={{ headerShown: false }}
             />
+            <RootStack.Screen
+              name="StaffLogin"
+              component={StaffLoginScreen}
+              options={{ headerShown: false }}
+            />
+
+            {/* Staff-mode: a staff member signed in on their own phone gets only
+                the permission-scoped Business Suite screens. */}
+            {staffMode && (
+              <>
+                <RootStack.Screen name="Business"        component={BusinessScreen}        options={{ headerShown: true, title: 'Business Suite' }} />
+                <RootStack.Screen name="Inventory"       component={InventoryScreen}       options={{ headerShown: true, title: 'Inventory' }} />
+                <RootStack.Screen name="ProductDetail"   component={ProductDetailScreen}   options={{ headerShown: true, title: 'Product' }} />
+                <RootStack.Screen name="RecordSale"      component={RecordSaleScreen}      options={{ headerShown: true, title: 'Record Sale' }} />
+                <RootStack.Screen name="SalesReport"     component={SalesReportScreen}     options={{ headerShown: true, title: 'Sales & Reports' }} />
+                <RootStack.Screen name="Staff"           component={StaffScreen}           options={{ headerShown: true, title: 'Staff' }} />
+                <RootStack.Screen name="AuditLog"        component={AuditLogScreen}        options={{ headerShown: true, title: 'Audit Log' }} />
+                <RootStack.Screen name="DayReport"       component={DayReportScreen}       options={{ headerShown: true, title: 'Day Close & Reports' }} />
+                <RootStack.Screen name="Receipt"         component={ReceiptScreen}         options={{ headerShown: true, title: 'Receipt' }} />
+                <RootStack.Screen name="ReceiptSettings" component={ReceiptSettingsScreen} options={{ headerShown: true, title: 'Receipt Settings' }} />
+                <RootStack.Screen name="BusinessUpgrade" component={BusinessUpgradeScreen} options={{ headerShown: true, title: 'Business Suite' }} />
+                <RootStack.Screen name="PaystackWebView" component={PaystackWebView}       options={{ headerShown: false }} />
+              </>
+            )}
 
             {isAuthenticated && (
               <>
@@ -709,6 +758,21 @@ export default function AppNavigator() {
                   name="AuditLog"
                   component={AuditLogScreen}
                   options={{ headerShown: true, title: 'Audit Log' }}
+                />
+                <RootStack.Screen
+                  name="DayReport"
+                  component={DayReportScreen}
+                  options={{ headerShown: true, title: 'Day Close & Reports' }}
+                />
+                <RootStack.Screen
+                  name="Receipt"
+                  component={ReceiptScreen}
+                  options={{ headerShown: true, title: 'Receipt' }}
+                />
+                <RootStack.Screen
+                  name="ReceiptSettings"
+                  component={ReceiptSettingsScreen}
+                  options={{ headerShown: true, title: 'Receipt Settings' }}
                 />
                 <RootStack.Screen
                   name="BusinessUpgrade"

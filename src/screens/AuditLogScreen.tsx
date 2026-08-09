@@ -6,7 +6,7 @@
 import React, { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { apiFetch } from '../api/client';
+import { businessFetch } from '../api/client';
 
 interface Movement {
   _id: string; productName: string; type: string; quantityChange: number;
@@ -32,8 +32,8 @@ export default function AuditLogScreen() {
       if (type) params.set('type', type);
       if (staffId) params.set('staffId', staffId);
       const [mRes, sRes] = await Promise.all([
-        apiFetch(`/api/v1/business/movements?${params.toString()}`, { method: 'GET' }),
-        staff.length ? Promise.resolve(null) : apiFetch('/api/v1/business/staff', { method: 'GET' }),
+        businessFetch(`/api/v1/business/movements?${params.toString()}`, { method: 'GET' }),
+        staff.length ? Promise.resolve(null) : businessFetch('/api/v1/business/staff', { method: 'GET' }),
       ]);
       if (mRes.ok && mRes.body?.data) setMoves(mRes.body.data);
       if (sRes && sRes.ok && sRes.body?.data) setStaff(sRes.body.data);

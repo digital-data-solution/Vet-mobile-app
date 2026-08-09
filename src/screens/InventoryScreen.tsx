@@ -7,7 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
-import { apiFetch } from '../api/client';
+import { businessFetch } from '../api/client';
 import { showAlert } from '../utils/alert';
 import { activeStaffId } from '../utils/businessSession';
 
@@ -32,7 +32,7 @@ export default function InventoryScreen({ navigation }: Props) {
       const params = new URLSearchParams();
       if (q.trim()) params.set('q', q.trim());
       if (lowOnly) params.set('lowStock', 'true');
-      const res = await apiFetch(`/api/v1/business/products?${params.toString()}`, { method: 'GET' });
+      const res = await businessFetch(`/api/v1/business/products?${params.toString()}`, { method: 'GET' });
       if (res.ok && res.body?.data) setProducts(res.body.data);
     } catch {
       showAlert('Error', 'Could not load inventory.');
@@ -48,7 +48,7 @@ export default function InventoryScreen({ navigation }: Props) {
     if (!form.sellPrice || isNaN(Number(form.sellPrice))) return showAlert('Price required', 'Enter a valid selling price.');
     setSaving(true);
     try {
-      const res = await apiFetch('/api/v1/business/products', {
+      const res = await businessFetch('/api/v1/business/products', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: form.name.trim(),

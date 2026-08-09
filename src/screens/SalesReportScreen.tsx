@@ -5,7 +5,8 @@
 import React, { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { apiFetch } from '../api/client';
+import { businessFetch } from '../api/client';
+import { money } from '../utils/money';
 
 interface Period { count: number; revenue: number; profit: number; }
 interface Summary {
@@ -23,8 +24,8 @@ export default function SalesReportScreen() {
   const load = useCallback(async () => {
     try {
       const [sumRes, salesRes] = await Promise.all([
-        apiFetch('/api/v1/business/sales/summary', { method: 'GET' }),
-        apiFetch('/api/v1/business/sales', { method: 'GET' }),
+        businessFetch('/api/v1/business/sales/summary', { method: 'GET' }),
+        businessFetch('/api/v1/business/sales', { method: 'GET' }),
       ]);
       if (sumRes.ok && sumRes.body?.data) setSummary(sumRes.body.data);
       if (salesRes.ok && salesRes.body?.data) setSales(salesRes.body.data.slice(0, 40));
@@ -38,8 +39,8 @@ export default function SalesReportScreen() {
   const Stat = ({ label, p }: { label: string; p: Period }) => (
     <View style={styles.statCard}>
       <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statRev}>₦{(p?.revenue || 0).toLocaleString()}</Text>
-      <Text style={styles.statMeta}>{p?.count || 0} sales · ₦{(p?.profit || 0).toLocaleString()} profit</Text>
+      <Text style={styles.statRev}>{money(p?.revenue)}</Text>
+      <Text style={styles.statMeta}>{p?.count || 0} sales · {money(p?.profit)} profit</Text>
     </View>
   );
 
@@ -59,7 +60,7 @@ export default function SalesReportScreen() {
             <View key={s._id || 'owner'} style={styles.repRow}>
               <Text style={styles.repName}>👤 {s._id || 'Owner'}</Text>
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={styles.repRev}>₦{s.revenue.toLocaleString()}</Text>
+                <Text style={styles.repRev}>{money(s.revenue)}</Text>
                 <Text style={styles.repMeta}>{s.count} sales</Text>
               </View>
             </View>
@@ -70,7 +71,7 @@ export default function SalesReportScreen() {
           {summary.topProducts.map((p) => (
             <View key={p._id} style={styles.topRow}>
               <Text style={styles.topName}>{p._id}</Text>
-              <Text style={styles.topQty}>{p.qty} sold · ₦{p.revenue.toLocaleString()}</Text>
+              <Text style={styles.topQty}>{p.qty} sold · {money(p.revenue)}</Text>
             </View>
           ))}
         </>
@@ -81,7 +82,7 @@ export default function SalesReportScreen() {
       {sales.map((s) => (
         <View key={s._id} style={styles.saleRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.saleTotal}>₦{s.total.toLocaleString()}</Text>
+            <Text style={styles.saleTotal}>{money(s.total)}</Text>
             <Text style={styles.saleMeta}>
               {s.items.length} item{s.items.length === 1 ? '' : 's'} · {s.staffName} · {s.paymentMethod}
               {s.customerName ? ` · ${s.customerName}` : ''}
