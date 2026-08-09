@@ -30,6 +30,9 @@ interface Status {
   atLimit: boolean;
   addonActive: boolean;
   daysRemaining: number;
+  planLabel?: string;
+  planTier?: string;
+  maxPatients?: number | null;
 }
 interface DueItem { patient?: { name?: string }; vaccineName?: string; reason?: string; nextDueDate?: string; followUpDate?: string; }
 interface Client { _id: string; name: string; phone?: string; email?: string; emailRemindersEnabled?: boolean; }
@@ -138,7 +141,10 @@ export default function PracticeRecordsScreen({ navigation }: Props) {
           <TouchableOpacity style={styles.statusCard} onPress={() => navigation.navigate('PracticeUpgrade')} activeOpacity={0.85}>
             <View style={{ flex: 1 }}>
               <Text style={styles.statusTitle}>
-                {status?.addonActive ? t('practice.unlimited') : t('practice.patients', { count: status?.patientCount ?? 0, limit: status?.freePatientLimit ?? 5 })}
+                {status?.planLabel ? `${status.planLabel}: ` : ''}
+                {status?.maxPatients == null && status?.addonActive
+                  ? t('practice.unlimited')
+                  : t('practice.patients', { count: status?.patientCount ?? 0, limit: status?.maxPatients ?? status?.freePatientLimit ?? 5 })}
               </Text>
               <Text style={styles.statusText}>
                 {status?.addonActive

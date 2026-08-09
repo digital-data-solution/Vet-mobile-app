@@ -23,6 +23,7 @@ interface Status {
   productCount: number; freeProductLimit: number; atLimit: boolean; lowStockCount: number;
   staffCount: number; canAddStaff: boolean; addonActive: boolean; daysRemaining: number;
   today: { count: number; total: number };
+  planLabel?: string; planTier?: string; maxProducts?: number | null;
 }
 interface Staff { _id: string; name: string; role: string; }
 interface Props { navigation: any; }
@@ -142,7 +143,8 @@ export default function BusinessScreen({ navigation }: Props) {
           <Text style={styles.statBig}>{money(status.today.total)}</Text>
           <Text style={styles.statSub}>{status.today.count} sale{status.today.count === 1 ? '' : 's'} today</Text>
           <View style={styles.statRow}>
-            <Text style={styles.statChip}>📦 {status.productCount} products</Text>
+            {status.planLabel && <Text style={[styles.statChip, styles.statPlan]}>⭐ {status.planLabel}</Text>}
+            <Text style={styles.statChip}>📦 {status.productCount}{status.maxProducts ? `/${status.maxProducts}` : ''} products</Text>
             {status.lowStockCount > 0 && <Text style={[styles.statChip, styles.statWarn]}>⚠️ {status.lowStockCount} low</Text>}
           </View>
         </View>
@@ -220,6 +222,7 @@ const styles = StyleSheet.create({
   statRow:  { flexDirection: 'row', gap: 8, marginTop: 12 },
   statChip: { backgroundColor: '#F3F4F6', color: '#374151', fontWeight: '700', fontSize: 12, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, overflow: 'hidden' },
   statWarn: { backgroundColor: '#FEF3C7', color: '#92400E' },
+  statPlan: { backgroundColor: '#EEF2FF', color: '#4338CA' },
 
   upBanner: { backgroundColor: '#FEF9C3', borderRadius: 12, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: '#FDE68A' },
   upBannerText: { color: '#854D0E', fontSize: 13, fontWeight: '600', lineHeight: 18 },
