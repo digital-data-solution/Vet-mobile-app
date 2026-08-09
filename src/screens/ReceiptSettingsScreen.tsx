@@ -73,7 +73,7 @@ export default function ReceiptSettingsScreen(_props: Props) {
         const manipulated = await ImageManipulator.manipulateAsync(uri, [{ resize: { width: 512 } }], { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG });
         uri = manipulated.uri;
       } catch { /* use original if manipulation fails */ }
-      const up = await uploadFile('/api/upload', uri, 'logo.jpg', { folder: 'business-logos', publicId: 'logo' }, 'image');
+      const up = await uploadFile('/api/upload/asset', uri, 'logo.jpg', { folder: 'business-logos' }, 'image');
       if (up.ok && up.body?.url) setP((prev) => ({ ...prev, logoUrl: up.body.url }));
       else showAlert('Upload failed', up.userMessage || 'Could not upload the logo.');
     } finally { setUploading(false); }

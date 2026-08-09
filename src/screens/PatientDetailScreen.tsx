@@ -209,7 +209,7 @@ export default function PatientDetailScreen({ route, navigation }: Props) {
     try {
       const uri = result.assets[0].uri;
       const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
-      const up = await uploadFile('/api/upload', uri, `lab-result.${ext}`, { folder: 'lab-results' }, 'image');
+      const up = await uploadFile('/api/upload/asset', uri, `lab-result.${ext}`, { folder: 'lab-results' }, 'image');
       if (up.ok && up.body?.url) setLxAttachment(up.body.url);
       else showAlert('Upload failed', up.userMessage || 'Could not upload the file.');
     } finally { setLxUploading(false); }

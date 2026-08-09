@@ -230,7 +230,12 @@ export async function uploadFile(
   const url = BACKEND_URL + path;
 
   try {
-    const authHeader = await getAuthHeader();
+    // Prefer an individual staff member's scoped token when one is signed in on
+    // this device (e.g. a lab technician uploading a result photo); otherwise
+    // fall back to the owner's Supabase token.
+    await loadStaffSession();
+    const staffToken = getStaffToken();
+    const authHeader = staffToken ? `Bearer ${staffToken}` : await getAuthHeader();
     const mimeType   = mimeFromFileName(fileName);
     const fileEntry  = await buildFileEntry(fileUri, fileName, mimeType);
 
