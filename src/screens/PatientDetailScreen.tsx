@@ -9,6 +9,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   Modal,
   ScrollView,
   StyleSheet,
@@ -18,7 +19,8 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { apiFetch } from '../api/client';
+import * as ImagePicker from 'expo-image-picker';
+import { apiFetch, uploadFile } from '../api/client';
 import { showAlert } from '../utils/alert';
 
 interface Treatment {
@@ -28,11 +30,23 @@ interface Treatment {
 interface Vaccination {
   _id: string; vaccineName: string; dateGiven?: string; nextDueDate?: string; notes?: string;
 }
+interface LabResult {
+  _id: string; testName: string; sampleType?: string; results?: string; referenceRange?: string;
+  status?: string; performedAt?: string; technicianName?: string; attachmentUrl?: string; notes?: string;
+}
 interface Patient {
   _id: string; name: string; species?: string; breed?: string; sex?: string;
   dob?: string; weightKg?: number; color?: string; microchipId?: string; notes?: string;
-  treatments: Treatment[]; vaccinations: Vaccination[];
+  client?: { _id?: string; name?: string; phone?: string; email?: string };
+  treatments: Treatment[]; vaccinations: Vaccination[]; labResults?: LabResult[];
 }
+
+// Stable, human-readable patient ID derived from the record id (no migration
+// needed) — shown so staff reference the exact patient without confusion.
+const patientCode = (id: string) => 'PT-' + String(id).slice(-6).toUpperCase();
+
+const LAB_STATUSES = ['pending', 'normal', 'abnormal', 'inconclusive'] as const;
+const statusColor: Record<string, string> = { normal: '#059669', abnormal: '#DC2626', inconclusive: '#D97706', pending: '#6B7280' };
 
 interface Props { route: any; navigation: any; }
 
@@ -61,6 +75,14 @@ export default function PatientDetailScreen({ route, navigation }: Props) {
   const [vxName, setVxName] = useState(''); const [vxDate, setVxDate] = useState('');
   const [vxNextDue, setVxNextDue] = useState(''); const [vxNotes, setVxNotes] = useState('');
   const [savingVx, setSavingVx] = useState(false);
+
+  const [lxOpen, setLxOpen] = useState(false);
+  const [lxTest, setLxTest] = useState(''); const [lxSample, setLxSample] = useState('');
+  const [lxResults, setLxResults] = useState(''); const [lxRef, setLxRef] = useState('');
+  const [lxStatus, setLxStatus] = useState<typeof LAB_STATUSES[number]>('pending');
+  const [lxTech, setLxTech] = useState(''); const [lxDate, setLxDate] = useState('');
+  const [lxNotes, setLxNotes] = useState(''); const [lxAttachment, setLxAttachment] = useState('');
+  const [lxUploading, setLxUploading] = useState(false); const [savingLx, setSavingLx] = useState(false);
 
   const fetchPatient = useCallback(async () => {
     setLoading(true);
@@ -172,6 +194,57 @@ export default function PatientDetailScreen({ route, navigation }: Props) {
     }
   };
 
+  const openAddLx = () => {
+    setLxTest(''); setLxSample(''); setLxResults(''); setLxRef(''); setLxStatus('pending');
+    setLxTech(''); setLxDate(''); setLxNotes(''); setLxAttachment('');
+    setLxOpen(true);
+  };
+
+  const pickLxAttachment = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (perm.status !== 'granted') { showAlert('Permission needed', 'Allow photo access to attach a result.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+    if (result.canceled || !result.assets?.[0]) return;
+    setLxUploading(true);
+    try {
+      const uri = result.assets[0].uri;
+      const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const up = await uploadFile('/api/upload', uri, `lab-result.${ext}`, { folder: 'lab-results' }, 'image');
+      if (up.ok && up.body?.url) setLxAttachment(up.body.url);
+      else showAlert('Upload failed', up.userMessage || 'Could not upload the file.');
+    } finally { setLxUploading(false); }
+  };
+
+  const submitLx = async () => {
+    if (!lxTest.trim()) { showAlert('Test name required', 'Enter the test name (e.g. Complete Blood Count).'); return; }
+    setSavingLx(true);
+    try {
+      const res = await apiFetch(`/api/v1/practice/patients/${patientId}/lab`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          testName: lxTest.trim(), sampleType: lxSample, results: lxResults, referenceRange: lxRef,
+          status: lxStatus, technicianName: lxTech, performedAt: lxDate || undefined,
+          notes: lxNotes, attachmentUrl: lxAttachment || undefined,
+        }),
+      });
+      if (res.ok && res.body?.success) { setLxOpen(false); await fetchPatient(); }
+      else showAlert('Error', res.body?.message || 'Could not save lab result.');
+    } catch {
+      showAlert('Error', 'Please check your connection and try again.');
+    } finally { setSavingLx(false); }
+  };
+
+  const deleteLx = (id: string) => {
+    showAlert('Delete result?', 'Remove this lab result?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        const res = await apiFetch(`/api/v1/practice/lab/${id}`, { method: 'DELETE' });
+        if (res.ok && res.body?.success) await fetchPatient();
+        else showAlert('Error', res.body?.message || 'Could not delete.');
+      } },
+    ]);
+  };
+
   if (loading || !patient) {
     return <View style={styles.center}><ActivityIndicator size="large" color={TEAL} /></View>;
   }
@@ -184,6 +257,8 @@ export default function PatientDetailScreen({ route, navigation }: Props) {
           <Text style={styles.patientName}>{patient.name}</Text>
           <TouchableOpacity onPress={openEdit}><Text style={styles.editLink}>Edit</Text></TouchableOpacity>
         </View>
+        <Text style={styles.patientId}>ID: {patientCode(patient._id)}</Text>
+        {patient.client?.name ? <Text style={styles.infoLine}>👤 Owner: {patient.client.name}{patient.client.phone ? ` · ${patient.client.phone}` : ''}</Text> : null}
         <Text style={styles.infoLine}>{[patient.species, patient.breed, patient.sex].filter(Boolean).join(' · ') || 'No details yet'}</Text>
         {patient.dob ? <Text style={styles.infoLine}>🎂 Born {fmt(patient.dob)}</Text> : null}
         {patient.weightKg ? <Text style={styles.infoLine}>⚖️ {patient.weightKg} kg</Text> : null}
@@ -221,6 +296,29 @@ export default function PatientDetailScreen({ route, navigation }: Props) {
           {t.medications ? <Text style={styles.entryMeta}>Medications: {t.medications}</Text> : null}
           {t.followUpDate ? <Text style={styles.entryMeta}>🔁 Follow-up: {fmt(t.followUpDate)}</Text> : null}
           {t.notes ? <Text style={styles.entryNotes}>{t.notes}</Text> : null}
+        </View>
+      ))}
+
+      <View style={styles.rowBetween}>
+        <Text style={styles.sectionTitle}>🧪 Lab Results</Text>
+        <TouchableOpacity style={styles.addBtn} onPress={openAddLx}><Text style={styles.addBtnText}>+ Add</Text></TouchableOpacity>
+      </View>
+      {(!patient.labResults || patient.labResults.length === 0) ? (
+        <Text style={styles.empty}>No lab results yet.</Text>
+      ) : patient.labResults.map((l) => (
+        <View key={l._id} style={styles.entryCard}>
+          <View style={styles.rowBetween}>
+            <Text style={styles.entryTitle}>{l.testName}</Text>
+            <Text style={[styles.statusPill, { color: statusColor[l.status || 'pending'], borderColor: statusColor[l.status || 'pending'] }]}>{(l.status || 'pending').toUpperCase()}</Text>
+          </View>
+          <Text style={styles.entryMeta}>{[l.sampleType, fmt(l.performedAt)].filter(Boolean).join(' · ')}{l.technicianName ? ` · ${l.technicianName}` : ''}</Text>
+          {l.results ? <Text style={styles.entryMeta}>Results: {l.results}</Text> : null}
+          {l.referenceRange ? <Text style={styles.entryMeta}>Reference: {l.referenceRange}</Text> : null}
+          {l.notes ? <Text style={styles.entryNotes}>{l.notes}</Text> : null}
+          <View style={styles.rowBetween}>
+            {l.attachmentUrl ? <Text style={styles.attachLink} onPress={() => Linking.openURL(l.attachmentUrl!)}>📎 View attachment</Text> : <Text style={styles.entryNotes}>No file attached</Text>}
+            <TouchableOpacity onPress={() => deleteLx(l._id)}><Text style={styles.deleteSmall}>Delete</Text></TouchableOpacity>
+          </View>
         </View>
       ))}
     </ScrollView>
@@ -287,6 +385,43 @@ export default function PatientDetailScreen({ route, navigation }: Props) {
         </View>
       </View>
     </Modal>
+
+    {/* Add lab result modal */}
+    <Modal visible={lxOpen} transparent animationType="slide" onRequestClose={() => setLxOpen(false)}>
+      <View style={styles.modalOverlay}>
+        <ScrollView style={styles.modalCard}>
+          <Text style={styles.modalTitle}>New Lab Result</Text>
+          <TextInput style={styles.input} placeholder="Test name (e.g. Complete Blood Count)" value={lxTest} onChangeText={setLxTest} />
+          <TextInput style={styles.input} placeholder="Sample type (e.g. Blood, Urine)" value={lxSample} onChangeText={setLxSample} />
+          <TextInput style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]} placeholder="Results / findings" multiline value={lxResults} onChangeText={setLxResults} />
+          <TextInput style={styles.input} placeholder="Reference range (optional)" value={lxRef} onChangeText={setLxRef} />
+
+          <Text style={styles.fieldLabel}>Status</Text>
+          <View style={styles.statusRow}>
+            {LAB_STATUSES.map((s) => (
+              <TouchableOpacity key={s} style={[styles.statusChip, lxStatus === s && { backgroundColor: statusColor[s], borderColor: statusColor[s] }]} onPress={() => setLxStatus(s)}>
+                <Text style={[styles.statusChipText, lxStatus === s && { color: '#fff' }]}>{s}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <TextInput style={styles.input} placeholder="Uploaded by (technician name)" value={lxTech} onChangeText={setLxTech} />
+          <TextInput style={styles.input} placeholder="Date performed (YYYY-MM-DD, optional)" value={lxDate} onChangeText={setLxDate} />
+          <TextInput style={[styles.input, { minHeight: 60, textAlignVertical: 'top' }]} placeholder="Notes" multiline value={lxNotes} onChangeText={setLxNotes} />
+
+          <TouchableOpacity style={styles.attachBtn} onPress={pickLxAttachment} disabled={lxUploading}>
+            {lxUploading ? <ActivityIndicator color={TEAL} /> : <Text style={styles.attachBtnText}>{lxAttachment ? '✓ Photo attached — change' : '📎 Attach result photo'}</Text>}
+          </TouchableOpacity>
+
+          <View style={styles.modalActions}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => setLxOpen(false)}><Text style={styles.cancelBtnText}>Cancel</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.confirmBtn} disabled={savingLx} onPress={submitLx}>
+              {savingLx ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmBtnText}>Save</Text>}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </View>
+    </Modal>
     </>
   );
 }
@@ -323,4 +458,15 @@ const styles = StyleSheet.create({
   cancelBtnText: { color: '#374151', fontWeight: '700' },
   confirmBtn: { flex: 1, paddingVertical: 13, borderRadius: 10, alignItems: 'center', backgroundColor: TEAL },
   confirmBtnText: { color: '#fff', fontWeight: '800' },
+
+  patientId: { fontSize: 12, fontWeight: '800', color: TEAL, backgroundColor: '#F0FDFA', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, overflow: 'hidden', marginBottom: 6 },
+  statusPill: { fontSize: 10, fontWeight: '900', borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
+  attachLink: { color: TEAL, fontWeight: '700', fontSize: 13, marginTop: 6 },
+  deleteSmall: { color: '#B91C1C', fontWeight: '700', fontSize: 12, marginTop: 6 },
+  fieldLabel: { fontSize: 12, fontWeight: '700', color: '#6B7280', marginBottom: 6 },
+  statusRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  statusChip: { borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#fff' },
+  statusChipText: { fontSize: 12, fontWeight: '700', color: '#374151', textTransform: 'capitalize' },
+  attachBtn: { borderWidth: 1, borderColor: TEAL, borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginBottom: 12 },
+  attachBtnText: { color: TEAL, fontWeight: '800' },
 });
