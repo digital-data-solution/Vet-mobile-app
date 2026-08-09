@@ -53,7 +53,7 @@ export default function BusinessUpgradeScreen({ navigation, route }: Props) {
 
   const onSuccess = useCallback(async (reference: string) => {
     await load();
-    showAlert('Unlocked!', `Payment confirmed (Ref: ${reference}). Unlimited products and sales reps are now active.`);
+    showAlert('Unlocked!', `Payment confirmed (Ref: ${reference}). Your Clinic plan is now active.`);
   }, [load]);
 
   const openPaystackWebView = useCallback((authorization_url: string, reference: string, amount: number) => {
@@ -174,7 +174,7 @@ export default function BusinessUpgradeScreen({ navigation, route }: Props) {
           {status.addonActive ? (
             <Text style={styles.statusText}>{status.daysRemaining} day{status.daysRemaining === 1 ? '' : 's'} remaining. Buy again to extend.</Text>
           ) : status.atLimit ? (
-            <Text style={styles.statusText}>You've reached the free limit — upgrade below for unlimited products and reps.</Text>
+            <Text style={styles.statusText}>You've reached the free limit — upgrade to the Clinic plan below.</Text>
           ) : (
             <Text style={styles.statusText}>{status.freeProductLimit - status.productCount} free product slot{status.freeProductLimit - status.productCount === 1 ? '' : 's'} left. Sales reps need an upgrade.</Text>
           )}
@@ -190,8 +190,8 @@ export default function BusinessUpgradeScreen({ navigation, route }: Props) {
       {packages.map((pkg) => (
         <View key={pkg.days} style={styles.pkgCard}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.pkgLabel}>{pkg.label}</Text>
-            <Text style={styles.pkgDays}>Unlimited products + reps for {pkg.days} days</Text>
+            <Text style={styles.pkgLabel}>Clinic plan · {pkg.label}</Text>
+            <Text style={styles.pkgDays}>Up to 600 products & 8 staff, for {pkg.days} days</Text>
           </View>
           <TouchableOpacity
             style={[styles.buyBtn, paying === pkg.days && styles.buyBtnDisabled]}

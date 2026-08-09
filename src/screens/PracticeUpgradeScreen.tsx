@@ -63,7 +63,7 @@ export default function PracticeUpgradeScreen({ navigation }: Props) {
 
   const onSuccess = useCallback(async (reference: string) => {
     await load();
-    showAlert('Unlocked!', `Payment confirmed (Ref: ${reference}). You now have unlimited patients in Practice Records.`);
+    showAlert('Unlocked!', `Payment confirmed (Ref: ${reference}). Your Clinic plan is now active in Practice Records.`);
   }, [load]);
 
   const onCancel = useCallback(() => {}, []);
@@ -112,7 +112,7 @@ export default function PracticeUpgradeScreen({ navigation }: Props) {
       {status && (
         <View style={styles.statusCard}>
           <Text style={styles.statusTitle}>
-            {status.addonActive ? '✨ Unlimited patients active' : `${status.patientCount} of ${status.freePatientLimit} free patients used`}
+            {status.addonActive ? '✨ Clinic plan active' : `${status.patientCount} of ${status.freePatientLimit} free patients used`}
           </Text>
           {status.addonActive ? (
             <Text style={styles.statusText}>{status.daysRemaining} day{status.daysRemaining === 1 ? '' : 's'} remaining. Buy again to extend.</Text>
@@ -134,7 +134,7 @@ export default function PracticeUpgradeScreen({ navigation }: Props) {
         <View key={pkg.days} style={styles.pkgCard}>
           <View style={{ flex: 1 }}>
             <Text style={styles.pkgLabel}>{pkg.label}</Text>
-            <Text style={styles.pkgDays}>Unlimited patients for {pkg.days} days</Text>
+            <Text style={styles.pkgDays}>Clinic plan · up to 300 patients, for {pkg.days} days</Text>
           </View>
           <TouchableOpacity
             style={[styles.buyBtn, paying === pkg.days && styles.buyBtnDisabled]}
