@@ -20,7 +20,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import { apiFetch, uploadFile } from '../api/client';
+import { businessFetch, uploadFile } from '../api/client';
 import { showAlert } from '../utils/alert';
 
 interface Treatment {
@@ -87,7 +87,7 @@ export default function PatientDetailScreen({ route, navigation }: Props) {
   const fetchPatient = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiFetch(`/api/v1/practice/patients/${patientId}`, { method: 'GET' });
+      const res = await businessFetch(`/api/v1/practice/patients/${patientId}`, { method: 'GET' });
       if (res.ok && res.body?.data) setPatient(res.body.data);
       else showAlert('Error', res.body?.message || 'Could not load patient.');
     } catch {
@@ -111,7 +111,7 @@ export default function PatientDetailScreen({ route, navigation }: Props) {
     if (!eName.trim()) { showAlert('Name required', 'Enter the patient\'s name.'); return; }
     setSaving(true);
     try {
-      const res = await apiFetch(`/api/v1/practice/patients/${patientId}`, {
+      const res = await businessFetch(`/api/v1/practice/patients/${patientId}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: eName.trim(), species: eSpecies, breed: eBreed, dob: eDob || undefined,
@@ -140,7 +140,7 @@ export default function PatientDetailScreen({ route, navigation }: Props) {
 
   const doDelete = async () => {
     try {
-      const res = await apiFetch(`/api/v1/practice/patients/${patientId}`, { method: 'DELETE' });
+      const res = await businessFetch(`/api/v1/practice/patients/${patientId}`, { method: 'DELETE' });
       if (res.ok && res.body?.success) navigation.goBack();
       else showAlert('Error', res.body?.message || 'Could not delete patient.');
     } catch {
@@ -156,7 +156,7 @@ export default function PatientDetailScreen({ route, navigation }: Props) {
   const submitTx = async () => {
     setSavingTx(true);
     try {
-      const res = await apiFetch(`/api/v1/practice/patients/${patientId}/treatments`, {
+      const res = await businessFetch(`/api/v1/practice/patients/${patientId}/treatments`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           reason: txReason, diagnosis: txDiagnosis, treatment: txTreatment,
@@ -181,7 +181,7 @@ export default function PatientDetailScreen({ route, navigation }: Props) {
     if (!vxName.trim()) { showAlert('Vaccine name required', 'Enter which vaccine was given.'); return; }
     setSavingVx(true);
     try {
-      const res = await apiFetch(`/api/v1/practice/patients/${patientId}/vaccinations`, {
+      const res = await businessFetch(`/api/v1/practice/patients/${patientId}/vaccinations`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ vaccineName: vxName.trim(), dateGiven: vxDate || undefined, nextDueDate: vxNextDue || undefined, notes: vxNotes }),
       });
@@ -219,7 +219,7 @@ export default function PatientDetailScreen({ route, navigation }: Props) {
     if (!lxTest.trim()) { showAlert('Test name required', 'Enter the test name (e.g. Complete Blood Count).'); return; }
     setSavingLx(true);
     try {
-      const res = await apiFetch(`/api/v1/practice/patients/${patientId}/lab`, {
+      const res = await businessFetch(`/api/v1/practice/patients/${patientId}/lab`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           testName: lxTest.trim(), sampleType: lxSample, results: lxResults, referenceRange: lxRef,
@@ -238,7 +238,7 @@ export default function PatientDetailScreen({ route, navigation }: Props) {
     showAlert('Delete result?', 'Remove this lab result?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
-        const res = await apiFetch(`/api/v1/practice/lab/${id}`, { method: 'DELETE' });
+        const res = await businessFetch(`/api/v1/practice/lab/${id}`, { method: 'DELETE' });
         if (res.ok && res.body?.success) await fetchPatient();
         else showAlert('Error', res.body?.message || 'Could not delete.');
       } },

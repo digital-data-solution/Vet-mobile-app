@@ -75,6 +75,10 @@ export interface StaffPermissions {
   adjustStock:     boolean;
   manageStaff:     boolean;
   dispense:        boolean;
+  // Practice Records / hospital-flow roles
+  reception?:      boolean;
+  clinical?:       boolean;
+  lab?:            boolean;
 }
 
 export interface StaffAuth {

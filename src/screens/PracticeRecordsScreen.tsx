@@ -21,7 +21,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
-import { apiFetch } from '../api/client';
+import { businessFetch } from '../api/client';
 import { showAlert } from '../utils/alert';
 
 interface Status {
@@ -60,9 +60,9 @@ export default function PracticeRecordsScreen({ navigation }: Props) {
     try {
       const qs = q ? `?q=${encodeURIComponent(q)}` : '';
       const [statusRes, dueRes, clientsRes] = await Promise.all([
-        apiFetch('/api/v1/practice/status', { method: 'GET' }),
-        apiFetch('/api/v1/practice/due-soon', { method: 'GET' }),
-        apiFetch(`/api/v1/practice/clients${qs}`, { method: 'GET' }),
+        businessFetch('/api/v1/practice/status', { method: 'GET' }),
+        businessFetch('/api/v1/practice/due-soon', { method: 'GET' }),
+        businessFetch(`/api/v1/practice/clients${qs}`, { method: 'GET' }),
       ]);
       if (statusRes.ok && statusRes.body?.data) setStatus(statusRes.body.data);
       else if (statusRes.status === 403) {
@@ -103,7 +103,7 @@ export default function PracticeRecordsScreen({ navigation }: Props) {
     }
     setSaving(true);
     try {
-      const res = await apiFetch('/api/v1/practice/clients', {
+      const res = await businessFetch('/api/v1/practice/clients', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), phone, email, address, emailRemindersEnabled: remindersOn }),
       });

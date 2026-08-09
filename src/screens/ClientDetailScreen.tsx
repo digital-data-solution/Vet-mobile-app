@@ -19,7 +19,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { apiFetch } from '../api/client';
+import { businessFetch } from '../api/client';
 import { showAlert } from '../utils/alert';
 
 interface Client {
@@ -59,7 +59,7 @@ export default function ClientDetailScreen({ route, navigation }: Props) {
   const fetchPatients = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiFetch(`/api/v1/practice/patients?clientId=${clientId}`, { method: 'GET' });
+      const res = await businessFetch(`/api/v1/practice/patients?clientId=${clientId}`, { method: 'GET' });
       if (res.ok && res.body?.data) setPatients(res.body.data);
     } catch {
       showAlert('Error', 'Could not load patients. Pull to refresh.');
@@ -83,7 +83,7 @@ export default function ClientDetailScreen({ route, navigation }: Props) {
     if (eReminders && !eEmail.trim()) { showAlert('Email needed', 'Add an email address to enable reminders.'); return; }
     setSaving(true);
     try {
-      const res = await apiFetch(`/api/v1/practice/clients/${clientId}`, {
+      const res = await businessFetch(`/api/v1/practice/clients/${clientId}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: eName.trim(), phone: ePhone, email: eEmail, address: eAddress, notes: eNotes, emailRemindersEnabled: eReminders }),
       });
@@ -113,7 +113,7 @@ export default function ClientDetailScreen({ route, navigation }: Props) {
 
   const doDelete = async () => {
     try {
-      const res = await apiFetch(`/api/v1/practice/clients/${clientId}`, { method: 'DELETE' });
+      const res = await businessFetch(`/api/v1/practice/clients/${clientId}`, { method: 'DELETE' });
       if (res.ok && res.body?.success) {
         navigation.goBack();
       } else {
@@ -133,7 +133,7 @@ export default function ClientDetailScreen({ route, navigation }: Props) {
     if (!pName.trim()) { showAlert('Name required', 'Enter the patient\'s name.'); return; }
     setAddingPatient(true);
     try {
-      const res = await apiFetch('/api/v1/practice/patients', {
+      const res = await businessFetch('/api/v1/practice/patients', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clientId, name: pName.trim(), species: pSpecies, breed: pBreed, sex: pSex,

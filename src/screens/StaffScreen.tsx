@@ -28,10 +28,15 @@ const PERMISSIONS: { key: keyof StaffPermissions; label: string }[] = [
   { key: 'adjustStock',     label: 'Adjust stock' },
   { key: 'manageStaff',     label: 'Manage staff' },
   { key: 'dispense',        label: 'Dispense items' },
+  // Practice Records / hospital-flow roles
+  { key: 'reception',       label: 'Reception — register clients & patients' },
+  { key: 'clinical',        label: 'Clinical — treatments & vaccinations (vet)' },
+  { key: 'lab',             label: 'Lab — upload lab results' },
 ];
 
 const DEFAULT_PERMS: StaffPermissions = {
   sell: true, viewReports: false, manageInventory: false, adjustStock: false, manageStaff: false, dispense: false,
+  reception: false, clinical: false, lab: false,
 };
 
 function PermissionToggles({ value, onChange }: { value: StaffPermissions; onChange: (v: StaffPermissions) => void }) {

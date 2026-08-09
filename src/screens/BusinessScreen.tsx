@@ -162,6 +162,7 @@ export default function BusinessScreen({ navigation }: Props) {
       {can('viewReports')     && <Tile icon="📅" title="Day Close & Reports" desc="Balance the till, close each day, monthly CSV" onPress={() => navigation.navigate('DayReport')} />}
       {can('manageStaff')     && <Tile icon="👥" title="Sales Reps" desc="Add staff, set logins & permissions" onPress={() => navigation.navigate('Staff')} />}
       {!isStaff && <Tile icon="🧾" title="Receipt Settings" desc="Your logo & details on every receipt" onPress={() => navigation.navigate('ReceiptSettings')} />}
+      {(!isStaff || perms?.reception || perms?.clinical || perms?.lab) && <Tile icon="🏥" title="Practice Records" desc="Clients, patients, treatments, lab results" onPress={() => navigation.navigate('PracticeRecords')} />}
       {(!isStaff || perms?.adjustStock || perms?.manageInventory) && <Tile icon="🔎" title="Audit Log" desc="Every stock move, who did it, when" onPress={() => navigation.navigate('AuditLog')} />}
       {!isStaff && <Tile icon="⭐" title="Upgrade / Renew" desc={status?.addonActive ? `${status.daysRemaining} days left` : 'Unlock unlimited + reps'} onPress={() => navigation.navigate('BusinessUpgrade')} />}
 
