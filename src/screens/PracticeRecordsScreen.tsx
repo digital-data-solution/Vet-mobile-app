@@ -155,6 +155,16 @@ export default function PracticeRecordsScreen({ navigation }: Props) {
             <Text style={styles.statusArrow}>›</Text>
           </TouchableOpacity>
 
+          {/* Hospital tools — wards, surgery, grooming, procedures */}
+          <TouchableOpacity style={styles.clinicalCard} onPress={() => navigation.navigate('Clinical')} activeOpacity={0.85}>
+            <Text style={styles.clinicalIcon}>🏥</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.clinicalTitle}>Ward · Surgery · Grooming · Procedures</Text>
+              <Text style={styles.clinicalText}>Admit patients, log daily care, record surgeries, grooming, X-rays & more</Text>
+            </View>
+            <Text style={styles.statusArrow}>›</Text>
+          </TouchableOpacity>
+
           {/* Due soon */}
           {dueCount > 0 && (
             <View style={styles.dueCard}>
@@ -236,6 +246,11 @@ const styles = StyleSheet.create({
   statusTitle: { fontSize: 16, fontWeight: '800', color: '#0F766E' },
   statusText:  { fontSize: 13, color: '#0F766E', marginTop: 3 },
   statusArrow: { fontSize: 26, color: TEAL, fontWeight: '900' },
+
+  clinicalCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ECFEFF', borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#A5F3FC' },
+  clinicalIcon: { fontSize: 24, marginRight: 12 },
+  clinicalTitle: { fontSize: 15, fontWeight: '800', color: '#0E7490' },
+  clinicalText: { fontSize: 12, color: '#0E7490', marginTop: 3 },
 
   dueCard: { backgroundColor: '#FFFBEB', borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#FCD34D' },
   dueTitle: { fontSize: 14, fontWeight: '800', color: '#92400E', marginBottom: 8 },

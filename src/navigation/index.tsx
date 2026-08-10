@@ -56,6 +56,7 @@ import MyListingsScreen             from '../screens/MyListingsScreen';
 import ListingBoostScreen           from '../screens/ListingBoostScreen';
 import WalletScreen                 from '../screens/WalletScreen';
 import PracticeRecordsScreen        from '../screens/PracticeRecordsScreen';
+import ClinicalScreen               from '../screens/ClinicalScreen';
 import PracticeUpgradeScreen        from '../screens/PracticeUpgradeScreen';
 import ClientDetailScreen           from '../screens/ClientDetailScreen';
 import PatientDetailScreen          from '../screens/PatientDetailScreen';
@@ -144,6 +145,7 @@ export type RootStackParamList = {
   MyListings:             undefined;
   ListingBoost:           { listingId: string };
   PracticeRecords:        undefined;
+  Clinical:               undefined;
   PracticeUpgrade:        undefined;
   ClientDetail:           { clientId: string; client?: any };
   PatientDetail:          { patientId: string };
@@ -666,8 +668,9 @@ export default function AppNavigator() {
                 <RootStack.Screen name="AuditLog"        component={AuditLogScreen}        options={{ headerShown: true, title: 'Audit Log' }} />
                 <RootStack.Screen name="DayReport"       component={DayReportScreen}       options={{ headerShown: true, title: 'Day Close & Reports' }} />
                 <RootStack.Screen name="Receipt"         component={ReceiptScreen}         options={{ headerShown: true, title: 'Receipt' }} />
-                <RootStack.Screen name="ReceiptSettings" component={ReceiptSettingsScreen} options={{ headerShown: true, title: 'Receipt Settings' }} />
+                <RootStack.Screen name="ReceiptSettings" component={ReceiptSettingsScreen} options={{ headerShown: true, title: 'Settings' }} />
                 <RootStack.Screen name="PracticeRecords" component={PracticeRecordsScreen} options={{ headerShown: true, title: 'Practice Records' }} />
+                <RootStack.Screen name="Clinical"        component={ClinicalScreen}        options={{ headerShown: true, title: 'Ward · Surgery · Grooming' }} />
                 <RootStack.Screen name="ClientDetail"    component={ClientDetailScreen}    options={{ headerShown: true, title: 'Client' }} />
                 <RootStack.Screen name="PatientDetail"   component={PatientDetailScreen}   options={{ headerShown: true, title: 'Patient' }} />
                 <RootStack.Screen name="PracticeUpgrade" component={PracticeUpgradeScreen} options={{ headerShown: true, title: 'Practice Records' }} />
@@ -745,6 +748,11 @@ export default function AppNavigator() {
                   options={{ headerShown: true, title: 'Practice Records' }}
                 />
                 <RootStack.Screen
+                  name="Clinical"
+                  component={ClinicalScreen}
+                  options={{ headerShown: true, title: 'Ward · Surgery · Grooming' }}
+                />
+                <RootStack.Screen
                   name="PracticeUpgrade"
                   component={PracticeUpgradeScreen}
                   options={{ headerShown: true, title: 'Practice Records' }}
@@ -797,7 +805,7 @@ export default function AppNavigator() {
                 <RootStack.Screen
                   name="ReceiptSettings"
                   component={ReceiptSettingsScreen}
-                  options={{ headerShown: true, title: 'Receipt Settings' }}
+                  options={{ headerShown: true, title: 'Settings' }}
                 />
                 <RootStack.Screen
                   name="BusinessUpgrade"
