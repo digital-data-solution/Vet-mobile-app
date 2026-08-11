@@ -13,8 +13,9 @@ import { businessFetch } from '../api/client';
 import { showAlert } from '../utils/alert';
 import { money } from '../utils/money';
 import { activeStaffId, getActiveRep } from '../utils/businessSession';
+import BarcodeScanner from '../components/BarcodeScanner';
 
-interface Product { _id: string; name: string; sellPrice: number; quantity: number; unit?: string; }
+interface Product { _id: string; name: string; sellPrice: number; quantity: number; unit?: string; barcode?: string; }
 interface CartLine { product: Product; quantity: number; }
 interface Props { navigation: any; }
 
@@ -31,6 +32,7 @@ export default function RecordSaleScreen({ navigation }: Props) {
   const [custName, setCustName] = useState('');
   const [custPhone, setCustPhone] = useState('');
   const [saving, setSaving]     = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -66,6 +68,14 @@ export default function RecordSaleScreen({ navigation }: Props) {
       if (qty > line.product.quantity) { showAlert('Out of stock', `Only ${line.product.quantity} left.`); return c; }
       return { ...c, [id]: { ...line, quantity: qty } };
     });
+  };
+
+  const onScan = (code: string) => {
+    setScanOpen(false);
+    const p = products.find((x) => x.barcode && x.barcode === code);
+    if (!p) return showAlert('Not found', `No product has barcode ${code}. Add it in Inventory first.`);
+    if (p.quantity <= 0) return showAlert('Out of stock', `${p.name} has no stock left.`);
+    add(p);
   };
 
   const record = async () => {
@@ -117,7 +127,10 @@ export default function RecordSaleScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <Text style={styles.repHint}>Selling as {rep ? rep.name : 'Owner'}</Text>
-      <TextInput style={styles.search} value={q} onChangeText={setQ} placeholder="Search products…" placeholderTextColor="#9CA3AF" />
+      <View style={styles.searchRow}>
+        <TextInput style={[styles.search, { flex: 1, marginBottom: 0 }]} value={q} onChangeText={setQ} placeholder="Search products…" placeholderTextColor="#9CA3AF" />
+        <TouchableOpacity style={styles.scanBtn} onPress={() => setScanOpen(true)}><Text style={styles.scanBtnText}>📷</Text></TouchableOpacity>
+      </View>
 
       <FlatList
         data={filtered}
@@ -191,6 +204,8 @@ export default function RecordSaleScreen({ navigation }: Props) {
           </View>
         </View>
       </Modal>
+
+      <BarcodeScanner visible={scanOpen} title="Scan to add to sale" onClose={() => setScanOpen(false)} onScanned={onScan} />
     </View>
   );
 }
@@ -200,6 +215,9 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9FAFB' },
   repHint: { fontSize: 12, color: '#6366F1', fontWeight: '700', paddingHorizontal: 16, paddingTop: 10 },
   search: { backgroundColor: '#fff', margin: 12, marginBottom: 0, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: '#111827', borderWidth: 1, borderColor: '#E5E7EB' },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingTop: 12 },
+  scanBtn: { backgroundColor: '#4338CA', borderRadius: 10, width: 46, height: 44, alignItems: 'center', justifyContent: 'center' },
+  scanBtnText: { fontSize: 20 },
 
   pRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: '#E5E7EB' },
   pName: { fontSize: 15, fontWeight: '700', color: '#111827' },
