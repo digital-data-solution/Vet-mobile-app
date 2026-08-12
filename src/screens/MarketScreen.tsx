@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { browseListings, getMarketMeta, Listing, ListingKind, MarketMeta } from '../api/market';
 import { getUserLocation } from '../utils/location';
+import { showAlert } from '../utils/alert';
 
 const ACCENT = '#0F9D58';
 
@@ -48,6 +49,23 @@ export default function MarketScreen({ navigation }: Props) {
   useEffect(() => { setLoading(true); load().finally(() => setLoading(false)); }, [load]);
 
   const onRefresh = useCallback(() => { setRefreshing(true); load().finally(() => setRefreshing(false)); }, [load]);
+
+  // "Near me" needs GPS. If we don't have coords yet, ask for them when the user
+  // taps the chip — otherwise it would silently fall back to "newest".
+  const selectSort = useCallback(async (val: 'newest' | 'nearest' | 'price_asc') => {
+    if (val === 'nearest' && !coords) {
+      try {
+        const loc: any = await getUserLocation();
+        if (loc?.latitude && loc?.longitude) setCoords({ lat: loc.latitude, lng: loc.longitude });
+        else throw new Error('no-coords');
+      } catch {
+        showAlert('Location needed', 'Turn on location access to see listings near you. Showing newest for now.');
+        setSort('newest');
+        return;
+      }
+    }
+    setSort(val);
+  }, [coords]);
 
   const categories = kind === 'pet' ? (meta?.petCategories || []) : (meta?.productCategories || []);
 
@@ -87,7 +105,7 @@ export default function MarketScreen({ navigation }: Props) {
       {/* Search */}
       <View style={styles.searchRow}>
         <Ionicons name="search" size={18} color="#9CA3AF" />
-        <TextInput style={styles.search} placeholder={kind === 'pet' ? 'Search breed, species…' : 'Search products…'}
+        <TextInput style={styles.search} placeholder={kind === 'pet' ? 'Search breed, species or city…' : 'Search products or city…'}
           value={q} onChangeText={setQ} returnKeyType="search" onSubmitEditing={load} placeholderTextColor="#9CA3AF" />
         {q ? <TouchableOpacity onPress={() => { setQ(''); }}><Ionicons name="close-circle" size={18} color="#9CA3AF" /></TouchableOpacity> : null}
       </View>
@@ -95,7 +113,7 @@ export default function MarketScreen({ navigation }: Props) {
       {/* Sort + category chips */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chips} contentContainerStyle={{ paddingHorizontal: 12 }}>
         {([['newest', 'Newest'], ['nearest', 'Near me'], ['price_asc', 'Cheapest']] as const).map(([val, label]) => (
-          <TouchableOpacity key={val} style={[styles.chip, sort === val && styles.chipActive]} onPress={() => setSort(val)}>
+          <TouchableOpacity key={val} style={[styles.chip, sort === val && styles.chipActive]} onPress={() => selectSort(val)}>
             <Text style={[styles.chipTxt, sort === val && styles.chipTxtActive]}>{label}</Text>
           </TouchableOpacity>
         ))}
