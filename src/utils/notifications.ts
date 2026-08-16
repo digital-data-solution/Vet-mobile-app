@@ -93,7 +93,29 @@ async function requestPermissionAndChannel(): Promise<boolean> {
  * it to its own endpoint; the backend delivers to it directly via web-push
  * (see mobile_backend services/pushNotification.service.js sendWebPush*).
  */
+// A browser only allows one applicationServerKey per PushManager subscription.
+// If a device already subscribed under an older key (e.g. the very first
+// VAPID key this project used, before switching to the current one),
+// subscribing again throws InvalidStateError — confirmed in production:
+// "A subscription with a different applicationServerKey ... already exists;
+// to change the applicationServerKey, unsubscribe then resubscribe."
+// expo-notifications doesn't handle this itself, so clear any existing
+// subscription first — safe no-op when there isn't one.
+async function unsubscribeExistingWebPush(): Promise<void> {
+  if (typeof navigator === 'undefined' || !navigator.serviceWorker) return;
+  try {
+    const registration = await navigator.serviceWorker.getRegistration();
+    const existing = await registration?.pushManager.getSubscription();
+    await existing?.unsubscribe();
+  } catch {
+    // best-effort — if this fails, the subscribe() call below will just
+    // surface its own error as before.
+  }
+}
+
 async function registerWebPush(accessToken: string): Promise<string | null> {
+  await unsubscribeExistingWebPush();
+
   let subscription: { endpoint: string; keys: { p256dh: string; auth: string } } | null = null;
   try {
     const result = await Notifications.getDevicePushTokenAsync();

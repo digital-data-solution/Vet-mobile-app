@@ -112,8 +112,16 @@ export default function AuthScreen({ navigation, route }: { navigation: any; rou
       //    can lag (or not fire promptly), which left users stuck on this
       //    screen until a manual refresh even though sign-in had succeeded.
       await refreshSession();
+
+      // 4. Navigate directly rather than relying on the isAuthenticated-driven
+      //    effect/key-remount in AppNavigator to catch the state change —
+      //    confirmed that alone still wasn't reliably firing in production.
+      //    Redundant with that mechanism, not a replacement for it (RegisterScreen
+      //    and biometric re-entry still lean on it too), just a guaranteed path
+      //    for this specific "just logged in" moment.
+      navigation.replace('MainTabs');
     },
-    [refreshSession],
+    [refreshSession, navigation],
   );
 
   // ─── Email / password login ─────────────────────────────────────────────────
