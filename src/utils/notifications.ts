@@ -4,6 +4,13 @@ import Constants from 'expo-constants';
 
 const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://vet-market-place-jsj5.onrender.com';
 
+// Same value as app.json's ios.bundleIdentifier / android.package. Web builds
+// strip those platform sections out of Constants.expoConfig entirely (confirmed
+// against a real `expo export --platform web` bundle — neither key nor value
+// makes it into the output), so it can't be read at runtime on web — it has to
+// be a literal here.
+const APPLICATION_ID = 'com.xpressvet.marketplace';
+
 // Controls how notifications behave when the app is in the foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -47,12 +54,8 @@ export async function registerForPushNotificationsAsync(accessToken: string): Pr
 
   // expo-application's applicationId is hardcoded null on web (no native
   // bundle ID there), which otherwise makes getExpoPushTokenAsync throw
-  // ERR_NOTIFICATIONS_NO_APPLICATION_ID. Reuse the iOS/Android identifier
-  // from app.json so the web token request succeeds too.
-  const applicationId =
-    Platform.OS === 'web'
-      ? (Constants.expoConfig as any)?.ios?.bundleIdentifier ?? (Constants.expoConfig as any)?.android?.package
-      : undefined;
+  // ERR_NOTIFICATIONS_NO_APPLICATION_ID.
+  const applicationId = Platform.OS === 'web' ? APPLICATION_ID : undefined;
 
   let token: string | null = null;
   try {

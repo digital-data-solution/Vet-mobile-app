@@ -101,6 +101,7 @@ type AuthContextType = {
   isAuthenticated: boolean;
   signOut:         () => Promise<void>;
   refreshRole:     () => Promise<void>;
+  refreshSession:  () => Promise<void>;
   unreadCount:     number;
   setUnreadCount:  (n: number) => void;
 };
@@ -114,6 +115,7 @@ export const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   signOut:         async () => {},
   refreshRole:     async () => {},
+  refreshSession:  async () => {},
   unreadCount:     0,
   setUnreadCount:  () => {},
 });
@@ -510,6 +512,19 @@ export default function AppNavigator() {
     await fetchRoleFromBackend(current);
   }, [fetchRoleFromBackend]);
 
+  // Explicitly re-pulls the session and pushes it into state, instead of
+  // waiting on supabase's onAuthStateChange listener. AuthScreen calls this
+  // right after a successful signInWithPassword() — the listener normally
+  // covers this too, but it can lag (or on some platform/timing combos not
+  // fire promptly at all), which is what left users stuck on the sign-in
+  // screen until a manual refresh even though the login itself succeeded.
+  const refreshSession = useCallback(async () => {
+    const { data: { session: current } } = await supabase.auth.getSession();
+    _bootstrapSession = current;
+    setSession(current);
+    await fetchRoleFromBackend(current);
+  }, [fetchRoleFromBackend]);
+
   useEffect(() => {
     let mounted = true;
 
@@ -617,7 +632,7 @@ export default function AppNavigator() {
   if (loading) return <LoadingScreen />;
 
   return (
-    <AuthContext.Provider value={{ session, userRole, isAuthenticated, signOut, refreshRole, unreadCount, setUnreadCount }}>
+    <AuthContext.Provider value={{ session, userRole, isAuthenticated, signOut, refreshRole, refreshSession, unreadCount, setUnreadCount }}>
       <NavigationErrorBoundary>
         <View style={{ flex: 1 }}>
           <OfflineBanner />

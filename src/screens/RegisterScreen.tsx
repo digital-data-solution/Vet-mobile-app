@@ -37,7 +37,7 @@ const EMAIL_VERIFY_REDIRECT = Platform.OS === 'web'
   : 'xpressvet://auth/callback';
 
 export default function RegisterScreen({ navigation, route }: Props & { route?: any }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, refreshSession } = useAuth();
 
   // Authenticated users who land here (e.g. via a shared referral link) should
   // go straight to the app — they don't need to register again.
@@ -137,6 +137,10 @@ export default function RegisterScreen({ navigation, route }: Props & { route?: 
         setStep('emailSent');
       } else if (data?.session) {
         await AsyncStorage.setItem('access_token', data.session.access_token);
+        // Push the new session into AppNavigator's shared auth state before
+        // navigating — otherwise isAuthenticated stays false there until a
+        // manual refresh, same class of bug as the sign-in screen.
+        await refreshSession();
         navigation.replace('MainTabs');
       }
     } catch {

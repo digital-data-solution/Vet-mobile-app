@@ -60,7 +60,7 @@ async function syncWithBackend(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function AuthScreen({ navigation, route }: { navigation: any; route?: any }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, refreshSession } = useAuth();
   const utmSource   = route?.params?.utmSource   ?? null;
   const utmCampaign = route?.params?.utmCampaign ?? null;
   const utmMedium   = route?.params?.utmMedium   ?? null;
@@ -107,9 +107,13 @@ export default function AuthScreen({ navigation, route }: { navigation: any; rou
       //    so the document is ready before any gated route is hit.
       await syncWithBackend(accessToken, utmSource, utmCampaign, utmMedium);
 
-      // 3. Navigation handled by onAuthStateChange — no navigate() call needed.
+      // 3. Explicitly pull the session into AppNavigator's state rather than
+      //    waiting on supabase's onAuthStateChange listener — that listener
+      //    can lag (or not fire promptly), which left users stuck on this
+      //    screen until a manual refresh even though sign-in had succeeded.
+      await refreshSession();
     },
-    [],
+    [refreshSession],
   );
 
   // ─── Email / password login ─────────────────────────────────────────────────
