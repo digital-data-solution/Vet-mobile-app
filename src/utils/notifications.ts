@@ -1,15 +1,14 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://vet-market-place-jsj5.onrender.com';
 
-// Same value as app.json's ios.bundleIdentifier / android.package. Web builds
-// strip those platform sections out of Constants.expoConfig entirely (confirmed
-// against a real `expo export --platform web` bundle — neither key nor value
-// makes it into the output), so it can't be read at runtime on web — it has to
-// be a literal here.
-const APPLICATION_ID = 'com.xpressvet.marketplace';
+// Same key AuthScreen.tsx persists the Supabase access token under — reused
+// here so the web click-tracking bridge (below) can report a tap even though
+// it fires from a service-worker message, outside any React auth context.
+const ACCESS_TOKEN_STORAGE_KEY = 'access_token';
 
 // Controls how notifications behave when the app is in the foreground
 Notifications.setNotificationHandler({
@@ -20,14 +19,52 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export async function registerForPushNotificationsAsync(accessToken: string): Promise<string | null> {
-  // Web push uses the browser's native Web Push API under the hood (see
-  // app.json's expo.notification.vapidPublicKey / serviceWorkerPath and
-  // public/expo-service-worker.js) — no Firebase SDK involved. It still
-  // returns a normal ExponentPushToken[...], so the backend needs no
-  // web-specific handling.
+/**
+ * Reports that the current user tapped a push carrying an
+ * adminNotificationId — the "who is clicking" half of admin-sent
+ * notifications (see backend services/adminNotification.service.js /
+ * api/notifications.controller.js). Best-effort: a failure here should
+ * never surface to the user, it's just analytics.
+ */
+export async function reportNotificationOpen(
+  data: Record<string, unknown> | undefined | null,
+  accessToken?: string | null,
+): Promise<void> {
+  const notificationId = data?.adminNotificationId;
+  if (!notificationId || typeof notificationId !== 'string') return;
 
-  // Set up Android notification channel
+  try {
+    const token = accessToken ?? (await AsyncStorage.getItem(ACCESS_TOKEN_STORAGE_KEY));
+    if (!token) return;
+    await fetch(`${BASE_URL}/api/notifications/track-open`, {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ notificationId }),
+    });
+  } catch {
+    // best-effort only
+  }
+}
+
+// Web taps happen inside the service worker (see public/expo-service-worker.js
+// notificationclick handler), which has no access to React state or a bearer
+// token directly — it posts a message to the page instead, and this listener
+// (set up once, module load) picks it up and reports the open using the
+// persisted access token. Set up unconditionally at import time so it's
+// active even before the user is on a screen that calls
+// registerForPushNotificationsAsync.
+if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.serviceWorker) {
+  navigator.serviceWorker.addEventListener('message', (event: MessageEvent) => {
+    if (event.data?.type === 'xpressvet-notification-click') {
+      reportNotificationOpen(event.data.data);
+    }
+  });
+}
+
+async function requestPermissionAndChannel(): Promise<boolean> {
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
       name:              'Default',
@@ -37,39 +74,72 @@ export async function registerForPushNotificationsAsync(accessToken: string): Pr
     });
   }
 
-  // Request permission
   const { status: existing } = await Notifications.getPermissionsAsync();
   let finalStatus = existing;
   if (existing !== 'granted') {
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
   }
-  if (finalStatus !== 'granted') return null;
+  return finalStatus === 'granted';
+}
 
-  // Get Expo push token — needs projectId for EAS builds
-  // projectId is populated in app.json extra.eas.projectId after running `eas init`
+/**
+ * Web push registration. Deliberately does NOT go through
+ * getExpoPushTokenAsync() — confirmed against the live API that Expo's push
+ * relay rejects type:"web" outright ("Invalid enum value. Expected 'apns' |
+ * 'fcm' | 'gcm'"), so there is no unified ExponentPushToken for browsers.
+ * Instead this gets a real W3C Push API subscription (getDevicePushTokenAsync,
+ * using app.json's notification.vapidPublicKey + serviceWorkerPath) and saves
+ * it to its own endpoint; the backend delivers to it directly via web-push
+ * (see mobile_backend services/pushNotification.service.js sendWebPush*).
+ */
+async function registerWebPush(accessToken: string): Promise<string | null> {
+  let subscription: { endpoint: string; keys: { p256dh: string; auth: string } } | null = null;
+  try {
+    const result = await Notifications.getDevicePushTokenAsync();
+    // On web, result.data is { endpoint, keys: { p256dh, auth } } — see
+    // expo-notifications/getDevicePushTokenAsync.web.ts.
+    subscription = result.data as any;
+  } catch (err) {
+    console.warn('[Push][Web] Could not get push subscription:', err);
+    return null;
+  }
+  if (!subscription?.endpoint) return null;
+
+  try {
+    await fetch(`${BASE_URL}/api/auth/web-push-subscription`, {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ subscription }),
+    });
+  } catch (err) {
+    console.warn('[Push][Web] Could not save subscription to backend:', err);
+  }
+
+  return subscription.endpoint;
+}
+
+/**
+ * Native (iOS/Android) push registration — unchanged Expo relay flow,
+ * returns a normal ExponentPushToken[...].
+ */
+async function registerNativePush(accessToken: string): Promise<string | null> {
   const projectId =
     (Constants.expoConfig?.extra as any)?.eas?.projectId ??
     (Constants as any).easConfig?.projectId;
 
-  // expo-application's applicationId is hardcoded null on web (no native
-  // bundle ID there), which otherwise makes getExpoPushTokenAsync throw
-  // ERR_NOTIFICATIONS_NO_APPLICATION_ID.
-  const applicationId = Platform.OS === 'web' ? APPLICATION_ID : undefined;
-
   let token: string | null = null;
   try {
-    const result = await Notifications.getExpoPushTokenAsync({
-      ...(projectId ? { projectId } : {}),
-      ...(applicationId ? { applicationId } : {}),
-    });
+    const result = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
     token = result.data;
   } catch (err) {
     console.warn('[Push] Could not get push token:', err);
     return null;
   }
 
-  // Save token to backend
   try {
     await fetch(`${BASE_URL}/api/auth/push-token`, {
       method:  'POST',
@@ -84,4 +154,11 @@ export async function registerForPushNotificationsAsync(accessToken: string): Pr
   }
 
   return token;
+}
+
+export async function registerForPushNotificationsAsync(accessToken: string): Promise<string | null> {
+  const granted = await requestPermissionAndChannel();
+  if (!granted) return null;
+
+  return Platform.OS === 'web' ? registerWebPush(accessToken) : registerNativePush(accessToken);
 }

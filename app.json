@@ -88,7 +88,7 @@
     },
     "notification": {
       "icon": "./assets/icon.png",
-      "vapidPublicKey": "BDi-uYFdjPBqeosVGoz6Nt6Vr1guFnoymo2Udvmbt01pbnAwmOwXrqwbhr04BSWOii6MunO-IpL4CxfQpTwW19w",
+      "vapidPublicKey": "BPL8hvItdzH6-E4S1byM6gGQT-PuFtCTrW6X3CRuyUw9gGIwZWLY26gMYaB3fHLz0EDRSAQv6oPz6ysbTC0bXoA",
       "serviceWorkerPath": "/expo-service-worker.js"
     },
     "extra": {

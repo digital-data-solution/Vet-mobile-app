@@ -52,15 +52,19 @@ self.addEventListener('push', (event) => {
   );
 });
 
-// Tapping the notification focuses an existing tab if there is one, otherwise
-// opens a new one at the site root.
+// Tapping the notification focuses an existing tab if there is one (else
+// opens a new one at the site root), and posts the notification's data back
+// to that page — the service worker has no access to React state or a bearer
+// token to report the tap itself, so notifications.ts's message listener
+// picks this up and calls /api/notifications/track-open instead.
 self.addEventListener('notificationclick', (event) => {
+  const data = event.notification.data || {};
   event.notification.close();
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientsArr) => {
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (clientsArr) => {
       const existing = clientsArr.find((c) => c.url.includes(self.location.origin));
-      if (existing) return existing.focus();
-      return self.clients.openWindow('/');
+      const client = existing ? await existing.focus() : await self.clients.openWindow('/');
+      client?.postMessage({ type: 'xpressvet-notification-click', data });
     })
   );
 });

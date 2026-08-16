@@ -24,7 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import { supabase } from '../api/supabase';
 import { useOnlineStatus } from '../utils/useOnlineStatus';
-import { registerForPushNotificationsAsync } from '../utils/notifications';
+import { registerForPushNotificationsAsync, reportNotificationOpen } from '../utils/notifications';
 import { loadStaffSession, getStaffSession, subscribeStaffSession } from '../utils/businessSession';
 
 import HomeScreen                   from '../screens/HomeScreen';
@@ -612,6 +612,7 @@ export default function AppNavigator() {
     const tapSub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as Record<string, unknown>;
       console.log('[Push] Notification tapped:', data);
+      reportNotificationOpen(data, session.access_token);
     });
 
     return () => {
