@@ -14,7 +14,11 @@ Notifications.setNotificationHandler({
 });
 
 export async function registerForPushNotificationsAsync(accessToken: string): Promise<string | null> {
-  if (Platform.OS === 'web') return null;
+  // Web push uses the browser's native Web Push API under the hood (see
+  // app.json's expo.notification.vapidPublicKey / serviceWorkerPath and
+  // public/expo-service-worker.js) — no Firebase SDK involved. It still
+  // returns a normal ExponentPushToken[...], so the backend needs no
+  // web-specific handling.
 
   // Set up Android notification channel
   if (Platform.OS === 'android') {
@@ -41,11 +45,21 @@ export async function registerForPushNotificationsAsync(accessToken: string): Pr
     (Constants.expoConfig?.extra as any)?.eas?.projectId ??
     (Constants as any).easConfig?.projectId;
 
+  // expo-application's applicationId is hardcoded null on web (no native
+  // bundle ID there), which otherwise makes getExpoPushTokenAsync throw
+  // ERR_NOTIFICATIONS_NO_APPLICATION_ID. Reuse the iOS/Android identifier
+  // from app.json so the web token request succeeds too.
+  const applicationId =
+    Platform.OS === 'web'
+      ? (Constants.expoConfig as any)?.ios?.bundleIdentifier ?? (Constants.expoConfig as any)?.android?.package
+      : undefined;
+
   let token: string | null = null;
   try {
-    const result = await Notifications.getExpoPushTokenAsync(
-      projectId ? { projectId } : undefined,
-    );
+    const result = await Notifications.getExpoPushTokenAsync({
+      ...(projectId ? { projectId } : {}),
+      ...(applicationId ? { applicationId } : {}),
+    });
     token = result.data;
   } catch (err) {
     console.warn('[Push] Could not get push token:', err);

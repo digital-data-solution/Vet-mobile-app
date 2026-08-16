@@ -86,6 +86,11 @@
       "description": "Find trusted vets, kennels, and pet shops near you across Nigeria.",
       "favicon": "./assets/icon.png"
     },
+    "notification": {
+      "icon": "./assets/icon.png",
+      "vapidPublicKey": "BDi-uYFdjPBqeosVGoz6Nt6Vr1guFnoymo2Udvmbt01pbnAwmOwXrqwbhr04BSWOii6MunO-IpL4CxfQpTwW19w",
+      "serviceWorkerPath": "/expo-service-worker.js"
+    },
     "extra": {
       "eas": {
         "projectId": "434617fd-5767-4eee-8920-e739e9894092"
