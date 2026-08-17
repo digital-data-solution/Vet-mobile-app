@@ -7,6 +7,7 @@ import {
   ScrollView,
   Pressable,
   Platform,
+  Switch,
 } from 'react-native';
 import { showAlert } from '../utils/alert';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,6 +26,10 @@ interface SubscriptionInfo {
   daysRemaining: number;
   isActive:      boolean;
   isPending?:    boolean;
+  autoRenew?:    boolean;
+  canAutoRenew?: boolean;
+  cardLast4?:    string | null;
+  cardBrand?:    string | null;
 }
 
 type UserType = 'pet_owner' | 'professional';
@@ -397,7 +402,12 @@ export default function SubscriptionScreen({ navigation }: any) {
       {subLoading ? (
         <ActivityIndicator style={{ marginVertical: 16 }} color="#2563EB" />
       ) : currentSub?.isActive ? (
-        <ActiveSubscriptionCard sub={currentSub} />
+        <ActiveSubscriptionCard
+          sub={currentSub}
+          onAutoRenewChange={(autoRenew) =>
+            setCurrentSub((prev) => (prev ? { ...prev, autoRenew } : prev))
+          }
+        />
       ) : isPending ? (
         <PendingCard
           onCheck={checkPaymentStatus}
@@ -574,7 +584,13 @@ function PlanCard({
 }
 
 
-function ActiveSubscriptionCard({ sub }: { sub: SubscriptionInfo }) {
+function ActiveSubscriptionCard({
+  sub,
+  onAutoRenewChange,
+}: {
+  sub: SubscriptionInfo;
+  onAutoRenewChange: (autoRenew: boolean) => void;
+}) {
   const planLabel = (sub.plan ?? 'Free')
     .replace('_', ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase());
@@ -599,6 +615,71 @@ function ActiveSubscriptionCard({ sub }: { sub: SubscriptionInfo }) {
           {sub.expiresAt ? new Date(sub.expiresAt).toLocaleDateString('en-NG') : ''}
         </Text>
       </View>
+      <AutoRenewRow sub={sub} onAutoRenewChange={onAutoRenewChange} />
+    </View>
+  );
+}
+
+function AutoRenewRow({
+  sub,
+  onAutoRenewChange,
+}: {
+  sub: SubscriptionInfo;
+  onAutoRenewChange: (autoRenew: boolean) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+
+  const toggle = useCallback(async (next: boolean) => {
+    setSaving(true);
+    try {
+      const res = await apiFetch('/api/subscriptions/auto-renew', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ enabled: next }),
+      });
+      if (res.ok && res.body?.success) {
+        onAutoRenewChange(next);
+      } else {
+        showAlert('Auto-renew', res.body?.message || 'Could not update auto-renew right now.');
+      }
+    } catch {
+      showAlert('Network error', 'Please check your connection and try again.');
+    } finally {
+      setSaving(false);
+    }
+  }, [onAutoRenewChange]);
+
+  return (
+    <View style={styles.autoRenewRow}>
+      <View style={styles.autoRenewIconWrap}>
+        <Ionicons name="sync-outline" size={16} color="#047857" />
+      </View>
+      <View style={styles.autoRenewTextWrap}>
+        <Text style={styles.autoRenewTitle}>Auto-renew</Text>
+        {sub.canAutoRenew ? (
+          <Text style={styles.autoRenewSubtitle}>
+            {sub.autoRenew
+              ? `We'll charge your card ending •••• ${sub.cardLast4 ?? '····'} automatically each month.`
+              : 'Renew automatically each month using your saved card.'}
+          </Text>
+        ) : (
+          <Text style={styles.autoRenewSubtitle}>
+            Pay by card next time to enable automatic monthly renewal.
+          </Text>
+        )}
+      </View>
+      {saving ? (
+        <ActivityIndicator size="small" color="#059669" />
+      ) : (
+        <Switch
+          value={!!sub.autoRenew}
+          onValueChange={toggle}
+          disabled={!sub.canAutoRenew}
+          trackColor={{ false: '#E2E8F0', true: '#6EE7B7' }}
+          thumbColor={sub.autoRenew ? '#059669' : '#fff'}
+          ios_backgroundColor="#E2E8F0"
+        />
+      )}
     </View>
   );
 }
@@ -780,6 +861,27 @@ const styles = StyleSheet.create({
   activeBadgeText:  { fontSize: 10, fontWeight: '800', color: '#fff' },
   activeCardFooter: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   activeCardExpiry: { fontSize: 13, color: '#047857' },
+
+  autoRenewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#A7F3D0',
+  },
+  autoRenewIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: '#D1FAE5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  autoRenewTextWrap:  { flex: 1 },
+  autoRenewTitle:     { fontSize: 13, fontWeight: '700', color: '#065F46', marginBottom: 2 },
+  autoRenewSubtitle:  { fontSize: 12, color: '#047857', lineHeight: 16 },
 
   // ── Pending card ──────────────────────────────────────────────────────────
   pendingCard: {
