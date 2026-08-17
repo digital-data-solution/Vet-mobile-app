@@ -2,7 +2,6 @@
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, RealtimeChannel } from '@supabase/supabase-js';
-import { Platform } from 'react-native';
 
 // Get Supabase credentials from environment variables
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
@@ -35,9 +34,16 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storage,
     autoRefreshToken: true,
     persistSession: true,
-    // On web, Supabase must read the token_hash from the callback URL.
-    // On native (iOS/Android), URL-based session detection causes errors.
-    detectSessionInUrl: Platform.OS === 'web',
+    // Always false — EmailVerifiedScreen.tsx does the URL parsing + code/token
+    // exchange itself, on every platform including web. Leaving Supabase's own
+    // detectSessionInUrl on for web used to race it: Supabase would silently
+    // consume and strip the recovery token from the URL (its own internal
+    // "clean up the address bar" step) before our screen's code ever got a
+    // chance to read `type=recovery` off it, so a password-reset link always
+    // looked identical to a plain email-verification link by the time we
+    // checked. Handling the exchange ourselves everywhere removes that race
+    // entirely — see EmailVerifiedScreen.tsx's handleCallback.
+    detectSessionInUrl: false,
   },
 });
 

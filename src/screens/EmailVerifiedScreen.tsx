@@ -40,46 +40,44 @@ export default function EmailVerifiedScreen({ navigation }: any) {
   }, [stage, isAuthenticated, navigation]);
 
   useEffect(() => {
-    let authSub: any;
-
     const handleCallback = async () => {
       try {
-        // Decide recovery-vs-verify from the URL itself, synchronously, before ever
-        // consulting session state. This matters on web: detectSessionInUrl:true
-        // means Supabase auto-exchanges the link and establishes a session before
-        // this component's onAuthStateChange listener can subscribe, so by the time
-        // getSession() resolves there's already a session — indistinguishable from a
-        // normal email-verification session unless we've already pinned the type
-        // from the URL. Without this, a password-reset link silently fell through to
-        // the "session exists" branch below and got treated as verified, sending the
-        // user straight to Home instead of the reset form.
-        let code: string | null = null;
-        let type: string | null = null;
-        let isAuthCallback = false;
+        // detectSessionInUrl is off on every platform (see api/supabase.ts) — we
+        // own the entire exchange here, on purpose. Supabase's own auto-detection
+        // used to strip the token/type out of the URL as part of establishing the
+        // session *before* this code got a chance to read it, so a recovery link
+        // and a plain verification link became indistinguishable by the time we
+        // checked. Reading the raw URL ourselves, first, before touching the SDK
+        // at all, removes that race entirely.
+        const rawUrl = Platform.OS === 'web' && typeof window !== 'undefined'
+          ? window.location.href
+          : await Linking.getInitialURL();
 
-        if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          try {
-            const parsed = new URL(window.location.href);
-            code = parsed.searchParams.get('code');
-            // Recovery `type` lands in the query string under PKCE flow, or in the
-            // hash fragment under the older implicit flow — check both.
-            type = parsed.searchParams.get('type');
-            if (!type && parsed.hash) {
-              type = new URLSearchParams(parsed.hash.replace(/^#/, '')).get('type');
-            }
-            isAuthCallback = parsed.pathname.includes('auth/callback') || !!code || !!type;
-          } catch { /* malformed URL — not a callback */ }
-        } else if (Platform.OS !== 'web') {
-          const url = await Linking.getInitialURL();
-          if (url) {
-            try {
-              const parsed = new URL(url);
-              code = parsed.searchParams.get('code');
-              type = parsed.searchParams.get('type');
-              isAuthCallback = parsed.pathname.includes('auth/callback') || !!code;
-            } catch { /* malformed URL — not a callback */ }
-          }
+        if (!rawUrl) {
+          navigation.reset({ index: 0, routes: [{ name: isAuthenticated ? 'MainTabs' : 'Auth' }] });
+          return;
         }
+
+        let parsed: URL;
+        try {
+          parsed = new URL(rawUrl);
+        } catch {
+          navigation.reset({ index: 0, routes: [{ name: isAuthenticated ? 'MainTabs' : 'Auth' }] });
+          return;
+        }
+
+        const query = parsed.searchParams;
+        // Supabase's own /auth/v1/verify redirect (used for both email-confirm and
+        // password-recovery links) puts the tokens in the hash fragment; a PKCE
+        // `code` exchange puts them in the query string. Check both.
+        const hashParams = parsed.hash ? new URLSearchParams(parsed.hash.replace(/^#/, '')) : null;
+
+        const code         = query.get('code');
+        const accessToken  = query.get('access_token')  || hashParams?.get('access_token')  || null;
+        const refreshToken = query.get('refresh_token') || hashParams?.get('refresh_token') || null;
+        const type         = query.get('type') || hashParams?.get('type') || null;
+
+        const isAuthCallback = parsed.pathname.includes('auth/callback') || !!code || !!accessToken || !!type;
 
         if (!isAuthCallback) {
           // Not opened via an auth deep link — redirect to the correct landing screen.
@@ -87,55 +85,32 @@ export default function EmailVerifiedScreen({ navigation }: any) {
           return;
         }
 
-        if (type === 'recovery') {
-          // Pinned from the URL — show the reset form regardless of what Supabase
-          // has already done with the session in the background.
-          setStage('reset_form');
-          return;
+        // Strip tokens out of the visible URL immediately on web — they're already
+        // captured in the variables above, no reason to leave them sitting in the
+        // address bar / browser history while we process them.
+        if (Platform.OS === 'web' && typeof window !== 'undefined' && window.history) {
+          window.history.replaceState({}, '', parsed.pathname);
         }
 
-        // On native, detectSessionInUrl is false so Supabase never auto-exchanges
-        // the PKCE code from the deep link — do it manually. On web, Supabase has
-        // already exchanged it (detectSessionInUrl:true), so just check the session.
-        if (Platform.OS !== 'web' && code) {
+        let exchangeError: string | null = null;
+
+        if (code) {
           const { error: exchErr } = await supabase.auth.exchangeCodeForSession(code);
-          if (exchErr) {
-            setStage('error');
-            setMessage(exchErr.message);
-          } else {
-            setStage('verified');
-          }
+          if (exchErr) exchangeError = exchErr.message;
+        } else if (accessToken && refreshToken) {
+          const { error: setErr } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+          if (setErr) exchangeError = setErr.message;
+        } else {
+          exchangeError = 'This link is missing or has invalid parameters. Please request a new one.';
+        }
+
+        if (exchangeError) {
+          setStage('error');
+          setMessage(exchangeError);
           return;
         }
 
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) throw error;
-
-        if (session) {
-          // Session already established — email verification success
-          setStage('verified');
-          return;
-        }
-
-        // No session yet — wait for Supabase to process the token from the URL
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-          (event, sess) => {
-            if (event === 'PASSWORD_RECOVERY') {
-              setStage('reset_form');
-              subscription.unsubscribe();
-            } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && sess) {
-              setStage('verified');
-              subscription.unsubscribe();
-            }
-          },
-        );
-        authSub = subscription;
-
-        // Fallback: if nothing happens in 10s show error
-        setTimeout(() => {
-          setStage((prev) => prev === 'loading' ? 'error' : prev);
-          setMessage('Verification timed out. Please try signing in.');
-        }, 10000);
+        setStage(type === 'recovery' ? 'reset_form' : 'verified');
       } catch {
         setStage('error');
         setMessage('Verification failed. Please try again.');
@@ -143,7 +118,6 @@ export default function EmailVerifiedScreen({ navigation }: any) {
     };
 
     handleCallback();
-    return () => authSub?.unsubscribe();
   }, []);
 
   const handleSetPassword = async () => {
