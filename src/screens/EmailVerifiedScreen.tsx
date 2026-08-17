@@ -44,15 +44,33 @@ export default function EmailVerifiedScreen({ navigation }: any) {
 
     const handleCallback = async () => {
       try {
-        // On native, detectSessionInUrl is false so Supabase never auto-exchanges
-        // the PKCE code from the deep link. Do it manually before falling through
-        // to the getSession() / onAuthStateChange path.
-        if (Platform.OS !== 'web') {
-          const url = await Linking.getInitialURL();
-          let code: string | null = null;
-          let type: string | null = null;
-          let isAuthCallback = false;
+        // Decide recovery-vs-verify from the URL itself, synchronously, before ever
+        // consulting session state. This matters on web: detectSessionInUrl:true
+        // means Supabase auto-exchanges the link and establishes a session before
+        // this component's onAuthStateChange listener can subscribe, so by the time
+        // getSession() resolves there's already a session — indistinguishable from a
+        // normal email-verification session unless we've already pinned the type
+        // from the URL. Without this, a password-reset link silently fell through to
+        // the "session exists" branch below and got treated as verified, sending the
+        // user straight to Home instead of the reset form.
+        let code: string | null = null;
+        let type: string | null = null;
+        let isAuthCallback = false;
 
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          try {
+            const parsed = new URL(window.location.href);
+            code = parsed.searchParams.get('code');
+            // Recovery `type` lands in the query string under PKCE flow, or in the
+            // hash fragment under the older implicit flow — check both.
+            type = parsed.searchParams.get('type');
+            if (!type && parsed.hash) {
+              type = new URLSearchParams(parsed.hash.replace(/^#/, '')).get('type');
+            }
+            isAuthCallback = parsed.pathname.includes('auth/callback') || !!code || !!type;
+          } catch { /* malformed URL — not a callback */ }
+        } else if (Platform.OS !== 'web') {
+          const url = await Linking.getInitialURL();
           if (url) {
             try {
               const parsed = new URL(url);
@@ -61,25 +79,33 @@ export default function EmailVerifiedScreen({ navigation }: any) {
               isAuthCallback = parsed.pathname.includes('auth/callback') || !!code;
             } catch { /* malformed URL — not a callback */ }
           }
+        }
 
-          if (!isAuthCallback) {
-            // Not opened via an auth deep link — redirect to the correct landing screen.
-            navigation.reset({ index: 0, routes: [{ name: isAuthenticated ? 'MainTabs' : 'Auth' }] });
-            return;
-          }
+        if (!isAuthCallback) {
+          // Not opened via an auth deep link — redirect to the correct landing screen.
+          navigation.reset({ index: 0, routes: [{ name: isAuthenticated ? 'MainTabs' : 'Auth' }] });
+          return;
+        }
 
-          if (code) {
-            const { error: exchErr } = await supabase.auth.exchangeCodeForSession(code);
-            if (exchErr) {
-              setStage('error');
-              setMessage(exchErr.message);
-            } else if (type === 'recovery') {
-              setStage('reset_form');
-            } else {
-              setStage('verified');
-            }
-            return;
+        if (type === 'recovery') {
+          // Pinned from the URL — show the reset form regardless of what Supabase
+          // has already done with the session in the background.
+          setStage('reset_form');
+          return;
+        }
+
+        // On native, detectSessionInUrl is false so Supabase never auto-exchanges
+        // the PKCE code from the deep link — do it manually. On web, Supabase has
+        // already exchanged it (detectSessionInUrl:true), so just check the session.
+        if (Platform.OS !== 'web' && code) {
+          const { error: exchErr } = await supabase.auth.exchangeCodeForSession(code);
+          if (exchErr) {
+            setStage('error');
+            setMessage(exchErr.message);
+          } else {
+            setStage('verified');
           }
+          return;
         }
 
         const { data: { session }, error } = await supabase.auth.getSession();
