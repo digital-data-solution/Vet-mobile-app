@@ -24,6 +24,9 @@ export interface Listing {
   condition?: 'new' | 'used' | null;
   quantity?: number;
   images: ListingImage[];
+  // External link only (YouTube/TikTok/Instagram/Vimeo) — never a hosted upload,
+  // see models/Listing.js on the backend for why.
+  videoUrl?: string | null;
   contactPhone?: string | null;
   contactWhatsapp?: string | null;
   address?: string | null;

@@ -20,6 +20,24 @@ import { showAlert } from '../utils/alert';
 const ACCENT = '#0F9D58';
 const MAX_IMAGES = 6;
 
+// Mirrors the backend allowlist in models/Listing.js — client-side check is
+// just for immediate feedback, the server is the real gate.
+const ALLOWED_VIDEO_HOSTS = [
+  'youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be',
+  'tiktok.com', 'www.tiktok.com', 'vm.tiktok.com',
+  'instagram.com', 'www.instagram.com',
+  'vimeo.com', 'www.vimeo.com',
+];
+function isAllowedVideoUrl(value: string): boolean {
+  if (!value) return true; // empty is fine — it's optional
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === 'https:' && ALLOWED_VIDEO_HOSTS.includes(url.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
 interface Props { navigation: any; route: any }
 
 export default function CreateListingScreen({ navigation, route }: Props) {
@@ -35,6 +53,8 @@ export default function CreateListingScreen({ navigation, route }: Props) {
   const [description, setDescription] = useState(edit?.description || '');
   const [images, setImages]   = useState<ListingImage[]>(edit?.images || []);
   const [uploading, setUploading] = useState(false);
+  // External link only — no hosted video upload, see api/market.ts.
+  const [videoUrl, setVideoUrl] = useState(edit?.videoUrl || '');
 
   // pet fields
   const [species, setSpecies] = useState(edit?.species || '');
@@ -93,10 +113,14 @@ export default function CreateListingScreen({ navigation, route }: Props) {
     if (description.trim().length < 10) { showAlert('Description', 'Add a description (at least 10 characters).'); return; }
     const p = parseInt(price, 10);
     if (Number.isNaN(p) || p < 0) { showAlert('Price', 'Enter a valid price.'); return; }
+    if (videoUrl.trim() && !isAllowedVideoUrl(videoUrl.trim())) {
+      showAlert('Video link', 'Please paste a YouTube, TikTok, Instagram, or Vimeo link — or leave it blank.');
+      return;
+    }
 
     const body: Record<string, any> = {
       kind, title: title.trim(), description: description.trim(), price: p, negotiable,
-      category: category || 'other', images,
+      category: category || 'other', images, videoUrl: videoUrl.trim() || undefined,
       contactPhone, contactWhatsapp, city, address, riskAccepted: true,
     };
     if (kind === 'pet') { Object.assign(body, { species, breed, ageText, sex: sex || undefined, healthInfo }); }
@@ -145,6 +169,16 @@ export default function CreateListingScreen({ navigation, route }: Props) {
             </TouchableOpacity>
           )}
         </ScrollView>
+
+        <Field
+          label="Video link (optional)"
+          value={videoUrl}
+          onChangeText={setVideoUrl}
+          placeholder="Paste a YouTube, TikTok, Instagram, or Vimeo link"
+          autoCapitalize="none"
+          keyboardType="url"
+        />
+        <Text style={styles.hint}>We don't host video uploads — link to one instead, it's free and buyers can watch it right there.</Text>
 
         <Field label="Title" value={title} onChangeText={setTitle} placeholder={kind === 'pet' ? 'e.g. German Shepherd puppy' : 'e.g. 20kg dog food'} />
 
@@ -234,6 +268,7 @@ function Field({ label, multiline, ...props }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
+  hint: { fontSize: 12, color: '#9CA3AF', marginTop: -8, marginBottom: 12, lineHeight: 16 },
   kindRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   kindBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#fff', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB' },
   kindBtnActive: { backgroundColor: ACCENT, borderColor: ACCENT },

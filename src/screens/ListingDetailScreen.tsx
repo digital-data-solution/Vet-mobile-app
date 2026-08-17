@@ -145,6 +145,16 @@ export default function ListingDetailScreen({ navigation, route }: Props) {
           <View style={[styles.hero, styles.heroEmpty]}><Ionicons name={listing.kind === 'pet' ? 'paw' : 'cube'} size={48} color="#CBD5E1" /></View>
         )}
 
+        {listing.videoUrl && (
+          <TouchableOpacity
+            style={styles.videoBtn}
+            onPress={() => Linking.openURL(listing.videoUrl!).catch(() => showAlert('Could not open link', ''))}
+          >
+            <Ionicons name="play-circle" size={20} color="#fff" />
+            <Text style={styles.videoBtnTxt}>Watch video</Text>
+          </TouchableOpacity>
+        )}
+
         <View style={styles.body}>
           <View style={styles.rowBetween}>
             <Text style={styles.price}>₦{listing.price.toLocaleString()}{listing.negotiable ? '  (negotiable)' : ''}</Text>
@@ -270,6 +280,12 @@ const styles = StyleSheet.create({
   muted: { color: '#9CA3AF', fontSize: 13 },
   hero: { width: 380, maxWidth: 480, height: 300, backgroundColor: '#E5E7EB' },
   heroEmpty: { width: '100%', alignItems: 'center', justifyContent: 'center' },
+  videoBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: '#111827', marginHorizontal: 10, marginTop: 10,
+    paddingVertical: 10, borderRadius: 10,
+  },
+  videoBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
   body: { backgroundColor: '#fff', margin: 10, borderRadius: 14, padding: 16 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   price: { fontSize: 24, fontWeight: '900', color: ACCENT },
