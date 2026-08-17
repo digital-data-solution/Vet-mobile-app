@@ -760,6 +760,20 @@ function PetOwnerHome({
         <Text style={[styles.emergencyBtnArrow, { color: '#0F9D58' }]}>›</Text>
       </TouchableOpacity>
 
+      {/* Job Board — connect clinics/shops with vets and candidates */}
+      <TouchableOpacity
+        style={styles.jobBoardBtn}
+        onPress={() => navigation.navigate('JobBoard')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.emergencyBtnIcon}>💼</Text>
+        <View style={styles.emergencyBtnText}>
+          <Text style={styles.jobBoardBtnTitle}>Job Board — Hire or Get Hired</Text>
+          <Text style={styles.jobBoardBtnSub}>Clinics post openings, vets & staff post their availability.</Text>
+        </View>
+        <Text style={[styles.emergencyBtnArrow, { color: '#2563EB' }]}>›</Text>
+      </TouchableOpacity>
+
       {dashboardCfg && (
         <TouchableOpacity
           style={[styles.dashboardCard, { backgroundColor: dashboardCfg.bgColor, borderColor: dashboardCfg.color + '44' }]}
@@ -1241,6 +1255,14 @@ const styles = StyleSheet.create({
   },
   marketBtnTitle: { fontSize: 15, fontWeight: '800', color: '#065F46' },
   marketBtnSub: { fontSize: 12, color: '#0F9D58', marginTop: 2 },
+  jobBoardBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginHorizontal: 20, marginTop: 10, marginBottom: 4,
+    backgroundColor: '#EFF6FF', borderWidth: 1.5, borderColor: '#93C5FD',
+    borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14,
+  },
+  jobBoardBtnTitle: { fontSize: 15, fontWeight: '800', color: '#1E3A8A' },
+  jobBoardBtnSub: { fontSize: 12, color: '#2563EB', marginTop: 2 },
 
   // Recently viewed
   recentCard: {
