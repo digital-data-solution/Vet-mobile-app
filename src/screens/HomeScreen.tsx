@@ -774,6 +774,20 @@ function PetOwnerHome({
         <Text style={[styles.emergencyBtnArrow, { color: '#2563EB' }]}>›</Text>
       </TouchableOpacity>
 
+      {/* Near Me — combined GPS search across vets, shops & kennels */}
+      <TouchableOpacity
+        style={styles.nearbyBtn}
+        onPress={() => navigation.navigate('NearbySearch')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.emergencyBtnIcon}>📍</Text>
+        <View style={styles.emergencyBtnText}>
+          <Text style={styles.nearbyBtnTitle}>Find Near Me</Text>
+          <Text style={styles.nearbyBtnSub}>Vets, shops & kennels closest to your location.</Text>
+        </View>
+        <Text style={[styles.emergencyBtnArrow, { color: '#0EA5E9' }]}>›</Text>
+      </TouchableOpacity>
+
       {dashboardCfg && (
         <TouchableOpacity
           style={[styles.dashboardCard, { backgroundColor: dashboardCfg.bgColor, borderColor: dashboardCfg.color + '44' }]}
@@ -1263,6 +1277,14 @@ const styles = StyleSheet.create({
   },
   jobBoardBtnTitle: { fontSize: 15, fontWeight: '800', color: '#1E3A8A' },
   jobBoardBtnSub: { fontSize: 12, color: '#2563EB', marginTop: 2 },
+  nearbyBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginHorizontal: 20, marginTop: 10, marginBottom: 4,
+    backgroundColor: '#F0F9FF', borderWidth: 1.5, borderColor: '#7DD3FC',
+    borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14,
+  },
+  nearbyBtnTitle: { fontSize: 15, fontWeight: '800', color: '#0C4A6E' },
+  nearbyBtnSub: { fontSize: 12, color: '#0EA5E9', marginTop: 2 },
 
   // Recently viewed
   recentCard: {

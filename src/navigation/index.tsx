@@ -55,6 +55,7 @@ import CreateListingScreen          from '../screens/CreateListingScreen';
 import MyListingsScreen             from '../screens/MyListingsScreen';
 import ListingBoostScreen           from '../screens/ListingBoostScreen';
 import JobBoardScreen               from '../screens/JobBoardScreen';
+import NearbySearchScreen           from '../screens/NearbySearchScreen';
 import JobPostingDetailScreen       from '../screens/JobPostingDetailScreen';
 import CreateJobPostingScreen       from '../screens/CreateJobPostingScreen';
 import MyJobPostingsScreen          from '../screens/MyJobPostingsScreen';
@@ -150,6 +151,7 @@ export type RootStackParamList = {
   CreateListing:          { kind?: 'pet' | 'product'; edit?: any } | undefined;
   MyListings:             undefined;
   ListingBoost:           { listingId: string };
+  NearbySearch:           undefined;
   JobBoard:               undefined;
   JobPostingDetail:       { id: string; mine?: boolean };
   CreateJobPosting:       { kind?: 'position' | 'seeking_work'; edit?: any } | undefined;
@@ -234,6 +236,7 @@ const AUTH_WEB_PATHS = [
   '/Market',
   '/ListingDetail',
   '/MyListings',
+  '/NearbySearch',
   '/JobBoard',
   '/JobPostingDetail',
   '/MyJobPostings',
@@ -282,6 +285,7 @@ const linking: LinkingOptions<RootStackParamList> = {
       Market:         'Market',
       ListingDetail:  { path: 'ListingDetail', parse: { id: String } },
       MyListings:     'MyListings',
+      NearbySearch:      'NearbySearch',
       JobBoard:          'JobBoard',
       JobPostingDetail:  { path: 'JobPostingDetail', parse: { id: String } },
       MyJobPostings:     'MyJobPostings',
@@ -772,6 +776,7 @@ export default function AppNavigator() {
                 <RootStack.Screen name="CreateListing" component={CreateListingScreen} options={{ headerShown: true, title: 'Sell an Item' }} />
                 <RootStack.Screen name="MyListings"    component={MyListingsScreen}    options={{ headerShown: true, title: 'My Listings' }} />
                 <RootStack.Screen name="ListingBoost"  component={ListingBoostScreen}  options={{ headerShown: true, title: 'Boost Listing' }} />
+                <RootStack.Screen name="NearbySearch"      component={NearbySearchScreen}      options={{ headerShown: true, title: 'Near Me' }} />
                 <RootStack.Screen name="JobBoard"          component={JobBoardScreen}          options={{ headerShown: true, title: 'Job Board' }} />
                 <RootStack.Screen name="JobPostingDetail"  component={JobPostingDetailScreen}  options={{ headerShown: true, title: 'Job Posting' }} />
                 <RootStack.Screen name="CreateJobPosting"  component={CreateJobPostingScreen}  options={{ headerShown: true, title: 'Post a Job' }} />
