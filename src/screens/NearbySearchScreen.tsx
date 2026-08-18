@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   FlatList,
   TouchableOpacity,
@@ -10,7 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { showAlert } from '../utils/alert';
-import { getUserLocation } from '../utils/location';
+import { getUserLocation, forwardGeocode } from '../utils/location';
 import { apiFetch } from '../api/client';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -56,22 +57,19 @@ const ROLE_EMOJI: Record<string, string> = {
 export default function NearbySearchScreen({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
+  const [addressInput, setAddressInput] = useState('');
   const [results, setResults] = useState<NearbyResult[]>([]);
   const [ownCount, setOwnCount] = useState(0);
   const [googleCount, setGoogleCount] = useState(0);
   const [attribution, setAttribution] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
-  const runSearch = async () => {
-    setLocationLoading(true);
+  const searchCoords = async (lat: number, lng: number) => {
+    setLoading(true);
     try {
-      const loc = await getUserLocation();
-      setLocationLoading(false);
-      setLoading(true);
-
       const params = new URLSearchParams({
-        lng: loc.longitude.toString(),
-        lat: loc.latitude.toString(),
+        lng: lng.toString(),
+        lat: lat.toString(),
         distance: '10',
       });
 
@@ -86,12 +84,39 @@ export default function NearbySearchScreen({ navigation }: any) {
       } else {
         showAlert('Error', res.body?.message || 'Failed to search nearby.');
       }
+    } catch {
+      showAlert('Error', 'Network error. Please try again.');
+    } finally {
+      setLoading(false);
+      setHasSearched(true);
+    }
+  };
+
+  const runSearch = async () => {
+    setLocationLoading(true);
+    try {
+      const loc = await getUserLocation();
+      await searchCoords(loc.latitude, loc.longitude);
     } catch (err) {
       showAlert('Error', (err as Error).message || 'Could not get your location.');
     } finally {
       setLocationLoading(false);
-      setLoading(false);
-      setHasSearched(true);
+    }
+  };
+
+  const runAddressSearch = async () => {
+    if (!addressInput.trim()) {
+      showAlert('Error', 'Type an area or address first, e.g. "Mile 2, Lagos".');
+      return;
+    }
+    setLocationLoading(true);
+    try {
+      const result = await forwardGeocode(addressInput.trim());
+      await searchCoords(result.lat, result.lon);
+    } catch {
+      showAlert('Not Found', 'Could not find that address. Try a more specific one.');
+    } finally {
+      setLocationLoading(false);
     }
   };
 
@@ -162,6 +187,27 @@ export default function NearbySearchScreen({ navigation }: any) {
         )}
       </TouchableOpacity>
 
+      <Text style={styles.orDivider}>or search a different area</Text>
+
+      <View style={styles.addressRow}>
+        <TextInput
+          style={styles.addressInput}
+          placeholder="e.g. Mile 2, Lagos"
+          placeholderTextColor="#9CA3AF"
+          value={addressInput}
+          onChangeText={setAddressInput}
+          onSubmitEditing={runAddressSearch}
+          returnKeyType="search"
+        />
+        <TouchableOpacity
+          style={styles.addressSearchBtn}
+          onPress={runAddressSearch}
+          disabled={loading || locationLoading}
+        >
+          <Ionicons name="search" size={18} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
       {hasSearched && !loading && (
         <>
           <Text style={styles.resultSummary}>
@@ -202,6 +248,26 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   searchBtnText: { color: '#fff', fontWeight: '600', fontSize: 15 },
+  orDivider: { fontSize: 12, color: '#9CA3AF', textAlign: 'center', marginBottom: 10 },
+  addressRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  addressInput: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#111827',
+  },
+  addressSearchBtn: {
+    width: 44,
+    borderRadius: 10,
+    backgroundColor: '#2563EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   resultSummary: { fontSize: 13, color: '#6B7280', marginBottom: 10 },
   card: {
     flexDirection: 'row',
