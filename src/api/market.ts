@@ -115,7 +115,9 @@ export async function uploadListingImage(uri: string): Promise<ListingImage | nu
 }
 
 // Public share link that renders an Open Graph preview (photo + price) on
-// WhatsApp/Facebook, then redirects into the app.
+// WhatsApp/Facebook, then redirects into the app. Served off a branded
+// subdomain (go.xpressvetmarketplace.com, CNAME'd to the Render backend)
+// instead of the raw onrender.com hostname so shared links look trustworthy.
 export function listingShareUrl(id: string) {
-  return `https://vet-market-place-jsj5.onrender.com/l/${id}`;
+  return `https://go.xpressvetmarketplace.com/l/${id}`;
 }
