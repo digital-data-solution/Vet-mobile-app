@@ -128,30 +128,38 @@ export default function MarketScreen({ navigation }: Props) {
         ))}
       </ScrollView>
 
-      {loading ? (
-        <View style={styles.center}><ActivityIndicator size="large" color={ACCENT} /></View>
-      ) : (
-        <FlatList
-          data={items}
-          keyExtractor={(i) => i._id}
-          renderItem={renderCard}
-          numColumns={2}
-          columnWrapperStyle={{ paddingHorizontal: 8, gap: 8 }}
-          contentContainerStyle={{ paddingVertical: 8, paddingBottom: 96 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          ListEmptyComponent={
-            <View style={styles.center}>
-              <Ionicons name={kind === 'pet' ? 'paw-outline' : 'cube-outline'} size={44} color="#D1D5DB" />
-              <Text style={styles.emptyTxt}>Nothing here yet.</Text>
-              <Text style={styles.emptySub}>Be the first to list {kind === 'pet' ? 'a pet' : 'a product'} for sale.</Text>
-            </View>
-          }
-        />
-      )}
+      {/* Wrapped in its own flex:1 box so the bottom bar below it is a real
+          docked element taking its own space in normal layout flow — not a
+          floating overlay guessing at padding. The list's available height
+          is physically shortened by the bar's height instead, so there is
+          no way for cards to render underneath it, on any screen size. */}
+      <View style={{ flex: 1 }}>
+        {loading ? (
+          <View style={styles.center}><ActivityIndicator size="large" color={ACCENT} /></View>
+        ) : (
+          <FlatList
+            data={items}
+            keyExtractor={(i) => i._id}
+            renderItem={renderCard}
+            numColumns={2}
+            columnWrapperStyle={{ paddingHorizontal: 8, gap: 8 }}
+            contentContainerStyle={{ paddingVertical: 8 }}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            ListEmptyComponent={
+              <View style={styles.center}>
+                <Ionicons name={kind === 'pet' ? 'paw-outline' : 'cube-outline'} size={44} color="#D1D5DB" />
+                <Text style={styles.emptyTxt}>Nothing here yet.</Text>
+                <Text style={styles.emptySub}>Be the first to list {kind === 'pet' ? 'a pet' : 'a product'} for sale.</Text>
+              </View>
+            }
+          />
+        )}
+      </View>
 
-      {/* My listings + Sell — solid bottom bar, not a transparent overlay, so it
-          never visually cuts into whatever product photo happens to scroll
-          underneath it. */}
+      {/* My listings + Sell — a real docked bar, not a floating overlay. It
+          takes up its own space at the bottom of the flex column, so the
+          list above it is physically shortened to make room; cards can
+          never render underneath it. */}
       <View style={styles.fabBar}>
         <TouchableOpacity style={styles.mineBtn} onPress={() => navigation.navigate('MyListings')}>
           <Ionicons name="pricetags-outline" size={18} color={ACCENT} />
@@ -199,7 +207,6 @@ const styles = StyleSheet.create({
   meta: { fontSize: 11, color: '#9CA3AF', marginTop: 3, textTransform: 'capitalize' },
 
   fabBar: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 10,
     flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8,
     backgroundColor: '#F3F4F6', borderTopWidth: 1, borderTopColor: '#E5E7EB',
     paddingHorizontal: 12, paddingVertical: 12, elevation: 6,
