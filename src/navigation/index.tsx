@@ -240,6 +240,8 @@ const AUTH_WEB_PATHS = [
   '/JobBoard',
   '/JobPostingDetail',
   '/MyJobPostings',
+  '/ProfessionalOnboarding',
+  '/Business',
 ];
 
 const linking: LinkingOptions<RootStackParamList> = {
@@ -289,6 +291,8 @@ const linking: LinkingOptions<RootStackParamList> = {
       JobBoard:          'JobBoard',
       JobPostingDetail:  { path: 'JobPostingDetail', parse: { id: String } },
       MyJobPostings:     'MyJobPostings',
+      ProfessionalOnboarding: 'ProfessionalOnboarding',
+      Business:               'Business',
       MainTabs:      {
         screens: {
           Home:          'home',
