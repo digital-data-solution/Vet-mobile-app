@@ -68,6 +68,7 @@ These providers are required to submit identification documents (such as a Natio
 - Professionals are solely responsible for the accuracy of their listing information.
 - Xpress Vet reserves the right to approve, reject, suspend, or remove any listing at its sole discretion.
 - Verification status may be revoked at any time if fraud or misconduct is discovered.
+- By publishing a listing (including on Xpress Market), you grant Xpress Vet a non-exclusive, royalty-free license to reproduce and share that listing's public content (title, description, price, and photos) on Xpress Vet's own marketing and social media channels, for the purpose of promoting the listing and the platform. This does not transfer ownership of your content, and you may request removal from a specific channel by contacting support.
 
 ---
 
