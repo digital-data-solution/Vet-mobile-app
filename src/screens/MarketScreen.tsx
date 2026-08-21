@@ -137,7 +137,7 @@ export default function MarketScreen({ navigation }: Props) {
           renderItem={renderCard}
           numColumns={2}
           columnWrapperStyle={{ paddingHorizontal: 8, gap: 8 }}
-          contentContainerStyle={{ paddingVertical: 8, paddingBottom: 90 }}
+          contentContainerStyle={{ paddingVertical: 8, paddingBottom: 96 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ListEmptyComponent={
             <View style={styles.center}>
@@ -149,8 +149,10 @@ export default function MarketScreen({ navigation }: Props) {
         />
       )}
 
-      {/* My listings + Sell */}
-      <View style={styles.fabRow}>
+      {/* My listings + Sell — solid bottom bar, not a transparent overlay, so it
+          never visually cuts into whatever product photo happens to scroll
+          underneath it. */}
+      <View style={styles.fabBar}>
         <TouchableOpacity style={styles.mineBtn} onPress={() => navigation.navigate('MyListings')}>
           <Ionicons name="pricetags-outline" size={18} color={ACCENT} />
           <Text style={styles.mineTxt}>My Listings</Text>
@@ -196,9 +198,14 @@ const styles = StyleSheet.create({
   title: { fontSize: 13, fontWeight: '600', color: '#111827', marginTop: 2 },
   meta: { fontSize: 11, color: '#9CA3AF', marginTop: 3, textTransform: 'capitalize' },
 
-  fabRow: { position: 'absolute', bottom: 16, right: 12, flexDirection: 'row', gap: 8, alignItems: 'center' },
-  mineBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 12, borderRadius: 30, borderWidth: 1, borderColor: ACCENT, elevation: 2 },
+  fabBar: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 10,
+    flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8,
+    backgroundColor: '#F3F4F6', borderTopWidth: 1, borderTopColor: '#E5E7EB',
+    paddingHorizontal: 12, paddingVertical: 12, elevation: 6,
+  },
+  mineBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 12, borderRadius: 30, borderWidth: 1, borderColor: ACCENT },
   mineTxt: { color: ACCENT, fontWeight: '800' },
-  sellBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: ACCENT, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 30, elevation: 3 },
+  sellBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: ACCENT, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 30 },
   sellTxt: { color: '#fff', fontWeight: '900', fontSize: 15 },
 });
