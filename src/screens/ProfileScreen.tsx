@@ -10,6 +10,7 @@ import {
   Share,
   TextInput,
   TouchableOpacity,
+  Linking,
 } from 'react-native';
 import { showAlert } from '../utils/alert';
 import { getCurrentUser } from '../api/supabase';
@@ -897,6 +898,17 @@ export default function ProfileScreen({ navigation }: Props) {
           label="Register Your Farm"
           onPress={() => navigation.navigate('ProfessionalOnboarding', { role: 'farm' })}
           tint="#92400E"
+        />
+      </View>
+
+      {/* ── Stay updated ────────────────────────────────────────────────── */}
+      <View style={styles.actionsCard}>
+        <Text style={styles.cardTitle}>Stay Updated</Text>
+        <MenuButton
+          emoji="📢"
+          label="Join our Telegram Channel"
+          onPress={() => Linking.openURL('https://t.me/XpressVetListings')}
+          tint="#229ED9"
         />
       </View>
 
