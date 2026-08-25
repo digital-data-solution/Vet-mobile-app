@@ -593,7 +593,15 @@ export default function AppNavigator() {
   }, []);
 
   // After login, redirect to the URL the user was trying to reach before auth.
-  // Use history.replaceState instead of window.location.href to avoid full reload loop.
+  // NOTE: this must be a real navigation (window.location.href), not just
+  // history.replaceState — React Navigation's web linking only re-syncs the
+  // screen on a `popstate` event (browser back/forward); it does not listen
+  // for pushState/replaceState, so replaceState alone silently updates the
+  // address bar while leaving the user stuck on whatever screen they landed
+  // on after signing in (e.g. Home instead of the onboarding form they
+  // actually clicked through from an email). We remove the stored redirect
+  // from sessionStorage *before* reloading, so the reload's own getInitialURL
+  // pass (which will now see a real, already-established session) can't loop.
   useEffect(() => {
     if (!isAuthenticated || loading) return;
     if (typeof window === 'undefined') return;
@@ -604,7 +612,7 @@ export default function AppNavigator() {
       const url = new URL(pending);
       // Only redirect if it's a different non-root path to avoid loop
       if (url.pathname !== '/' && url.pathname !== window.location.pathname) {
-        window.history.replaceState({}, '', url.pathname + url.search);
+        window.location.href = url.pathname + url.search;
       }
     } catch {}
   }, [isAuthenticated, loading]);
