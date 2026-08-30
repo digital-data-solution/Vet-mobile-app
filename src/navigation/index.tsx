@@ -84,6 +84,8 @@ import PrivacyPolicyScreen          from '../screens/PrivacyPolicyScreen';
 import TermsScreen                  from '../screens/TermsScreen';
 import SupportScreen                from '../screens/SupportScreen';
 import FavoritesScreen              from '../screens/FavoritesScreen';
+import BlogScreen                   from '../screens/BlogScreen';
+import BlogPostScreen               from '../screens/BlogPostScreen';
 
 const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://vet-market-place-jsj5.onrender.com';
 
@@ -186,6 +188,8 @@ export type RootStackParamList = {
   PrivacyPolicy: undefined;
   Terms:         undefined;
   Support:       undefined;
+  Blog:          undefined;
+  BlogPost:      { slug: string };
 };
 
 export type TabParamList = {
@@ -214,6 +218,11 @@ const PUBLIC_WEB_PATHS = [
   '/privacy-policy',
   '/terms-and-conditions',
   '/support',
+  // Blog is deliberately public (not in AUTH_WEB_PATHS below) — articles are
+  // meant to be link-shareable and readable without an account, including
+  // straight from the blog-post marketing email's "Read the full article"
+  // button (see email.service.js's sendBlogPostEmail).
+  '/Blog',
 ];
 
 const AUTH_WEB_PATHS = [
@@ -293,6 +302,8 @@ const linking: LinkingOptions<RootStackParamList> = {
       MyJobPostings:     'MyJobPostings',
       ProfessionalOnboarding: 'ProfessionalOnboarding',
       Business:               'Business',
+      Blog:                   'Blog',
+      BlogPost:               { path: 'Blog/:slug', parse: { slug: String } },
       MainTabs:      {
         screens: {
           Home:          'home',
@@ -783,6 +794,8 @@ export default function AppNavigator() {
                   component={WalletScreen}
                   options={{ headerShown: true, title: 'My Wallet' }}
                 />
+                <RootStack.Screen name="Blog"     component={BlogScreen}     options={{ headerShown: true, title: 'Blog' }} />
+                <RootStack.Screen name="BlogPost" component={BlogPostScreen} options={{ headerShown: true, title: 'Article' }} />
                 <RootStack.Screen name="Market"        component={MarketScreen}        options={{ headerShown: true, title: 'Xpress Market' }} />
                 <RootStack.Screen name="ListingDetail" component={ListingDetailScreen} options={{ headerShown: true, title: 'Listing' }} />
                 <RootStack.Screen name="CreateListing" component={CreateListingScreen} options={{ headerShown: true, title: 'Sell an Item' }} />

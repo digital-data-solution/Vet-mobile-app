@@ -774,6 +774,20 @@ function PetOwnerHome({
         <Text style={[styles.emergencyBtnArrow, { color: '#2563EB' }]}>›</Text>
       </TouchableOpacity>
 
+      {/* Blog — pet care tips, product news & updates */}
+      <TouchableOpacity
+        style={styles.blogBtn}
+        onPress={() => navigation.navigate('Blog')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.emergencyBtnIcon}>📰</Text>
+        <View style={styles.emergencyBtnText}>
+          <Text style={styles.blogBtnTitle}>Xpress Vet Blog</Text>
+          <Text style={styles.blogBtnSub}>Pet care tips, product news and updates from our team.</Text>
+        </View>
+        <Text style={[styles.emergencyBtnArrow, { color: '#7C3AED' }]}>›</Text>
+      </TouchableOpacity>
+
       {/* Near Me — combined GPS search across vets, shops & kennels */}
       <TouchableOpacity
         style={styles.nearbyBtn}
@@ -1277,6 +1291,14 @@ const styles = StyleSheet.create({
   },
   jobBoardBtnTitle: { fontSize: 15, fontWeight: '800', color: '#1E3A8A' },
   jobBoardBtnSub: { fontSize: 12, color: '#2563EB', marginTop: 2 },
+  blogBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginHorizontal: 20, marginTop: 10, marginBottom: 4,
+    backgroundColor: '#F5F3FF', borderWidth: 1.5, borderColor: '#C4B5FD',
+    borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14,
+  },
+  blogBtnTitle: { fontSize: 15, fontWeight: '800', color: '#4C1D95' },
+  blogBtnSub: { fontSize: 12, color: '#7C3AED', marginTop: 2 },
   nearbyBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     marginHorizontal: 20, marginTop: 10, marginBottom: 4,
