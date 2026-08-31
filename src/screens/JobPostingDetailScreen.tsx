@@ -65,7 +65,10 @@ export default function JobPostingDetailScreen({ navigation, route }: Props) {
         if ((navigator as any).share) await (navigator as any).share({ title: posting.title, text: msg, url });
         else { await (navigator as any).clipboard.writeText(url); showAlert('Link Copied!', 'Share it anywhere.'); }
       } else {
-        await Share.share({ message: msg, url });
+        // message already has the link embedded — passing `url` too makes
+        // RN's Share module attach it a second time on iOS (WhatsApp then
+        // shows the URL twice in one message).
+        await Share.share({ message: msg });
       }
     } catch {}
   };

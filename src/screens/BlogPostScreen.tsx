@@ -54,13 +54,18 @@ export default function BlogPostScreen({ route, navigation }: Props) {
   const share = async () => {
     if (!post) return;
     const url = blogShareUrl(post.slug);
-    const msg = `${post.title} — on the Xpress Vet blog 🐾\n${url}`;
+    // Teaser (the excerpt) before the link, not just a bare title — gives
+    // whoever receives it a reason to actually tap through.
+    const msg = `📰 ${post.title}\n\n${post.excerpt}\n\nRead more on Xpress Vet 🐾\n${url}`;
     try {
       if (Platform.OS === 'web') {
         if ((navigator as any).share) await (navigator as any).share({ title: post.title, text: msg, url });
         else { await (navigator as any).clipboard.writeText(url); showAlert('Link Copied!', 'Share it anywhere.'); }
       } else {
-        await Share.share({ message: msg, url });
+        // message already has the link embedded — passing `url` too makes
+        // RN's Share module attach it a second time on iOS (WhatsApp then
+        // shows the URL twice in one message).
+        await Share.share({ message: msg });
       }
     } catch {}
   };

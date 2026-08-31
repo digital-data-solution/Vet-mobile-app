@@ -209,7 +209,10 @@ export default function ShopProfileScreen({ route, navigation }: any) {
           showAlert('Link Copied!', 'Share this link to let others find this shop.');
         }
       } else {
-        await Share.share({ message: msg, url: profileUrl });
+        // message already has the link embedded — passing `url` too makes
+        // RN's Share module attach it a second time on iOS (WhatsApp then
+        // shows the URL twice in one message).
+        await Share.share({ message: msg });
       }
     } catch {}
   };
