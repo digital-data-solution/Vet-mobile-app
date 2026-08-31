@@ -203,7 +203,9 @@ export default function ShopProfileScreen({ route, navigation }: any) {
     try {
       if (Platform.OS === 'web') {
         if ((navigator as any).share) {
-          await (navigator as any).share({ title: name, text: msg, url: profileUrl });
+          // Same double-URL issue as the native branch below — text already
+          // has the link embedded, so `url` isn't passed here either.
+          await (navigator as any).share({ title: name, text: msg });
         } else {
           await (navigator as any).clipboard.writeText(profileUrl);
           showAlert('Link Copied!', 'Share this link to let others find this shop.');

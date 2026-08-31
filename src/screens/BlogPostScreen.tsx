@@ -59,7 +59,9 @@ export default function BlogPostScreen({ route, navigation }: Props) {
     const msg = `📰 ${post.title}\n\n${post.excerpt}\n\nRead more on Xpress Vet 🐾\n${url}`;
     try {
       if (Platform.OS === 'web') {
-        if ((navigator as any).share) await (navigator as any).share({ title: post.title, text: msg, url });
+        // Same double-URL issue as the native branch below — text already
+        // has the link embedded, so `url` isn't passed here either.
+        if ((navigator as any).share) await (navigator as any).share({ title: post.title, text: msg });
         else { await (navigator as any).clipboard.writeText(url); showAlert('Link Copied!', 'Share it anywhere.'); }
       } else {
         // message already has the link embedded — passing `url` too makes
