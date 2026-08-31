@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ProfileImageUploader from '../components/ProfileImageUploader';
 import LanguagePicker from '../components/LanguagePicker';
+import { clearOfflineCacheForCurrentActor } from '../utils/offlineCache';
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -355,6 +356,9 @@ export default function ProfileScreen({ navigation }: Props) {
     const doLogout = async () => {
       setLoggingOut(true);
       try {
+        // Clear this account's cached offline data BEFORE the session goes
+        // away — clearing relies on still knowing who's signed in.
+        await clearOfflineCacheForCurrentActor();
         await AsyncStorage.removeItem('access_token');
         await signOut();
         navigation.reset({ index: 0, routes: [{ name: 'Auth' }] });

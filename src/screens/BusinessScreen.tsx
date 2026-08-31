@@ -18,6 +18,7 @@ import {
   ActiveRep, getActiveRep, loadActiveRep, setActiveRep,
   StaffAuth, getStaffSession, loadStaffSession, clearStaffSession,
 } from '../utils/businessSession';
+import { clearOfflineCacheForCurrentActor } from '../utils/offlineCache';
 
 interface Status {
   productCount: number; freeProductLimit: number; atLimit: boolean; lowStockCount: number;
@@ -93,7 +94,10 @@ export default function BusinessScreen({ navigation }: Props) {
   const staffLogout = () => {
     showAlert('Log out?', 'You will need your username and password to sign back in.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Log out', style: 'destructive', onPress: async () => { await clearStaffSession(); } },
+      { text: 'Log out', style: 'destructive', onPress: async () => {
+        await clearOfflineCacheForCurrentActor();
+        await clearStaffSession();
+      } },
     ]);
   };
 

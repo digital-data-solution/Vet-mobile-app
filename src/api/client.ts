@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import { supabase } from './supabase';
 import { getStaffToken, loadStaffSession } from '../utils/businessSession';
+import { saveCachedResponse, loadCachedResponse } from '../utils/offlineCache';
 
 const BACKEND_URL = (
   process.env.EXPO_PUBLIC_BACKEND_URL || 'https://vet-market-place-jsj5.onrender.com'
@@ -170,9 +171,25 @@ async function requestJson(
       };
     }
 
+    // Cache every successful GET so it can be served back if this exact
+    // request fails with no connection later. Fire-and-forget — never let a
+    // slow disk write hold up a response that already succeeded.
+    if (method === 'GET') saveCachedResponse(path, responseBody);
+
     return { status, ok: true, body: responseBody };
 
   } catch (error: any) {
+    // No connection / request timed out. For a GET, fall back to the last
+    // successful response for this exact path rather than surfacing a bare
+    // error — writes (POST/PUT/DELETE) always fall through to the error
+    // below instead, since a booking or payment can't be faked offline.
+    if (method === 'GET') {
+      const cached = await loadCachedResponse(path);
+      if (cached) {
+        return { status: 200, ok: true, body: cached.body, fromCache: true, cachedAt: cached.cachedAt };
+      }
+    }
+
     if (error.name === 'AbortError') {
       console.error('API request timeout:', url);
       return {
