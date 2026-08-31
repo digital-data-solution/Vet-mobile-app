@@ -31,3 +31,23 @@ export async function getBlogPost(slug: string) {
   const r = await apiFetch(`/api/v1/blog/${encodeURIComponent(slug)}`);
   return r.ok ? (r.body?.data as BlogPost) : null;
 }
+
+// Share-preview link (server-rendered Open Graph tags — see app.js's /b/:slug)
+// rather than the raw /Blog/:slug SPA route, so WhatsApp/Facebook/etc show the
+// post's own title and cover image instead of the generic app shell. Same
+// go.xpressvetmarketplace.com pattern as market.ts's listingShareUrl.
+export function blogShareUrl(slug: string) {
+  return `https://go.xpressvetmarketplace.com/b/${slug}`;
+}
+
+// Rough reading time — ~200 words/minute, same heuristic most blogs use.
+// Markdown syntax (#, *, -, links) is stripped first so it doesn't inflate
+// the word count.
+export function readingTime(markdown: string): number {
+  const plain = markdown
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/[#*_>`~-]/g, ' ')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+  const words = plain.trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(words / 200));
+}
