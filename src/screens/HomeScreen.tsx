@@ -788,6 +788,20 @@ function PetOwnerHome({
         <Text style={[styles.emergencyBtnArrow, { color: '#7C3AED' }]}>›</Text>
       </TouchableOpacity>
 
+      {/* Help Videos — "how to use Xpress Vet" tutorials */}
+      <TouchableOpacity
+        style={styles.helpVideosBtn}
+        onPress={() => navigation.navigate('HelpVideos')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.emergencyBtnIcon}>❓</Text>
+        <View style={styles.emergencyBtnText}>
+          <Text style={styles.helpVideosBtnTitle}>Help & Tutorials</Text>
+          <Text style={styles.helpVideosBtnSub}>Short videos on how to use Xpress Vet.</Text>
+        </View>
+        <Text style={[styles.emergencyBtnArrow, { color: '#0369A1' }]}>›</Text>
+      </TouchableOpacity>
+
       {/* Near Me — combined GPS search across vets, shops & kennels */}
       <TouchableOpacity
         style={styles.nearbyBtn}
@@ -1299,6 +1313,14 @@ const styles = StyleSheet.create({
   },
   blogBtnTitle: { fontSize: 15, fontWeight: '800', color: '#4C1D95' },
   blogBtnSub: { fontSize: 12, color: '#7C3AED', marginTop: 2 },
+  helpVideosBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginHorizontal: 20, marginTop: 10, marginBottom: 4,
+    backgroundColor: '#F0F9FF', borderWidth: 1.5, borderColor: '#7DD3FC',
+    borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14,
+  },
+  helpVideosBtnTitle: { fontSize: 15, fontWeight: '800', color: '#0C4A6E' },
+  helpVideosBtnSub: { fontSize: 12, color: '#0369A1', marginTop: 2 },
   nearbyBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     marginHorizontal: 20, marginTop: 10, marginBottom: 4,

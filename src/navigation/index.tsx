@@ -86,6 +86,8 @@ import SupportScreen                from '../screens/SupportScreen';
 import FavoritesScreen              from '../screens/FavoritesScreen';
 import BlogScreen                   from '../screens/BlogScreen';
 import BlogPostScreen               from '../screens/BlogPostScreen';
+import HelpVideosScreen             from '../screens/HelpVideosScreen';
+import HelpVideoPlayerScreen        from '../screens/HelpVideoPlayerScreen';
 
 const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://vet-market-place-jsj5.onrender.com';
 
@@ -190,6 +192,8 @@ export type RootStackParamList = {
   Support:       undefined;
   Blog:          undefined;
   BlogPost:      { slug: string };
+  HelpVideos:      undefined;
+  HelpVideoPlayer: { id: string; title?: string };
 };
 
 export type TabParamList = {
@@ -223,6 +227,9 @@ const PUBLIC_WEB_PATHS = [
   // straight from the blog-post marketing email's "Read the full article"
   // button (see email.service.js's sendBlogPostEmail).
   '/Blog',
+  // Same reasoning as Blog — tutorials are meant to be viewable without an
+  // account, including shared straight from a WhatsApp/outreach link.
+  '/HelpVideos',
 ];
 
 const AUTH_WEB_PATHS = [
@@ -304,6 +311,8 @@ const linking: LinkingOptions<RootStackParamList> = {
       Business:               'Business',
       Blog:                   'Blog',
       BlogPost:               { path: 'Blog/:slug', parse: { slug: String } },
+      HelpVideos:             'HelpVideos',
+      HelpVideoPlayer:        { path: 'HelpVideos/:id', parse: { id: String } },
       MainTabs:      {
         screens: {
           Home:          'home',
@@ -796,6 +805,8 @@ export default function AppNavigator() {
                 />
                 <RootStack.Screen name="Blog"     component={BlogScreen}     options={{ headerShown: true, title: 'Blog' }} />
                 <RootStack.Screen name="BlogPost" component={BlogPostScreen} options={{ headerShown: true, title: 'Article' }} />
+                <RootStack.Screen name="HelpVideos"      component={HelpVideosScreen}      options={{ headerShown: true, title: 'Help & Tutorials' }} />
+                <RootStack.Screen name="HelpVideoPlayer" component={HelpVideoPlayerScreen} options={{ headerShown: false }} />
                 <RootStack.Screen name="Market"        component={MarketScreen}        options={{ headerShown: true, title: 'Xpress Market' }} />
                 <RootStack.Screen name="ListingDetail" component={ListingDetailScreen} options={{ headerShown: true, title: 'Listing' }} />
                 <RootStack.Screen name="CreateListing" component={CreateListingScreen} options={{ headerShown: true, title: 'Sell an Item' }} />
