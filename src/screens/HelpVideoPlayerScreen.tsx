@@ -18,6 +18,11 @@ import { getHelpVideo, youtubeEmbedUrl, recordHelpVideoView, HelpVideo } from '.
 
 const ACCENT = '#2563EB';
 
+// Web-only style (border: 'none' isn't a valid RN ViewStyle property, so this
+// stays outside StyleSheet.create's type checking — same reasoning as the
+// `as any` cast on the iframe's style prop below).
+const iframeStyle = { width: '100%', height: '100%', border: 'none', backgroundColor: '#000' };
+
 interface RouteParams { id: string; title?: string }
 
 export default function HelpVideoPlayerScreen({ route, navigation }: any) {
@@ -62,14 +67,28 @@ export default function HelpVideoPlayerScreen({ route, navigation }: any) {
       ) : (
         <>
           <View style={styles.playerWrap}>
-            <WebView
-              source={{ uri: youtubeEmbedUrl(video.youtubeVideoId) }}
-              style={styles.webview}
-              allowsFullscreenVideo
-              mediaPlaybackRequiresUserAction={Platform.OS === 'ios'}
-              javaScriptEnabled
-              domStorageEnabled
-            />
+            {Platform.OS === 'web' ? (
+              // react-native-webview doesn't support web (throws "does not
+              // support this platform") — same fork PaystackWebView.tsx uses
+              // for its web checkout: a plain <iframe> instead.
+              // @ts-ignore — <iframe> is a valid web DOM element, RN's types just don't know it
+              <iframe
+                src={youtubeEmbedUrl(video.youtubeVideoId)}
+                title={video.title}
+                style={iframeStyle as any}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            ) : (
+              <WebView
+                source={{ uri: youtubeEmbedUrl(video.youtubeVideoId) }}
+                style={styles.webview}
+                allowsFullscreenVideo
+                mediaPlaybackRequiresUserAction={Platform.OS === 'ios'}
+                javaScriptEnabled
+                domStorageEnabled
+              />
+            )}
           </View>
           {!!video.description && (
             <Text style={styles.description}>{video.description}</Text>
