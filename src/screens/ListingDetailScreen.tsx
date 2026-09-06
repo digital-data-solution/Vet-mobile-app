@@ -312,9 +312,20 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6', padding: 24 },
   muted: { color: '#9CA3AF', fontSize: 13 },
   hero: { width: 380, maxWidth: 480, height: 300, backgroundColor: '#E5E7EB' },
-  // 9:16 — the generated video's real aspect ratio, capped so it doesn't
-  // dominate the whole screen on a tall phone.
-  videoWrap: { width: '100%', aspectRatio: 9 / 16, maxHeight: 480, backgroundColor: '#000' },
+  // 9:16 — the generated video's real aspect ratio. On a narrow phone
+  // screen, width:'100%' + aspectRatio alone is correct (height follows
+  // width). But on a wide screen (web, tablet), maxHeight alone was
+  // clamping the *height* without ever shrinking the *width* back down to
+  // match — CSS aspect-ratio doesn't reverse-solve for width from a
+  // height clamp, so the box stayed full-width and the browser's own
+  // <video> pillarboxed the actual vertical video inside it (black bars
+  // either side, video looking small and centered). Fix: cap width too,
+  // computed from the same maxHeight at the true 9:16 ratio, and center
+  // the now-correctly-shaped box.
+  videoWrap: {
+    width: '100%', aspectRatio: 9 / 16, maxHeight: 480, maxWidth: 480 * (9 / 16),
+    alignSelf: 'center', backgroundColor: '#000',
+  },
   heroEmpty: { width: '100%', alignItems: 'center', justifyContent: 'center' },
   videoBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
