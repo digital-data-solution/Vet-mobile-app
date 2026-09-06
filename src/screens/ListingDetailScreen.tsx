@@ -11,6 +11,7 @@ import {
   StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { WebView } from 'react-native-webview';
 import {
   getListing, buyListing, reportListing, markListingSold, renewListing,
   removeListing, listingShareUrl, Listing,
@@ -139,6 +140,33 @@ export default function ListingDetailScreen({ navigation, route }: Props) {
   return (
     <View style={{ flex: 1, backgroundColor: '#F3F4F6' }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
+        {/* Auto-generated video ad (paid-tier sellers) — shown above the
+            photo gallery on purpose, this is the marketing centerpiece a
+            buyer should see first, not a secondary extra. */}
+        {listing.generatedVideoStatus === 'ready' && listing.generatedVideoUrl && (
+          <View style={styles.videoWrap}>
+            {Platform.OS === 'web' ? (
+              // react-native-webview doesn't support web — same fallback
+              // used in PaystackWebView.tsx / HelpVideoPlayerScreen.tsx.
+              // @ts-ignore — <video> is a valid web DOM element
+              <video
+                src={listing.generatedVideoUrl}
+                controls
+                muted
+                playsInline
+                style={{ width: '100%', height: '100%', backgroundColor: '#000' } as any}
+              />
+            ) : (
+              <WebView
+                source={{ uri: listing.generatedVideoUrl }}
+                style={{ flex: 1, backgroundColor: '#000' }}
+                allowsFullscreenVideo
+                mediaPlaybackRequiresUserAction={Platform.OS === 'ios'}
+              />
+            )}
+          </View>
+        )}
+
         {/* Gallery */}
         {listing.images?.length ? (
           <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
@@ -284,6 +312,9 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6', padding: 24 },
   muted: { color: '#9CA3AF', fontSize: 13 },
   hero: { width: 380, maxWidth: 480, height: 300, backgroundColor: '#E5E7EB' },
+  // 9:16 — the generated video's real aspect ratio, capped so it doesn't
+  // dominate the whole screen on a tall phone.
+  videoWrap: { width: '100%', aspectRatio: 9 / 16, maxHeight: 480, backgroundColor: '#000' },
   heroEmpty: { width: '100%', alignItems: 'center', justifyContent: 'center' },
   videoBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,

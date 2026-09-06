@@ -27,6 +27,11 @@ export interface Listing {
   // External link only (YouTube/TikTok/Instagram/Vimeo) — never a hosted upload,
   // see models/Listing.js on the backend for why.
   videoUrl?: string | null;
+  // Auto-generated 15-25s vertical ad (paid-tier sellers only) — separate
+  // from the seller-supplied videoUrl above. 'none' unless the seller was
+  // on a paid tier at creation time; see mobile_backend's Listing.js.
+  generatedVideoStatus?: 'none' | 'pending' | 'processing' | 'ready' | 'failed';
+  generatedVideoUrl?: string | null;
   contactPhone?: string | null;
   contactWhatsapp?: string | null;
   address?: string | null;

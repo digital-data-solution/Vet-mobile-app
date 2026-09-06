@@ -43,6 +43,16 @@ export default function MyListingsScreen({ navigation }: Props) {
             </Text>
           </View>
           <Text style={styles.views}><Ionicons name="eye-outline" size={12} color="#9CA3AF" /> {item.views || 0}</Text>
+          {(item.generatedVideoStatus === 'pending' || item.generatedVideoStatus === 'processing') && (
+            <View style={[styles.badge, { backgroundColor: '#EFF6FF' }]}>
+              <Text style={[styles.badgeTxt, { color: '#2563EB' }]}>🎬 Video generating…</Text>
+            </View>
+          )}
+          {item.generatedVideoStatus === 'ready' && (
+            <View style={[styles.badge, { backgroundColor: '#ECFDF5' }]}>
+              <Text style={[styles.badgeTxt, { color: '#0F9D58' }]}>🎬 Video ready</Text>
+            </View>
+          )}
         </View>
       </View>
       <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
