@@ -105,11 +105,11 @@ const PROFESSIONAL_PLANS = [
     color:    '#64748B',
     bgColor:  '#F8FAFC',
     features: [
-      { text: 'Create full professional profile',     included: true  },
+      { text: 'Listed in search results after admin approval', included: true },
+      { text: 'Phone shown to users with access',     included: true  },
+      { text: 'Appear in GPS nearby searches',        included: true  },
       { text: 'Upload up to 3 gallery photos',        included: true  },
-      { text: 'Listed in search results',             included: false },
-      { text: 'Contact info visible to pet owners',   included: false },
-      { text: 'Appear in GPS nearby searches',        included: false },
+      { text: 'In-app messaging',                     included: false },
       { text: 'Featured badge on profile',            included: false },
     ],
   },
@@ -117,31 +117,31 @@ const PROFESSIONAL_PLANS = [
     id:       'basic',
     name:     'Basic',
     price:    1500,
-    tagline:  'Get listed and discovered',
+    tagline:  'In-app messaging and more photos',
     color:    '#059669',
     bgColor:  '#ECFDF5',
     features: [
-      { text: 'Listed in search results',             included: true  },
+      { text: 'Everything in Free',                   included: true  },
       { text: 'Upload up to 5 gallery photos',        included: true  },
-      { text: 'Profile visible to all users',         included: true  },
-      { text: 'Contact info visible to pet owners',   included: false },
-      { text: 'Appear in GPS nearby searches',        included: false },
+      { text: 'In-app messaging',                     included: true  },
+      { text: 'Use GPS nearby search',                included: true  },
       { text: 'Featured badge on profile',            included: false },
+      { text: 'Sorted to top of search results',      included: false },
     ],
   },
   {
     id:       'starter',
     name:     'Starter',
     price:    2500,
-    tagline:  'Full visibility + contact access',
+    tagline:  'Messaging and a fuller profile',
     color:    '#7C3AED',
     bgColor:  '#F5F3FF',
     badge:    'Most Popular',
     features: [
-      { text: 'Listed in search results',             included: true  },
+      { text: 'Everything in Free',                   included: true  },
       { text: 'Upload up to 10 gallery photos',       included: true  },
-      { text: 'Phone & email shown to Premium users', included: true  },
-      { text: 'Appear in GPS nearby searches',        included: true  },
+      { text: 'In-app messaging',                     included: true  },
+      { text: 'Use GPS nearby search',                included: true  },
       { text: 'Featured badge on profile',            included: false },
       { text: 'Sorted to top of search results',      included: false },
     ],
@@ -155,10 +155,10 @@ const PROFESSIONAL_PLANS = [
     bgColor:  '#FFFBEB',
     badge:    'Best Value',
     features: [
-      { text: 'Listed in search results',             included: true },
+      { text: 'Everything in Free',                   included: true },
       { text: 'Upload up to 30 gallery photos',       included: true },
-      { text: 'Phone & email shown to Premium users', included: true },
-      { text: 'Appear in GPS nearby searches',        included: true },
+      { text: 'In-app messaging',                     included: true },
+      { text: 'Use GPS nearby search',                included: true },
       { text: 'Featured badge on profile',            included: true },
       { text: 'Sorted to top of search results',      included: true },
     ],
@@ -393,7 +393,7 @@ export default function SubscriptionScreen({ navigation }: any) {
         </Text>
         <Text style={styles.headerSubtitle}>
           {userType === 'professional'
-            ? 'Choose a plan to get listed and reach thousands of pet owners'
+            ? 'Listing is free. Paid plans add in-app messaging and more photos.'
             : 'Choose a plan to unlock full access to verified professionals near you'}
         </Text>
       </View>
