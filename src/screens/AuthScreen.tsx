@@ -138,6 +138,37 @@ export default function AuthScreen({ navigation, route }: { navigation: any; rou
       });
 
       if (error) {
+        if (/email not confirmed/i.test(error.message)) {
+          const addr = email.trim().toLowerCase();
+          return showAlert(
+            'Email Not Confirmed',
+            'Please tap the link we emailed you. If it expired, we can send a new one.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Send New Link',
+                onPress: async () => {
+                  const { error: rErr } = await supabase.auth.resend({
+                    type: 'signup',
+                    email: addr,
+                    options: {
+                      emailRedirectTo: Platform.OS === 'web'
+                        ? 'https://xpressvetmarketplace.com/auth/callback'
+                        : 'xpressvet://auth/callback',
+                    },
+                  });
+                  showAlert(
+                    rErr ? 'Could Not Send' : 'Email Sent',
+                    rErr ? rErr.message : 'A new link is in your inbox (check Spam too). Please open it soon.',
+                  );
+                },
+              },
+            ],
+          );
+        }
+        if (/failed to fetch|network/i.test(error.message)) {
+          return showAlert('Connection Problem', 'Could not reach our server. Check your internet, or open xpressvetmarketplace.com in Chrome, then try again.');
+        }
         return showAlert('Sign In Failed', error.message);
       }
 

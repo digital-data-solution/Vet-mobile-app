@@ -106,6 +106,8 @@ export default function RegisterScreen({ navigation, route }: Props & { route?: 
             'An account with this email already exists. Please sign in instead.',
             [{ text: 'Sign In', onPress: () => navigation.navigate('Auth') }],
           );
+        } else if (/failed to fetch|network/i.test(error.message)) {
+          showAlert('Connection Problem', 'Could not reach our server. Check your internet, or open xpressvetmarketplace.com in Chrome, then try again.');
         } else {
           showAlert('Registration Failed', error.message);
         }

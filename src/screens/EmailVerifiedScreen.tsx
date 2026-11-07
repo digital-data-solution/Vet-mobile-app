@@ -12,7 +12,15 @@ import {
 import { supabase } from '../api/supabase';
 import { useAuth } from '../navigation';
 
-type Stage = 'loading' | 'verified' | 'reset_form' | 'reset_success' | 'error';
+type Stage = 'loading' | 'verified' | 'verified_signin' | 'reset_form' | 'reset_success' | 'expired' | 'error';
+
+const EMAIL_VERIFY_REDIRECT = Platform.OS === 'web'
+  ? 'https://xpressvetmarketplace.com/auth/callback'
+  : 'xpressvet://auth/callback';
+
+function isNetworkError(msg: string): boolean {
+  return /failed to fetch|network|load failed|timeout/i.test(msg);
+}
 
 export default function EmailVerifiedScreen({ navigation }: any) {
   const [stage,     setStage]     = useState<Stage>('loading');
@@ -20,6 +28,8 @@ export default function EmailVerifiedScreen({ navigation }: any) {
   const [newPw,     setNewPw]     = useState('');
   const [confirmPw, setConfirmPw] = useState('');
   const [saving,    setSaving]    = useState(false);
+  const [resendEmail, setResendEmail] = useState('');
+  const [resendNote,  setResendNote]  = useState('');
 
   const { isAuthenticated } = useAuth();
 
@@ -76,8 +86,12 @@ export default function EmailVerifiedScreen({ navigation }: any) {
         const accessToken  = query.get('access_token')  || hashParams?.get('access_token')  || null;
         const refreshToken = query.get('refresh_token') || hashParams?.get('refresh_token') || null;
         const type         = query.get('type') || hashParams?.get('type') || null;
+        // Supabase sends expired / already-used links back here as
+        // #error=access_denied&error_code=otp_expired&error_description=...
+        const linkErrorCode = query.get('error_code') || hashParams?.get('error_code')
+          || query.get('error') || hashParams?.get('error') || null;
 
-        const isAuthCallback = parsed.pathname.includes('auth/callback') || !!code || !!accessToken || !!type;
+        const isAuthCallback = parsed.pathname.includes('auth/callback') || !!code || !!accessToken || !!type || !!linkErrorCode;
 
         if (!isAuthCallback) {
           // Not opened via an auth deep link — redirect to the correct landing screen.
@@ -92,6 +106,13 @@ export default function EmailVerifiedScreen({ navigation }: any) {
           window.history.replaceState({}, '', parsed.pathname);
         }
 
+        if (linkErrorCode && !code && !accessToken) {
+          // Link expired or was already used (most often: opened hours later).
+          // Let the person request a fresh link right here.
+          setStage('expired');
+          return;
+        }
+
         let exchangeError: string | null = null;
 
         if (code) {
@@ -102,6 +123,13 @@ export default function EmailVerifiedScreen({ navigation }: any) {
           if (setErr) exchangeError = setErr.message;
         } else {
           exchangeError = 'This link is missing or has invalid parameters. Please request a new one.';
+        }
+
+        if (exchangeError && accessToken && isNetworkError(exchangeError)) {
+          // Supabase only issues tokens after the email is confirmed, so the
+          // account IS verified; only the follow-up network call failed.
+          setStage('verified_signin');
+          return;
         }
 
         if (exchangeError) {
@@ -140,6 +168,32 @@ export default function EmailVerifiedScreen({ navigation }: any) {
     }
   };
 
+  const handleResend = async () => {
+    const e = resendEmail.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) {
+      setResendNote('Please enter the email you signed up with.');
+      return;
+    }
+    setSaving(true);
+    setResendNote('');
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: e,
+        options: { emailRedirectTo: EMAIL_VERIFY_REDIRECT },
+      });
+      if (error) {
+        setResendNote(isNetworkError(error.message) ? 'Could not reach our server. Check your internet, or open xpressvetmarketplace.com in Chrome, then try again.' : error.message);
+      } else {
+        setResendNote('Done! A new link is in your inbox (check Spam too). Please open it soon.');
+      }
+    } catch {
+      setResendNote('Could not reach our server. Check your internet, or open xpressvetmarketplace.com in Chrome, then try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const pwTooShort   = newPw.length > 0 && newPw.length < 6;
   const pwMismatch   = confirmPw.length > 0 && newPw !== confirmPw;
   const canSubmit    = newPw.length >= 6 && newPw === confirmPw;
@@ -161,6 +215,56 @@ export default function EmailVerifiedScreen({ navigation }: any) {
           <Text style={styles.message}>
             Welcome to Xpress Vet Marketplace. Redirecting you now...
           </Text>
+        </>
+      )}
+
+      {stage === 'verified_signin' && (
+        <>
+          <Text style={styles.icon}>✅</Text>
+          <Text style={styles.title}>Email Verified!</Text>
+          <Text style={styles.message}>
+            Your account is confirmed. Please sign in with your email and password.
+          </Text>
+          <Pressable
+            style={({ pressed }) => [styles.button, { opacity: pressed ? 0.8 : 1 }]}
+            onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Auth' }] })}
+          >
+            <Text style={styles.buttonText}>Go to Sign In</Text>
+          </Pressable>
+        </>
+      )}
+
+      {stage === 'expired' && (
+        <>
+          <Text style={styles.icon}>⏰</Text>
+          <Text style={styles.title}>This link has expired</Text>
+          <Text style={styles.message}>
+            Email links work for a limited time and only once. If you already
+            confirmed, just sign in. Otherwise, enter your email to get a new link.
+          </Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Email you signed up with"
+            placeholderTextColor="#9CA3AF"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            value={resendEmail}
+            onChangeText={setResendEmail}
+          />
+          {!!resendNote && <Text style={styles.message}>{resendNote}</Text>}
+          <Pressable
+            style={({ pressed }) => [styles.button, saving && styles.buttonDisabled, { opacity: pressed ? 0.8 : 1 }]}
+            onPress={handleResend}
+            disabled={saving}
+          >
+            <Text style={styles.buttonText}>{saving ? 'Sending...' : 'Send New Link'}</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.secondaryButton, { opacity: pressed ? 0.8 : 1 }]}
+            onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Auth' }] })}
+          >
+            <Text style={styles.secondaryText}>I already confirmed: Sign In</Text>
+          </Pressable>
         </>
       )}
 
@@ -276,5 +380,7 @@ const styles = StyleSheet.create({
     alignItems:        'center',
   },
   buttonDisabled: { backgroundColor: '#D1D5DB' },
+  secondaryButton: { marginTop: 14, paddingVertical: 10, alignSelf: 'stretch', alignItems: 'center' },
+  secondaryText:   { color: '#E8610A', fontWeight: '600', fontSize: 14 },
   buttonText:     { color: '#fff', fontWeight: 'bold', fontSize: 15 },
 });
